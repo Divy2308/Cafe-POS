@@ -1,99 +1,254 @@
 {% extends "base.html" %}
-{% block title %}Login — POS Cafe{% endblock %}
+{% block title %}Secure Access — POS Cafe{% endblock %}
+{% block extra_head %}
+<style>
+  .auth-shell {
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at top left, rgba(249,115,22,0.18), transparent 28%),
+      radial-gradient(circle at 85% 15%, rgba(255,255,255,0.06), transparent 24%),
+      linear-gradient(180deg, #090909 0%, #0d0d0d 100%);
+  }
+  .auth-panel {
+    position: relative;
+    overflow: hidden;
+  }
+  .auth-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(135deg, rgba(249,115,22,0.08), transparent 38%),
+      radial-gradient(circle at 25% 20%, rgba(255,255,255,0.04), transparent 20%);
+    pointer-events: none;
+  }
+  .password-wrap {
+    position: relative;
+  }
+  .password-wrap input {
+    padding-right: 5rem;
+  }
+  .password-toggle {
+    position: absolute;
+    right: 0.7rem;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    color: #d1d5db;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    transition: all .2s ease;
+  }
+  .password-toggle:hover { background: rgba(255,255,255,0.08); }
+  .policy-row {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    font-size: .78rem;
+    color: #9ca3af;
+  }
+  .policy-row.ok { color: #86efac; }
+  .policy-dot {
+    width: .55rem;
+    height: .55rem;
+    border-radius: 999px;
+    background: #374151;
+    flex: 0 0 auto;
+  }
+  .policy-row.ok .policy-dot { background: #22c55e; }
+  .meter-track {
+    height: .45rem;
+    background: rgba(255,255,255,0.08);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .meter-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    transition: width .25s ease, background-color .25s ease;
+  }
+  .hero-card {
+    background: linear-gradient(180deg, rgba(26,26,26,.96), rgba(17,17,17,.96));
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 25px 80px rgba(0,0,0,.35);
+  }
+</style>
+{% endblock %}
 {% block body %}
-<div class="min-h-screen flex items-center justify-center p-4" style="background:radial-gradient(ellipse at 60% 20%,rgba(249,115,22,0.08) 0%,transparent 60%),#0a0a0a">
-  <div class="w-full max-w-md">
-    <div class="text-center mb-10">
-      <div class="inline-flex items-center justify-center w-16 h-16 brand-gradient rounded-2xl mb-4 shadow-lg shadow-orange-900/40">
-        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-      </div>
-      <h1 class="font-display text-3xl font-800 tracking-tight text-white">POS Cafe</h1>
-      <p class="text-gray-500 text-sm mt-1">Restaurant Management System</p>
-    </div>
-
-    <div class="card p-1 mb-6 flex" style="border-radius:14px">
-      <button onclick="switchTab('login')" id="tab-login" class="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-white" style="background:rgba(249,115,22,0.15);color:#f97316">Login</button>
-      <button onclick="switchTab('signup')" id="tab-signup" class="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-gray-500">Sign Up</button>
-      <button onclick="switchTab('reset')" id="tab-reset" class="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-gray-500">Forgot Password</button>
-    </div>
-
-    <div id="form-login" class="card p-8" style="border-radius:16px">
-      <h2 class="font-display text-xl font-600 mb-6">Welcome back</h2>
-      <div class="space-y-4">
+<div class="auth-shell">
+  <div class="min-h-screen grid lg:grid-cols-[1.05fr_.95fr]">
+    <section class="hidden lg:flex items-stretch p-8">
+      <div class="hero-card w-full rounded-[28px] p-10 flex flex-col justify-between">
         <div>
-          <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Email</label>
-          <input type="email" id="login-email" placeholder="you@cafe.com">
-        </div>
-        <div>
-          <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Password</label>
-          <input type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
-        </div>
-        <button onclick="doLogin()" class="btn-primary w-full py-3 rounded-xl text-white font-medium mt-2">
-          Open Session →
-        </button>
-      </div>
-      <p class="text-center text-gray-600 text-xs mt-6">Demo: admin@cafe.com / password</p>
-    </div>
-
-    <div id="form-signup" class="card p-8 hidden" style="border-radius:16px">
-      <h2 class="font-display text-xl font-600 mb-6">Create account</h2>
-      <div class="space-y-4">
-        <div>
-          <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Full Name</label>
-          <input type="text" id="signup-name" placeholder="Your Name">
-        </div>
-        <div>
-          <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Email</label>
-          <input type="email" id="signup-email" placeholder="you@cafe.com">
-        </div>
-        <div>
-          <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Password</label>
-          <input type="password" id="signup-password" placeholder="••••••••">
-        </div>
-        <div>
-          <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Account Type</label>
-          <select id="signup-role">
-            <option value="user">User</option>
-            <option value="restaurant">Restaurant / Admin</option>
-          </select>
-        </div>
-        <button onclick="doSignup()" class="btn-primary w-full py-3 rounded-xl text-white font-medium mt-2">
-          Create Account →
-        </button>
-      </div>
-    </div>
-
-    <div id="form-reset" class="card p-8 hidden" style="border-radius:16px">
-      <h2 class="font-display text-xl font-600 mb-2">Reset password</h2>
-      <p class="text-sm text-gray-500 mb-6">Enter your email, then use the code sent to you to set a new password.</p>
-      <div class="space-y-4">
-        <div>
-          <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Email</label>
-          <input type="email" id="reset-email" placeholder="you@cafe.com" oninput="syncResetEmail()">
-        </div>
-        <div class="flex gap-3">
-          <button onclick="requestResetOtp()" class="btn-primary flex-1 py-3 rounded-xl text-white font-medium">Send OTP</button>
-          <button onclick="switchTab('login')" class="btn-ghost px-4 py-3 rounded-xl text-sm">Back</button>
-        </div>
-        <div id="reset-step-2" class="hidden pt-2 space-y-4 border-t border-border">
-          <div>
-            <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">OTP Code</label>
-            <input type="text" id="reset-otp" placeholder="123456" maxlength="6">
+          <div class="inline-flex items-center gap-3 rounded-full border border-white/10 px-4 py-2 text-xs text-gray-300 mb-10" style="background:rgba(255,255,255,0.03)">
+            <span class="w-2.5 h-2.5 rounded-full bg-green-400"></span>
+            Secure staff access
           </div>
-          <div>
-            <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">New Password</label>
-            <input type="password" id="reset-password" placeholder="New password">
+          <h1 class="font-display text-5xl font-800 tracking-tight leading-tight max-w-lg">
+            Protect the register with stronger passwords and cleaner access control.
+          </h1>
+          <p class="text-gray-400 mt-5 max-w-xl text-base leading-7">
+            Login, reset, and account creation now push users toward high-entropy passwords and safer recovery behavior.
+          </p>
+        </div>
+        <div class="grid md:grid-cols-3 gap-4 mt-12">
+          <div class="card p-4 rounded-2xl" style="background:rgba(255,255,255,0.03)">
+            <div class="text-brand-500 text-sm uppercase tracking-wider mb-2">Policy</div>
+            <div class="text-sm text-gray-300 leading-6">12+ chars, mixed case, number, symbol, and no obvious weak passwords.</div>
           </div>
-          <div>
-            <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Confirm New Password</label>
-            <input type="password" id="reset-confirm-password" placeholder="Confirm new password">
+          <div class="card p-4 rounded-2xl" style="background:rgba(255,255,255,0.03)">
+            <div class="text-brand-500 text-sm uppercase tracking-wider mb-2">Recovery</div>
+            <div class="text-sm text-gray-300 leading-6">Password resets are gated by OTP and the same password policy.</div>
           </div>
-          <button onclick="completeReset()" class="btn-primary w-full py-3 rounded-xl text-white font-medium mt-2">
-            Update Password →
-          </button>
+          <div class="card p-4 rounded-2xl" style="background:rgba(255,255,255,0.03)">
+            <div class="text-brand-500 text-sm uppercase tracking-wider mb-2">Access</div>
+            <div class="text-sm text-gray-300 leading-6">Role-based routing keeps admin, POS, and staff views separated.</div>
+          </div>
         </div>
       </div>
-    </div>
+    </section>
+
+    <section class="auth-panel flex items-center justify-center p-4 sm:p-8">
+      <div class="relative z-10 w-full max-w-lg">
+        <div class="lg:hidden text-center mb-8">
+          <div class="inline-flex items-center justify-center w-16 h-16 brand-gradient rounded-2xl mb-4 shadow-lg shadow-orange-900/40">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c1.657 0 3-1.567 3-3.5S13.657 4 12 4 9 5.567 9 7.5 10.343 11 12 11zm0 0c-3.314 0-6 2.686-6 6v1h12v-1c0-3.314-2.686-6-6-6z"/></svg>
+          </div>
+          <h1 class="font-display text-3xl font-800 tracking-tight text-white">POS Cafe</h1>
+          <p class="text-gray-500 text-sm mt-1">Secure restaurant access</p>
+        </div>
+
+        <div class="card p-1 mb-5 flex rounded-2xl">
+          <button onclick="switchTab('login')" id="tab-login" class="flex-1 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 text-white" style="background:rgba(249,115,22,0.16);color:#f97316">Login</button>
+          <button onclick="switchTab('signup')" id="tab-signup" class="flex-1 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 text-gray-500">Sign Up</button>
+          <button onclick="switchTab('reset')" id="tab-reset" class="flex-1 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 text-gray-500">Reset</button>
+        </div>
+
+        <div class="hero-card rounded-[28px] p-6 sm:p-8">
+          <div id="form-login">
+            <div class="mb-7">
+              <p class="text-xs uppercase tracking-[0.3em] text-gray-500 mb-3">Staff Login</p>
+              <h2 class="font-display text-2xl font-700">Welcome back</h2>
+              <p class="text-sm text-gray-400 mt-2">Use your assigned staff credentials to open a register session.</p>
+            </div>
+            <div class="space-y-4">
+              <div>
+                <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Email</label>
+                <input type="email" id="login-email" placeholder="you@cafe.com" autocomplete="username">
+              </div>
+              <div class="password-wrap">
+                <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Password</label>
+                <input type="password" id="login-password" placeholder="••••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+                <button type="button" class="password-toggle" onclick="togglePassword('login-password', this)">Show</button>
+              </div>
+              <button onclick="doLogin()" class="btn-primary w-full py-3 rounded-xl text-white font-medium mt-2">
+                Open Session →
+              </button>
+            </div>
+            <div class="mt-6 rounded-2xl border border-white/8 bg-white/3 p-4">
+              <div class="text-xs uppercase tracking-wider text-gray-500 mb-2">Security note</div>
+              <p class="text-sm text-gray-400 leading-6">Passwords are stored hashed. New passwords must be strong, and reset requests require OTP verification.</p>
+            </div>
+          </div>
+
+          <div id="form-signup" class="hidden">
+            <div class="mb-7">
+              <p class="text-xs uppercase tracking-[0.3em] text-gray-500 mb-3">Create Account</p>
+              <h2 class="font-display text-2xl font-700">Set up a staff login</h2>
+              <p class="text-sm text-gray-400 mt-2">Choose a unique password. Weak passwords are rejected server-side too.</p>
+            </div>
+            <div class="space-y-4">
+              <div>
+                <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Full Name</label>
+                <input type="text" id="signup-name" placeholder="Your Name" autocomplete="name">
+              </div>
+              <div>
+                <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Email</label>
+                <input type="email" id="signup-email" placeholder="you@cafe.com" autocomplete="email" oninput="renderPasswordPolicy('signup')">
+              </div>
+              <div class="password-wrap">
+                <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Password</label>
+                <input type="password" id="signup-password" placeholder="Create a strong password" minlength="12" autocomplete="new-password" oninput="renderPasswordPolicy('signup')">
+                <button type="button" class="password-toggle" onclick="togglePassword('signup-password', this)">Show</button>
+              </div>
+              <div class="space-y-2">
+                <div class="flex items-center justify-between text-xs text-gray-500">
+                  <span>Password strength</span>
+                  <span id="signup-meter-label" class="text-gray-400">Too short</span>
+                </div>
+                <div class="meter-track">
+                  <div id="signup-meter-fill" class="meter-fill"></div>
+                </div>
+              </div>
+              <div class="grid sm:grid-cols-2 gap-2" id="signup-rules"></div>
+              <div>
+                <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Account Type</label>
+                <select id="signup-role">
+                  <option value="user">Staff</option>
+                  <option value="restaurant">Restaurant / Admin</option>
+                </select>
+              </div>
+              <button onclick="doSignup()" class="btn-primary w-full py-3 rounded-xl text-white font-medium mt-2">
+                Create Account →
+              </button>
+            </div>
+          </div>
+
+          <div id="form-reset" class="hidden">
+            <div class="mb-7">
+              <p class="text-xs uppercase tracking-[0.3em] text-gray-500 mb-3">Password Recovery</p>
+              <h2 class="font-display text-2xl font-700">Reset access securely</h2>
+              <p class="text-sm text-gray-400 mt-2">OTP verification is required before a new password can be saved.</p>
+            </div>
+            <div class="space-y-4">
+              <div>
+                <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Email</label>
+                <input type="email" id="reset-email" placeholder="you@cafe.com" autocomplete="email" oninput="syncResetEmail(); renderPasswordPolicy('reset')">
+              </div>
+              <div class="flex gap-3">
+                <button onclick="requestResetOtp()" class="btn-primary flex-1 py-3 rounded-xl text-white font-medium">Send OTP</button>
+                <button onclick="switchTab('login')" class="btn-ghost px-4 py-3 rounded-xl text-sm">Back</button>
+              </div>
+              <div id="reset-step-2" class="hidden pt-4 space-y-4 border-t border-border">
+                <div>
+                  <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">OTP Code</label>
+                  <input type="text" id="reset-otp" placeholder="123456" maxlength="6" inputmode="numeric">
+                </div>
+                <div class="password-wrap">
+                  <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">New Password</label>
+                  <input type="password" id="reset-password" placeholder="Create a strong password" minlength="12" autocomplete="new-password" oninput="renderPasswordPolicy('reset')">
+                  <button type="button" class="password-toggle" onclick="togglePassword('reset-password', this)">Show</button>
+                </div>
+                <div class="space-y-2">
+                  <div class="flex items-center justify-between text-xs text-gray-500">
+                    <span>Password strength</span>
+                    <span id="reset-meter-label" class="text-gray-400">Too short</span>
+                  </div>
+                  <div class="meter-track">
+                    <div id="reset-meter-fill" class="meter-fill"></div>
+                  </div>
+                </div>
+                <div class="grid sm:grid-cols-2 gap-2" id="reset-rules"></div>
+                <div>
+                  <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Confirm New Password</label>
+                  <input type="password" id="reset-confirm-password" placeholder="Confirm new password" autocomplete="new-password">
+                </div>
+                <button onclick="completeReset()" class="btn-primary w-full py-3 rounded-xl text-white font-medium mt-2">
+                  Update Password →
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p class="text-center text-xs text-gray-600 mt-5">
+          Access is restricted to authorized staff accounts.
+        </p>
+      </div>
+    </section>
   </div>
 </div>
 {% endblock %}
@@ -102,16 +257,71 @@
 let resetEmailValue = '';
 
 function switchTab(tab) {
-  document.getElementById('form-login').classList.toggle('hidden', tab!=='login');
-  document.getElementById('form-signup').classList.toggle('hidden', tab!=='signup');
-  document.getElementById('form-reset').classList.toggle('hidden', tab!=='reset');
-  document.getElementById('tab-login').style.cssText = tab==='login' ? 'background:rgba(249,115,22,0.15);color:#f97316' : 'color:#6b7280';
-  document.getElementById('tab-signup').style.cssText = tab==='signup' ? 'background:rgba(249,115,22,0.15);color:#f97316' : 'color:#6b7280';
-  document.getElementById('tab-reset').style.cssText = tab==='reset' ? 'background:rgba(249,115,22,0.15);color:#f97316' : 'color:#6b7280';
+  document.getElementById('form-login').classList.toggle('hidden', tab !== 'login');
+  document.getElementById('form-signup').classList.toggle('hidden', tab !== 'signup');
+  document.getElementById('form-reset').classList.toggle('hidden', tab !== 'reset');
+  document.getElementById('tab-login').style.cssText = tab === 'login' ? 'background:rgba(249,115,22,0.16);color:#f97316' : 'color:#6b7280';
+  document.getElementById('tab-signup').style.cssText = tab === 'signup' ? 'background:rgba(249,115,22,0.16);color:#f97316' : 'color:#6b7280';
+  document.getElementById('tab-reset').style.cssText = tab === 'reset' ? 'background:rgba(249,115,22,0.16);color:#f97316' : 'color:#6b7280';
+  if (tab === 'signup' || tab === 'reset') renderPasswordPolicy(tab);
 }
 
 function syncResetEmail() {
   resetEmailValue = document.getElementById('reset-email').value.trim();
+}
+
+function togglePassword(inputId, button) {
+  const input = document.getElementById(inputId);
+  const isPassword = input.type === 'password';
+  input.type = isPassword ? 'text' : 'password';
+  button.textContent = isPassword ? 'Hide' : 'Show';
+}
+
+function getPasswordChecks(password, email = '') {
+  const localPart = (email || '').toLowerCase().split('@')[0] || '';
+  const lower = (password || '').toLowerCase();
+  return [
+    { key: 'len', label: '12+ characters', ok: password.length >= 12 },
+    { key: 'lower', label: 'Lowercase letter', ok: /[a-z]/.test(password) },
+    { key: 'upper', label: 'Uppercase letter', ok: /[A-Z]/.test(password) },
+    { key: 'digit', label: 'Number', ok: /\d/.test(password) },
+    { key: 'symbol', label: 'Symbol', ok: /[^A-Za-z0-9]/.test(password) },
+    { key: 'space', label: 'No spaces', ok: !/\s/.test(password) },
+    { key: 'email', label: 'Not your email name', ok: !localPart || !lower.includes(localPart) }
+  ];
+}
+
+function renderPasswordPolicy(prefix) {
+  const passwordInput = document.getElementById(prefix + '-password');
+  if (!passwordInput) return;
+  const emailInput = document.getElementById(prefix + '-email');
+  const password = passwordInput.value || '';
+  const email = emailInput ? emailInput.value.trim() : '';
+  const checks = getPasswordChecks(password, email);
+  const passed = checks.filter(item => item.ok).length;
+  const fill = document.getElementById(prefix + '-meter-fill');
+  const label = document.getElementById(prefix + '-meter-label');
+  const rules = document.getElementById(prefix + '-rules');
+
+  if (fill) {
+    const pct = Math.round((passed / checks.length) * 100);
+    fill.style.width = pct + '%';
+    fill.style.background = passed <= 2 ? '#ef4444' : passed <= 4 ? '#f97316' : '#22c55e';
+  }
+
+  if (label) {
+    label.textContent = passed <= 2 ? 'Weak' : passed <= 4 ? 'Fair' : 'Strong';
+    label.className = passed <= 2 ? 'text-red-400' : passed <= 4 ? 'text-orange-400' : 'text-green-400';
+  }
+
+  if (rules) {
+    rules.innerHTML = checks.map(item => `
+      <div class="policy-row ${item.ok ? 'ok' : ''}">
+        <span class="policy-dot"></span>
+        <span>${item.label}</span>
+      </div>
+    `).join('');
+  }
 }
 
 async function requestResetOtp() {
@@ -134,25 +344,37 @@ async function completeReset() {
   toast('Password updated successfully');
   setTimeout(() => location.href = '/auth', 600);
 }
+
 async function doLogin() {
-  const email = document.getElementById('login-email').value;
+  const email = document.getElementById('login-email').value.trim();
   const password = document.getElementById('login-password').value;
   if (!email || !password) return toast('Fill all fields', 'error');
-  const r = await api('/api/login','POST',{email,password});
-  if (r.error) return toast(r.error,'error');
-  toast('Welcome back, '+r.name+'!');
-  setTimeout(()=>location.href=r.role === 'restaurant' ? '/backend' : '/pos',600);
+  const r = await api('/api/login', 'POST', { email, password });
+  if (r.error) return toast(r.error, 'error');
+  toast('Welcome back, ' + r.name + '!');
+  setTimeout(() => location.href = r.role === 'restaurant' ? '/backend' : '/pos', 600);
 }
+
 async function doSignup() {
-  const name = document.getElementById('signup-name').value;
-  const email = document.getElementById('signup-email').value;
+  const name = document.getElementById('signup-name').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
   const password = document.getElementById('signup-password').value;
   const role = document.getElementById('signup-role').value;
-  if (!name||!email||!password) return toast('Fill all fields','error');
-  const r = await api('/api/signup','POST',{name,email,password,role});
-  if (r.error) return toast(r.error,'error');
+  if (!name || !email || !password) return toast('Fill all fields', 'error');
+  const checks = getPasswordChecks(password, email);
+  if (checks.some(item => !item.ok)) {
+    return toast('Use a stronger password first', 'error');
+  }
+  const r = await api('/api/signup', 'POST', { name, email, password, role });
+  if (r.error) return toast(r.error, 'error');
   toast('Account created!');
-  setTimeout(()=>location.href=r.role === 'restaurant' ? '/backend' : '/pos',600);
+  setTimeout(() => location.href = r.role === 'restaurant' ? '/backend' : '/pos', 600);
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+  switchTab('login');
+  renderPasswordPolicy('signup');
+  renderPasswordPolicy('reset');
+});
 </script>
 {% endblock %}

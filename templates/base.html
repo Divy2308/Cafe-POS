@@ -56,7 +56,12 @@ async function api(url, method='GET', data=null) {
   const opts = { method, headers:{'Content-Type':'application/json'} };
   if (data) opts.body = JSON.stringify(data);
   const r = await fetch(url, opts);
-  return r.json();
+  const payload = await r.json().catch(()=>({}));
+  if (r.status === 401 && window.location.pathname !== '/auth') {
+    window.location.href = '/auth';
+    return { error: 'unauthorized' };
+  }
+  return payload;
 }
 </script>
 {% block scripts %}{% endblock %}

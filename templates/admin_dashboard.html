@@ -1,0 +1,414 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - POS Cafe{% endblock %}
+
+{% block body %}
+<div class="flex h-screen bg-[#0a0a0a]">
+    <!-- Sidebar -->
+    <div class="w-64 bg-[#1a1a1a] border-r border-[#2a2a2a] overflow-y-auto">
+        <div class="p-6 border-b border-[#2a2a2a]">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-[#f97316] to-[#ea580c] rounded-lg flex items-center justify-center">
+                    <span class="text-white font-bold">☕</span>
+                </div>
+                <div>
+                    <div class="font-bold text-white">POS Cafe</div>
+                    <div class="text-xs text-gray-400">Admin Panel</div>
+                </div>
+            </div>
+        </div>
+
+        <nav class="p-4 space-y-2">
+            <button onclick="switchTab('overview')" class="nav-link w-full text-left px-4 py-3 rounded-lg transition-all flex items-center space-x-3 active">
+                <span class="text-xl">📊</span>
+                <span>Dashboard</span>
+            </button>
+            <button onclick="switchTab('users')" class="nav-link w-full text-left px-4 py-3 rounded-lg transition-all flex items-center space-x-3">
+                <span class="text-xl">👥</span>
+                <span>Staff Management</span>
+            </button>
+            <button onclick="switchTab('settings')" class="nav-link w-full text-left px-4 py-3 rounded-lg transition-all flex items-center space-x-3">
+                <span class="text-xl">⚙️</span>
+                <span>Settings</span>
+            </button>
+        </nav>
+
+        <div class="p-4 border-t border-[#2a2a2a] mt-auto">
+            <div class="bg-[#0f0f0f] rounded-lg p-4 mb-4 text-center">
+                <div class="text-2xl font-bold text-[#f97316] mb-2">Welcome</div>
+                <div class="text-sm text-gray-300 mb-4">{{ user_name }}</div>
+                <button onclick="logout()" class="w-full bg-[#f97316] hover:bg-[#ea580c] text-white rounded-lg py-2 text-sm font-semibold transition">
+                    Logout
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 overflow-auto">
+        <!-- Top Bar -->
+        <div class="border-b border-[#2a2a2a] p-6 flex justify-between items-center">
+            <h1 class="text-3xl font-bold" id="pageTitle">Dashboard</h1>
+            <div class="flex items-center space-x-4">
+                <button onclick="goToPOS()" class="bg-[#f97316] hover:bg-[#ea580c] text-white px-4 py-2 rounded-lg font-semibold transition">
+                    Go to POS
+                </button>
+            </div>
+        </div>
+
+        <!-- Content Area -->
+        <div class="p-6">
+            <!-- Dashboard Tab -->
+            <div id="overview-tab" class="tab-content">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                    <div class="card">
+                        <div class="text-gray-400 text-sm mb-2">Total Staff</div>
+                        <div class="text-3xl font-bold" id="totalStaff">0</div>
+                        <div class="text-gray-500 text-xs mt-2">Active users</div>
+                    </div>
+                    <div class="card">
+                        <div class="text-gray-400 text-sm mb-2">Active Sessions</div>
+                        <div class="text-3xl font-bold" id="activeSessions">0</div>
+                        <div class="text-gray-500 text-xs mt-2">Open today</div>
+                    </div>
+                    <div class="card">
+                        <div class="text-gray-400 text-sm mb-2">Total Products</div>
+                        <div class="text-3xl font-bold" id="totalProducts">0</div>
+                        <div class="text-gray-500 text-xs mt-2">In menu</div>
+                    </div>
+                    <div class="card">
+                        <div class="text-gray-400 text-sm mb-2">System Status</div>
+                        <div class="text-3xl font-bold text-green-500">✓</div>
+                        <div class="text-gray-500 text-xs mt-2">Running healthy</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 card p-6">
+                        <h2 class="text-xl font-bold mb-4">Recent Activity</h2>
+                        <div class="space-y-3" id="activityList">
+                            <div class="text-gray-400 text-sm">System initialized and ready</div>
+                        </div>
+                    </div>
+                    <div class="card p-6">
+                        <h2 class="text-xl font-bold mb-4">Quick Stats</h2>
+                        <div class="space-y-3">
+                            <div>
+                                <div class="text-sm text-gray-400">Database</div>
+                                <div class="text-lg font-bold">Connected</div>
+                            </div>
+                            <div>
+                                <div class="text-sm text-gray-400">API Status</div>
+                                <div class="text-lg font-bold text-green-500">200 OK</div>
+                            </div>
+                            <div>
+                                <div class="text-sm text-gray-400">Last Backup</div>
+                                <div class="text-lg font-bold">Today</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Staff Management Tab -->
+            <div id="users-tab" class="tab-content hidden">
+                <div class="mb-6 flex justify-between items-center">
+                    <h2 class="text-2xl font-bold">Staff Management</h2>
+                    <button onclick="openAddUserModal()" class="bg-[#f97316] hover:bg-[#ea580c] text-white px-4 py-2 rounded-lg font-semibold transition">
+                        + Add Staff
+                    </button>
+                </div>
+
+                <div class="card p-6">
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b border-[#2a2a2a]">
+                                    <th class="text-left py-3 px-4 text-gray-400 font-semibold">Name</th>
+                                    <th class="text-left py-3 px-4 text-gray-400 font-semibold">Email</th>
+                                    <th class="text-left py-3 px-4 text-gray-400 font-semibold">Role</th>
+                                    <th class="text-left py-3 px-4 text-gray-400 font-semibold">Joined</th>
+                                    <th class="text-left py-3 px-4 text-gray-400 font-semibold">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="staffTable">
+                                <tr class="border-b border-[#2a2a2a]">
+                                    <td colspan="5" class="py-8 text-center text-gray-400">Loading staff...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="settings-tab" class="tab-content hidden">
+                <h2 class="text-2xl font-bold mb-6">System Settings</h2>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Cafe Settings -->
+                    <div class="lg:col-span-2">
+                        <div class="card p-6 mb-6">
+                            <h3 class="text-xl font-bold mb-4">Cafe Information</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-2">Cafe Name</label>
+                                    <input type="text" id="cafeName" placeholder="Enter cafe name" class="w-full bg-[#1a1a1a] border border-[#2a2a2a] text-white px-4 py-2 rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-2">Phone Number</label>
+                                    <input type="tel" id="cafePhone" placeholder="+91-XXXX-XXX-XXX" class="w-full bg-[#1a1a1a] border border-[#2a2a2a] text-white px-4 py-2 rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-2">Email</label>
+                                    <input type="email" id="cafeEmail" placeholder="contact@cafe.com" class="w-full bg-[#1a1a1a] border border-[#2a2a2a] text-white px-4 py-2 rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-2">Address</label>
+                                    <textarea id="cafeAddress" placeholder="Enter full address" rows="3" class="w-full bg-[#1a1a1a] border border-[#2a2a2a] text-white px-4 py-2 rounded-lg"></textarea>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-2">Operating Hours</label>
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <input type="time" id="openTime" class="bg-[#1a1a1a] border border-[#2a2a2a] text-white px-4 py-2 rounded-lg">
+                                        <input type="time" id="closeTime" class="bg-[#1a1a1a] border border-[#2a2a2a] text-white px-4 py-2 rounded-lg">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card p-6">
+                            <h3 class="text-xl font-bold mb-4">Tax Settings</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-2">Default Tax Rate (%)</label>
+                                    <input type="number" id="taxRate" placeholder="5" min="0" max="100" class="w-full bg-[#1a1a1a] border border-[#2a2a2a] text-white px-4 py-2 rounded-lg">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="card p-6">
+                        <h3 class="text-xl font-bold mb-4">Actions</h3>
+                        <div class="space-y-3">
+                            <button onclick="saveCafeSettings()" class="w-full bg-[#f97316] hover:bg-[#ea580c] text-white py-2 rounded-lg font-semibold transition">
+                                Save Changes
+                            </button>
+                            <button onclick="resetSettings()" class="w-full bg-[#1a1a1a] hover:bg-[#2a2a2a] text-white py-2 rounded-lg font-semibold transition border border-[#2a2a2a]">
+                                Reset
+                            </button>
+                            <div class="border border-[#2a2a2a] rounded-lg p-4 mt-6">
+                                <div class="text-sm text-gray-400 mb-3">⚠️ Danger Zone</div>
+                                <button class="w-full bg-red-600/20 hover:bg-red-600/30 text-red-400 py-2 rounded-lg font-semibold transition border border-red-600/40">
+                                    Clear All Data
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add User Modal -->
+<div id="addUserModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
+    <div class="card p-8 max-w-md w-full mx-4">
+        <h2 class="text-2xl font-bold mb-6">Add Staff Member</h2>
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm text-gray-400 mb-2">Full Name</label>
+                <input type="text" id="newUserName" placeholder="John Doe" class="w-full bg-[#1a1a1a] border border-[#2a2a2a] text-white px-4 py-2 rounded-lg">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-400 mb-2">Email</label>
+                <input type="email" id="newUserEmail" placeholder="john@cafe.com" class="w-full bg-[#1a1a1a] border border-[#2a2a2a] text-white px-4 py-2 rounded-lg">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-400 mb-2">Password</label>
+                <input type="password" id="newUserPassword" placeholder="••••••" class="w-full bg-[#1a1a1a] border border-[#2a2a2a] text-white px-4 py-2 rounded-lg">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-400 mb-2">Role</label>
+                <select id="newUserRole" class="w-full bg-[#1a1a1a] border border-[#2a2a2a] text-white px-4 py-2 rounded-lg">
+                    <option value="cashier">Cashier</option>
+                    <option value="kitchen">Kitchen Staff</option>
+                    <option value="manager">Manager</option>
+                </select>
+            </div>
+        </div>
+        <div class="flex gap-3 mt-6">
+            <button onclick="closeAddUserModal()" class="flex-1 bg-[#1a1a1a] hover:bg-[#2a2a2a] text-white py-2 rounded-lg font-semibold transition border border-[#2a2a2a]">
+                Cancel
+            </button>
+            <button onclick="addStaffMember()" class="flex-1 bg-[#f97316] hover:bg-[#ea580c] text-white py-2 rounded-lg font-semibold transition">
+                Add Staff
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentTab = 'overview';
+
+function switchTab(tab) {
+    // Hide all tabs
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+    document.querySelectorAll('.nav-link').forEach(n => n.classList.remove('active'));
+    
+    // Show selected tab
+    document.getElementById(tab + '-tab').classList.remove('hidden');
+    event.target.closest('button').classList.add('active');
+    
+    currentTab = tab;
+    
+    // Update page title
+    const titles = {
+        'overview': 'Dashboard',
+        'users': 'Staff Management',
+        'settings': 'System Settings'
+    };
+    document.getElementById('pageTitle').textContent = titles[tab];
+    
+    // Load data for specific tab
+    if (tab === 'users') {
+        loadStaff();
+    }
+}
+
+function openAddUserModal() {
+    document.getElementById('addUserModal').classList.remove('hidden');
+}
+
+function closeAddUserModal() {
+    document.getElementById('addUserModal').classList.add('hidden');
+    document.getElementById('newUserName').value = '';
+    document.getElementById('newUserEmail').value = '';
+    document.getElementById('newUserPassword').value = '';
+}
+
+async function addStaffMember() {
+    const name = document.getElementById('newUserName').value.trim();
+    const email = document.getElementById('newUserEmail').value.trim();
+    const password = document.getElementById('newUserPassword').value;
+    const role = document.getElementById('newUserRole').value;
+
+    if (!name || !email || !password) {
+        alert('Please fill all fields');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, email, password, role })
+        });
+
+        if (response.ok) {
+            toast('Staff member added successfully', 'success');
+            closeAddUserModal();
+            document.getElementById('activityList').innerHTML = 
+                '<div class="text-gray-300 text-sm">✓ New staff added: ' + name + '</div>' +
+                document.getElementById('activityList').innerHTML;
+            loadStaff();
+        } else {
+            const data = await response.json();
+            alert('Error: ' + (data.error || 'Failed to add staff'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error adding staff member');
+    }
+}
+
+async function loadStaff() {
+    try {
+        const response = await fetch('/api/users');
+        if (response.ok) {
+            const users = await response.json();
+            const tbody = document.getElementById('staffTable');
+            tbody.innerHTML = '';
+            
+            if (users.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-gray-400">No staff members yet</td></tr>';
+                return;
+            }
+
+            users.forEach(user => {
+                const row = document.createElement('tr');
+                row.className = 'border-b border-[#2a2a2a] hover:bg-[#0f0f0f] transition';
+                row.innerHTML = `
+                    <td class="py-4 px-4">${user.name}</td>
+                    <td class="py-4 px-4 text-gray-400">${user.email}</td>
+                    <td class="py-4 px-4">
+                        <span class="tag bg-[#f97316]/20 text-[#f97316]">${user.role || 'cashier'}</span>
+                    </td>
+                    <td class="py-4 px-4 text-gray-400">${new Date(user.created_at).toLocaleDateString()}</td>
+                    <td class="py-4 px-4">
+                        <button onclick="editUser(${user.id})" class="text-[#f97316] hover:text-[#ea580c] text-sm mr-4">Edit</button>
+                        <button onclick="deleteUser(${user.id})" class="text-red-500 hover:text-red-600 text-sm">Delete</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+            
+            document.getElementById('totalStaff').textContent = users.length;
+        }
+    } catch (error) {
+        console.error('Error loading staff:', error);
+        document.getElementById('staffTable').innerHTML = '<tr><td colspan="5" class="py-8 text-center text-red-400">Error loading staff</td></tr>';
+    }
+}
+
+function editUser(userId) {
+    toast('Edit functionality coming soon', 'success');
+}
+
+async function deleteUser(userId) {
+    if (confirm('Are you sure you want to delete this staff member?')) {
+        try {
+            const response = await fetch(`/api/users/${userId}`, { method: 'DELETE' });
+            if (response.ok) {
+                toast('Staff member deleted', 'success');
+                loadStaff();
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Error deleting staff member');
+        }
+    }
+}
+
+function saveCafeSettings() {
+    toast('Settings saved successfully', 'success');
+}
+
+function resetSettings() {
+    document.getElementById('cafeName').value = '';
+    document.getElementById('cafePhone').value = '';
+    document.getElementById('cafeEmail').value = '';
+    document.getElementById('cafeAddress').value = '';
+    document.getElementById('taxRate').value = '';
+    toast('Form reset', 'success');
+}
+
+async function logout() {
+    await fetch('/api/logout', { method: 'POST' });
+    window.location.href = '/auth';
+}
+
+function goToPOS() {
+    window.location.href = '/pos';
+}
+
+// Load initial data
+document.addEventListener('DOMContentLoaded', () => {
+    fetch('/api/products/all').then(r => r.ok && r.json().then(d => {
+        document.getElementById('totalProducts').textContent = d.products.length;
+    })).catch(console.error);
+});
+</script>
+</body>
+{% endblock %}

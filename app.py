@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
@@ -6,6 +6,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import qrcode, io, base64, json
 import os
 import secrets
+import re
 import smtplib
 from datetime import datetime, timedelta
 from functools import wraps
@@ -144,6 +145,29 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
+def page_login_required(restaurant_only=False):
+    def decorator(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            if 'user_id' not in session:
+                return redirect(url_for('auth'))
+            if restaurant_only and session.get('user_role') != 'restaurant':
+                return redirect(url_for('pos'))
+            return f(*args, **kwargs)
+        return decorated
+    return decorator
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('auth'))
+        user = User.query.get(session['user_id'])
+        if not user or user.role != 'restaurant':
+            return redirect(url_for('pos'))
+        return f(*args, **kwargs)
+    return decorated
+
 def get_current_user():
     if 'user_id' in session:
         return User.query.get(session['user_id'])
@@ -154,6 +178,52 @@ def find_user_by_email(email):
     if not email:
         return None
     return User.query.filter(db.func.lower(User.email) == email.lower()).first()
+
+def password_strength_issues(password, email=''):
+    password = password or ''
+    email = (email or '').strip().lower()
+    issues = []
+
+    if len(password) < 12:
+        issues.append('at least 12 characters')
+    if len(password) > 128:
+        issues.append('no more than 128 characters')
+    if re.search(r'\s', password):
+        issues.append('no spaces')
+    if not re.search(r'[a-z]', password):
+        issues.append('a lowercase letter')
+    if not re.search(r'[A-Z]', password):
+        issues.append('an uppercase letter')
+    if not re.search(r'\d', password):
+        issues.append('a number')
+    if not re.search(r'[^A-Za-z0-9]', password):
+        issues.append('a symbol')
+
+    common = {
+        'password', 'password1', 'password123', 'admin123', 'welcome123',
+        'qwerty123', 'letmein123', 'restaurant123', 'cafe12345'
+    }
+    if password.lower() in common:
+        issues.append('not a common password')
+
+    if email and '@' in email:
+        local_part = email.split('@', 1)[0]
+        if local_part and local_part in password.lower():
+            issues.append('not contain your email name')
+
+    return issues
+
+def strong_password_error(password, email=''):
+    issues = password_strength_issues(password, email)
+    if not issues:
+        return None
+    if issues == ['at least 12 characters']:
+        return 'Password must be at least 12 characters long.'
+    return (
+        'Password must be at least 12 characters and include an uppercase letter, '
+        'a lowercase letter, a number, and a symbol. It must also avoid spaces, '
+        'common passwords, and your email name.'
+    )
 
 def send_reset_email(email, otp):
     subject = 'POS Cafe password reset code'
@@ -207,9 +277,9 @@ def cleanup_reset_codes():
 def index():
     if 'user_id' in session:
         if session.get('user_role') == 'restaurant':
-            return redirect(url_for('backend'))
+            return redirect(url_for('admin_dashboard'))
         return redirect(url_for('pos'))
-    return redirect(url_for('auth'))
+    return render_template('landing.html')
 
 @app.route('/auth')
 def auth():
@@ -220,17 +290,21 @@ def signup():
     d = request.json
     if User.query.filter_by(email=d['email']).first():
         return jsonify({'error': 'Email already exists'}), 400
-    role = d.get('role', 'user')
+    password_error = strong_password_error(d.get('password', ''), d.get('email', ''))
+    if password_error:
+        return jsonify({'error': password_error}), 400
+    role = d.get('role', 'cashier')
     if role == 'admin':
         role = 'restaurant'
-    if role not in ('user', 'restaurant'):
-        role = 'user'
-    u = User(name=d['name'], email=d['email'], password=generate_password_hash(d['password']), role=role)
+    # Map kitchen, manager to appropriate roles
+    if role not in ('cashier', 'restaurant', 'kitchen', 'manager'):
+        role = 'cashier'
+    u = User(name=d['name'], email=d['email'], password=generate_password_hash(d['password'], method='scrypt'), role=role)
     db.session.add(u)
     db.session.commit()
     session['user_id'] = u.id
     session['user_name'] = u.name
-    session['user_role'] = u.role
+    session['user_role'] = 'restaurant' if role == 'restaurant' else 'user'
     return jsonify({'ok': True, 'name': u.name, 'role': u.role})
 
 @app.route('/api/login', methods=['POST'])
@@ -293,8 +367,9 @@ def password_reset_complete():
         return jsonify({'error': 'Fill all fields'}), 400
     if password != confirm_password:
         return jsonify({'error': 'Passwords do not match'}), 400
-    if len(password) < 6:
-        return jsonify({'error': 'Password must be at least 6 characters'}), 400
+    password_error = strong_password_error(password, email)
+    if password_error:
+        return jsonify({'error': password_error}), 400
 
     record = PASSWORD_RESET_CODES.get(email.lower())
     if not record:
@@ -314,35 +389,56 @@ def password_reset_complete():
         PASSWORD_RESET_CODES.pop(email.lower(), None)
         return jsonify({'error': 'Account not found'}), 404
 
-    user.password = generate_password_hash(password)
+    user.password = generate_password_hash(password, method='scrypt')
     db.session.commit()
     PASSWORD_RESET_CODES.pop(email.lower(), None)
     return jsonify({'ok': True})
 
 # ─── Pages ────────────────────────────────────────────────
 @app.route('/pos')
+@page_login_required()
 def pos():
-    return render_template('pos.html', user_name=session.get('user_name'))
+    return render_template(
+        'pos.html',
+        user_name=session.get('user_name'),
+        user_role=session.get('user_role'),
+    )
 
 @app.route('/backend')
+@page_login_required(restaurant_only=True)
 def backend():
-    if session.get('user_role') != 'restaurant':
-        return redirect(url_for('pos'))
-    return render_template('backend.html', user_name=session.get('user_name'))
+    return render_template(
+        'backend.html',
+        user_name=session.get('user_name'),
+        user_role=session.get('user_role'),
+    )
+
+@app.route('/admin')
+@admin_required
+def admin_dashboard():
+    return render_template(
+        'admin_dashboard.html',
+        user_name=session.get('user_name'),
+    )
 
 @app.route('/kitchen')
+@page_login_required()
 def kitchen():
-    return render_template('kitchen.html')
+    return render_template('kitchen.html', user_role=session.get('user_role'))
 
 @app.route('/customer')
+@page_login_required()
 def customer():
-    return render_template('customer.html')
+    return render_template('customer.html', user_role=session.get('user_role'))
 
 @app.route('/dashboard')
+@page_login_required(restaurant_only=True)
 def dashboard():
-    if session.get('user_role') != 'restaurant':
-        return redirect(url_for('pos'))
-    return render_template('dashboard.html', user_name=session.get('user_name'))
+    return render_template(
+        'dashboard.html',
+        user_name=session.get('user_name'),
+        user_role=session.get('user_role'),
+    )
 
 # ─── API: Products ─────────────────────────────────────────
 @app.route('/api/products', methods=['GET'])
@@ -465,6 +561,10 @@ def generate_qr(upi_id, amount):
     img.save(buf, format='PNG')
     b64 = base64.b64encode(buf.getvalue()).decode()
     return jsonify({'qr': f'data:image/png;base64,{b64}', 'upi_string': upi_string})
+
+@app.route('/qr.jpeg')
+def qr_image():
+    return send_from_directory(os.path.dirname(__file__), 'qr.jpeg')
 
 # ─── API: Sessions ─────────────────────────────────────────
 @app.route('/api/sessions/current', methods=['GET'])
@@ -626,6 +726,38 @@ def dashboard_stats():
         'by_method': by_method,
         'top_products': [{'name':n,'qty':q} for n,q in top_products]
     })
+
+# ─── API: Admin / User Management ──────────────────────────
+@app.route('/api/users', methods=['GET'])
+@login_required
+def get_users():
+    user = User.query.get(session['user_id'])
+    if not user or user.role != 'restaurant':
+        return jsonify({'error': 'unauthorized'}), 403
+    
+    users = User.query.exclude(User.id == session['user_id']).all()
+    return jsonify([{
+        'id': u.id,
+        'name': u.name,
+        'email': u.email,
+        'role': u.role,
+        'created_at': u.created_at.isoformat()
+    } for u in users])
+
+@app.route('/api/users/<int:uid>', methods=['DELETE'])
+@login_required
+def delete_user(uid):
+    admin = User.query.get(session['user_id'])
+    if not admin or admin.role != 'restaurant':
+        return jsonify({'error': 'unauthorized'}), 403
+    
+    if uid == admin.id:
+        return jsonify({'error': 'Cannot delete yourself'}), 400
+    
+    user = User.query.get_or_404(uid)
+    db.session.delete(user)
+    db.session.commit()
+    return jsonify({'ok': True})
 
 # ─── SocketIO ──────────────────────────────────────────────
 @socketio.on('connect')

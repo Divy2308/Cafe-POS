@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS Cafe - Point of Sale System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a0f0a 100%);
+            color: #f0f0f0;
+            font-family: 'DM Sans', sans-serif;
+        }
+        .brand-gradient {
+            background: linear-gradient(135deg, #f97316, #ea580c);
+        }
+        .hero-gradient {
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.1), rgba(234, 88, 12, 0.05));
+        }
+        .nav-link {
+            transition: all 0.2s;
+            color: #f0f0f0;
+        }
+        .nav-link:hover {
+            color: #f97316;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #f97316, #ea580c);
+            transition: all 0.2s;
+            color: white;
+            font-weight: 600;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 32px rgba(249, 115, 22, 0.4);
+        }
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #f0f0f0;
+            transition: all 0.2s;
+        }
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #f97316;
+        }
+        .card-glass {
+            background: rgba(26, 26, 26, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .feature-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #f97316, #ea580c);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+        }
+        .menu-item {
+            background: rgba(26, 26, 26, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 16px;
+            transition: all 0.3s;
+        }
+        .menu-item:hover {
+            border-color: #f97316;
+            transform: translateY(-4px);
+        }
+        .fade-in {
+            animation: fadeIn 0.6s ease-out;
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .slide-in-right {
+            animation: slideInRight 0.8s ease-out;
+        }
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(40px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="fixed w-full top-0 z-50 backdrop-blur-md bg-black/40 border-b border-[rgba(255,255,255,0.08)]">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center space-x-2">
+                    <div class="w-10 h-10 brand-gradient rounded-lg flex items-center justify-center">
+                        <span class="text-white font-bold text-xl">☕</span>
+                    </div>
+                    <span class="text-xl font-bold text-white">POS Cafe</span>
+                </div>
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="#home" class="nav-link">Home</a>
+                    <a href="#features" class="nav-link">Features</a>
+                    <a href="#menu" class="nav-link">Menu</a>
+                    <a href="#contact" class="nav-link">Contact</a>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <button onclick="redirectToAuth('login')" class="btn-secondary px-4 py-2 rounded-lg text-sm">Login</button>
+                    <button onclick="redirectToAuth('signup')" class="btn-primary px-4 py-2 rounded-lg text-sm">Sign Up</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="home" class="pt-32 pb-20 px-4">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid md:grid-cols-2 gap-12 items-center">
+                <div class="fade-in">
+                    <h1 class="text-5xl md:text-6xl font-bold mb-6 leading-tight">
+                        Manage Your Cafe <span class="brand-gradient bg-clip-text text-transparent">Smarter</span>
+                    </h1>
+                    <p class="text-gray-400 text-lg mb-8 leading-relaxed">
+                        A modern, all-in-one Point of Sale system designed for cafes. From orders to kitchen management, handle everything with ease.
+                    </p>
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <button onclick="redirectToAuth('signup')" class="btn-primary px-8 py-3 rounded-lg text-base font-semibold">
+                            Get Started Free
+                        </button>
+                        <button onclick="document.getElementById('features').scrollIntoView({behavior: 'smooth'})" class="btn-secondary px-8 py-3 rounded-lg text-base font-semibold">
+                            Learn More →
+                        </button>
+                    </div>
+                    <div class="mt-12 flex items-center space-x-8 text-sm text-gray-400">
+                        <div>
+                            <div class="font-bold text-2xl text-white">500+</div>
+                            <div>Active Users</div>
+                        </div>
+                        <div>
+                            <div class="font-bold text-2xl text-white">⭐ 4.8</div>
+                            <div>Rating</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="slide-in-right hidden md:block">
+                    <div class="hero-gradient rounded-2xl p-8 min-h-96 flex items-center justify-center">
+                        <div class="text-center">
+                            <div class="text-6xl mb-4">📱</div>
+                            <p class="text-gray-400">Modern, intuitive interface</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="py-20 px-4">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold mb-4">About POS Cafe</h2>
+                <p class="text-gray-400 text-lg">Everything you need to run a modern cafe</p>
+            </div>
+            <div class="grid md:grid-cols-2 gap-12 items-center">
+                <div>
+                    <div class="space-y-6">
+                        <div class="flex items-start space-x-4">
+                            <div class="text-2xl">✅</div>
+                            <div>
+                                <h3 class="font-bold text-white mb-2">Easy to Use</h3>
+                                <p class="text-gray-400">Intuitive interface designed for cafe staff and customers alike</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start space-x-4">
+                            <div class="text-2xl">⚡</div>
+                            <div>
+                                <h3 class="font-bold text-white mb-2">Real-time Updates</h3>
+                                <p class="text-gray-400">Live order tracking and kitchen updates powered by WebSocket</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start space-x-4">
+                            <div class="text-2xl">📊</div>
+                            <div>
+                                <h3 class="font-bold text-white mb-2">Analytics & Reports</h3>
+                                <p class="text-gray-400">Comprehensive insights into sales, orders, and customer preferences</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-glass rounded-2xl p-8">
+                    <h3 class="text-2xl font-bold mb-6">Why Choose Us?</h3>
+                    <ul class="space-y-4 text-gray-300">
+                        <li>✨ Modern, responsive design</li>
+                        <li>🔒 Secure authentication & data</li>
+                        <li>🚀 Fast and reliable</li>
+                        <li>🛠️ Easy menu management</li>
+                        <li>👥 Multi-user support</li>
+                        <li>📱 Mobile-friendly</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="py-20 px-4">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold mb-4">Powerful Features</h2>
+                <p class="text-gray-400 text-lg">Everything built for cafe management</p>
+            </div>
+            <div class="grid md:grid-cols-3 gap-8">
+                <div class="card-glass p-8 rounded-xl">
+                    <div class="feature-icon mb-4">📦</div>
+                    <h3 class="text-xl font-bold mb-3">Menu Management</h3>
+                    <p class="text-gray-400">Easy product categorization, pricing, and availability management</p>
+                </div>
+                <div class="card-glass p-8 rounded-xl">
+                    <div class="feature-icon mb-4">🍽️</div>
+                    <h3 class="text-xl font-bold mb-3">Table Management</h3>
+                    <p class="text-gray-400">Manage multiple floors and tables with real-time status updates</p>
+                </div>
+                <div class="card-glass p-8 rounded-xl">
+                    <div class="feature-icon mb-4">💳</div>
+                    <h3 class="text-xl font-bold mb-3">Payment Processing</h3>
+                    <p class="text-gray-400">Support for cash, cards, UPI and multiple payment methods</p>
+                </div>
+                <div class="card-glass p-8 rounded-xl">
+                    <div class="feature-icon mb-4">👨‍🍳</div>
+                    <h3 class="text-xl font-bold mb-3">Kitchen Display</h3>
+                    <p class="text-gray-400">Real-time kitchen tickets with order status tracking</p>
+                </div>
+                <div class="card-glass p-8 rounded-xl">
+                    <div class="feature-icon mb-4">📈</div>
+                    <h3 class="text-xl font-bold mb-3">Analytics</h3>
+                    <p class="text-gray-400">Detailed sales reports and business insights</p>
+                </div>
+                <div class="card-glass p-8 rounded-xl">
+                    <div class="feature-icon mb-4">👥</div>
+                    <h3 class="text-xl font-bold mb-3">Staff Management</h3>
+                    <p class="text-gray-400">User roles and permissions for different staff members</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Menu Preview Section -->
+    <section id="menu" class="py-20 px-4">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold mb-4">Sample Menu</h2>
+                <p class="text-gray-400 text-lg">Easy to customize for your cafe</p>
+            </div>
+            <div class="grid md:grid-cols-3 gap-6">
+                <div class="menu-item">
+                    <div class="text-4xl mb-4">☕</div>
+                    <h3 class="font-bold text-lg mb-2">Beverages</h3>
+                    <p class="text-gray-400 text-sm mb-4">Coffee, tea, juices, and more</p>
+                    <div class="text-2xl font-bold text-orange-500">From ₹30</div>
+                </div>
+                <div class="menu-item">
+                    <div class="text-4xl mb-4">🍕</div>
+                    <h3 class="font-bold text-lg mb-2">Food</h3>
+                    <p class="text-gray-400 text-sm mb-4">Pizza, pasta, sandwiches, salads</p>
+                    <div class="text-2xl font-bold text-orange-500">From ₹150</div>
+                </div>
+                <div class="menu-item">
+                    <div class="text-4xl mb-4">🍰</div>
+                    <h3 class="font-bold text-lg mb-2">Desserts</h3>
+                    <p class="text-gray-400 text-sm mb-4">Cake, ice cream, brownies</p>
+                    <div class="text-2xl font-bold text-orange-500">From ₹80</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="py-20 px-4">
+        <div class="max-w-4xl mx-auto">
+            <div class="card-glass rounded-xl p-12 text-center">
+                <h2 class="text-3xl font-bold mb-4">Get Started Today</h2>
+                <p class="text-gray-400 text-lg mb-8">Join hundreds of cafes managing their business better</p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <button onclick="redirectToAuth('signup')" class="btn-primary px-8 py-3 rounded-lg font-semibold">
+                        Create Free Account
+                    </button>
+                    <button onclick="redirectToAuth('login')" class="btn-secondary px-8 py-3 rounded-lg font-semibold">
+                        Already have an account?
+                    </button>
+                </div>
+                <div class="mt-8 text-gray-500 text-sm">
+                    <p>Email: support@pos-cafe.local | Phone: +91-XXXX-XXX-XXX</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="border-t border-[rgba(255,255,255,0.08)] py-12 px-4 mt-20">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid md:grid-cols-4 gap-8 mb-8">
+                <div>
+                    <div class="flex items-center space-x-2 mb-4">
+                        <div class="w-8 h-8 brand-gradient rounded-lg flex items-center justify-center">
+                            <span class="text-white font-bold text-lg">☕</span>
+                        </div>
+                        <span class="font-bold">POS Cafe</span>
+                    </div>
+                    <p class="text-gray-400 text-sm">Modern POS system for smart cafes</p>
+                </div>
+                <div>
+                    <h4 class="font-bold mb-4">Product</h4>
+                    <ul class="space-y-2 text-gray-400 text-sm">
+                        <li><a href="#features" class="hover:text-orange-500">Features</a></li>
+                        <li><a href="#" class="hover:text-orange-500">Pricing</a></li>
+                        <li><a href="#" class="hover:text-orange-500">Demo</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-bold mb-4">Company</h4>
+                    <ul class="space-y-2 text-gray-400 text-sm">
+                        <li><a href="#about" class="hover:text-orange-500">About</a></li>
+                        <li><a href="#contact" class="hover:text-orange-500">Contact</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-bold mb-4">Legal</h4>
+                    <ul class="space-y-2 text-gray-400 text-sm">
+                        <li><a href="#" class="hover:text-orange-500">Privacy</a></li>
+                        <li><a href="#" class="hover:text-orange-500">Terms</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-t border-[rgba(255,255,255,0.08)] pt-8 text-center text-gray-500 text-sm">
+                <p>&copy; 2024 POS Cafe. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        function redirectToAuth(mode) {
+            window.location.href = '/auth#' + mode;
+        }
+    </script>
+</body>
+</html>
