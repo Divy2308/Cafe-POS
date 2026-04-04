@@ -1,380 +1,1012 @@
 {% extends "base.html" %}
 {% block title %}Secure Access — POS Cafe{% endblock %}
 {% block extra_head %}
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cabinet+Grotesk:wght@300;400;500;600;700;800;900&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
-  .auth-shell {
-    min-height: 100vh;
-    background:
-      radial-gradient(circle at top left, rgba(249,115,22,0.18), transparent 28%),
-      radial-gradient(circle at 85% 15%, rgba(255,255,255,0.06), transparent 24%),
-      linear-gradient(180deg, #090909 0%, #0d0d0d 100%);
-  }
-  .auth-panel {
-    position: relative;
-    overflow: hidden;
-  }
-  .auth-panel::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background:
-      linear-gradient(135deg, rgba(249,115,22,0.08), transparent 38%),
-      radial-gradient(circle at 25% 20%, rgba(255,255,255,0.04), transparent 20%);
-    pointer-events: none;
-  }
-  .password-wrap {
-    position: relative;
-  }
-  .password-wrap input {
-    padding-right: 5rem;
-  }
-  .password-toggle {
-    position: absolute;
-    right: 0.7rem;
-    top: 50%;
-    transform: translateY(-50%);
-    padding: 0.35rem 0.7rem;
-    border-radius: 999px;
-    font-size: 0.72rem;
-    color: #d1d5db;
-    border: 1px solid rgba(255,255,255,0.1);
-    background: rgba(255,255,255,0.04);
-    transition: all .2s ease;
-  }
-  .password-toggle:hover { background: rgba(255,255,255,0.08); }
-  .policy-row {
-    display: flex;
-    align-items: center;
-    gap: .5rem;
-    font-size: .78rem;
-    color: #9ca3af;
-  }
-  .policy-row.ok { color: #86efac; }
-  .policy-dot {
-    width: .55rem;
-    height: .55rem;
-    border-radius: 999px;
-    background: #374151;
-    flex: 0 0 auto;
-  }
-  .policy-row.ok .policy-dot { background: #22c55e; }
-  .meter-track {
-    height: .45rem;
-    background: rgba(255,255,255,0.08);
-    border-radius: 999px;
-    overflow: hidden;
-  }
-  .meter-fill {
-    height: 100%;
-    width: 0%;
-    border-radius: 999px;
-    transition: width .25s ease, background-color .25s ease;
-  }
-  .hero-card {
-    background: linear-gradient(180deg, rgba(26,26,26,.96), rgba(17,17,17,.96));
-    border: 1px solid rgba(255,255,255,0.08);
-    box-shadow: 0 25px 80px rgba(0,0,0,.35);
-  }
+/* ═══════════════════════════════════════════
+   RESET & ROOT
+═══════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --ink:    #080604;
+  --ink2:   #0f0c09;
+  --ink3:   #181310;
+  --ink4:   #211a15;
+  --ember:  #f97316;
+  --ember2: #ea580c;
+  --ember3: #c2410c;
+  --cream:  #fdf4e7;
+  --muted:  #7c6a56;
+  --muted2: #4a3f34;
+  --white:  #fff9f2;
+  --border: rgba(255,255,255,0.07);
+  --border-e: rgba(249,115,22,0.18);
+}
+
+body {
+  background: var(--ink);
+  color: var(--white);
+  font-family: 'Cabinet Grotesk', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+  cursor: none;
+}
+
+/* ═══════════════════════════════════════════
+   CUSTOM CURSOR
+═══════════════════════════════════════════ */
+#a-cur { width:10px; height:10px; background:var(--ember); border-radius:50%; position:fixed; pointer-events:none; z-index:9999; transform:translate(-50%,-50%); transition:width .25s,height .25s; }
+#a-ring { width:36px; height:36px; border:1.5px solid rgba(249,115,22,.45); border-radius:50%; position:fixed; pointer-events:none; z-index:9998; transform:translate(-50%,-50%); transition:all .08s linear; }
+body.c-hover #a-cur { width:16px; height:16px; mix-blend-mode:difference; background:#fff; }
+body.c-hover #a-ring { width:48px; height:48px; border-color:rgba(249,115,22,.7); }
+
+/* ═══════════════════════════════════════════
+   GRAIN
+═══════════════════════════════════════════ */
+body::after {
+  content:''; position:fixed; inset:0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='0.045'/%3E%3C/svg%3E");
+  pointer-events:none; z-index:997; opacity:.45; animation: grainShift 8s steps(10) infinite;
+}
+@keyframes grainShift {
+  0%{transform:translate(0,0)} 20%{transform:translate(-2%,-3%)}
+  40%{transform:translate(3%,1%)} 60%{transform:translate(-1%,3%)}
+  80%{transform:translate(2%,-2%)} 100%{transform:translate(0,0)}
+}
+
+/* ═══════════════════════════════════════════
+   LAYOUT SHELL
+═══════════════════════════════════════════ */
+.auth-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+@media(max-width: 960px) { .auth-shell { grid-template-columns: 1fr; } }
+
+/* ═══════════════════════════════════════════
+   LEFT PANEL — CINEMATIC
+═══════════════════════════════════════════ */
+.left-panel {
+  position: relative;
+  overflow: hidden;
+  background: var(--ink2);
+  display: flex;
+  flex-direction: column;
+  padding: 48px;
+  min-height: 100vh;
+}
+@media(max-width: 960px) { .left-panel { display: none; } }
+
+/* layered background */
+.left-panel::before {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse at 0% 0%, rgba(249,115,22,.22) 0%, transparent 45%),
+    radial-gradient(ellipse at 100% 100%, rgba(234,88,12,.1) 0%, transparent 40%);
+  pointer-events: none; z-index: 0;
+}
+.lp-grid {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(249,115,22,.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(249,115,22,.05) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at 30% 50%, black 20%, transparent 70%);
+  pointer-events: none; z-index: 0;
+  animation: gridDrift 20s ease-in-out infinite alternate;
+}
+@keyframes gridDrift { from{transform:translate(0,0)} to{transform:translate(8px,12px)} }
+
+/* orbs */
+.lp-orb1 {
+  position:absolute; width:400px; height:400px; border-radius:50%;
+  background: radial-gradient(circle, rgba(249,115,22,.16) 0%, transparent 70%);
+  top: -80px; left: -80px; pointer-events:none; z-index:0;
+  animation: orbFloat 10s ease-in-out infinite alternate;
+  filter: blur(40px);
+}
+.lp-orb2 {
+  position:absolute; width:300px; height:300px; border-radius:50%;
+  background: radial-gradient(circle, rgba(234,88,12,.1) 0%, transparent 70%);
+  bottom: 40px; right: -40px; pointer-events:none; z-index:0;
+  animation: orbFloat 14s ease-in-out infinite alternate-reverse;
+  filter: blur(40px);
+}
+@keyframes orbFloat { from{transform:translate(0,0)} to{transform:translate(20px,30px)} }
+
+/* left content */
+.lp-content { position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+
+.lp-logo {
+  display: flex; align-items: center; gap: 12px;
+  text-decoration: none; cursor: none;
+}
+.lp-logo-mark {
+  width: 44px; height: 44px; border-radius: 12px;
+  background: linear-gradient(135deg, var(--ember), var(--ember3));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  box-shadow: 0 8px 24px rgba(249,115,22,.4);
+}
+.lp-logo-text {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 26px; letter-spacing: .1em; color: var(--white);
+}
+
+.lp-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(249,115,22,.1); border: 1px solid rgba(249,115,22,.22);
+  border-radius: 100px; padding: 5px 14px 5px 8px;
+  font-family: 'DM Mono', monospace; font-size: 11px;
+  color: var(--ember); letter-spacing: .08em; margin-top: 56px; margin-bottom: 28px;
+}
+.lp-badge-dot { width:6px; height:6px; border-radius:50%; background:var(--ember); animation: blink 1.8s ease-in-out infinite; }
+@keyframes blink { 0%,100%{opacity:1;box-shadow:0 0 6px var(--ember)} 50%{opacity:.3;box-shadow:none} }
+
+.lp-headline {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(48px, 5.5vw, 72px);
+  line-height: .92; letter-spacing: .02em; color: var(--white);
+}
+.lp-headline em { color: var(--ember); font-style: normal; }
+
+.lp-sub {
+  font-size: 15px; color: var(--muted); line-height: 1.7;
+  max-width: 340px; margin-top: 20px; font-weight: 400;
+}
+
+.lp-cards { display: flex; flex-direction: column; gap: 12px; margin-top: 48px; }
+.lp-card {
+  background: rgba(255,255,255,.03);
+  border: 1px solid var(--border);
+  border-radius: 16px; padding: 20px 22px;
+  transition: border-color .3s, background .3s; cursor: none;
+  position: relative; overflow: hidden;
+}
+.lp-card::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px; background: linear-gradient(to bottom, var(--ember), var(--ember3));
+  border-radius: 3px 0 0 3px; opacity: 0; transition: opacity .3s;
+}
+.lp-card:hover { border-color: var(--border-e); background: rgba(249,115,22,.04); }
+.lp-card:hover::before { opacity: 1; }
+.lp-card-tag {
+  font-family: 'DM Mono', monospace; font-size: 10px;
+  letter-spacing: .14em; color: var(--ember); text-transform: uppercase; margin-bottom: 6px;
+}
+.lp-card-text { font-size: 13px; color: rgba(255,249,242,.65); line-height: 1.6; }
+
+.lp-footer {
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted2);
+  letter-spacing: .06em;
+}
+.lp-footer-dot { width:5px; height:5px; border-radius:50%; background:var(--ember); }
+
+/* ═══════════════════════════════════════════
+   RIGHT PANEL — FORM
+═══════════════════════════════════════════ */
+.right-panel {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  padding: 40px 32px; min-height: 100vh;
+  background: var(--ink);
+}
+.right-panel::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 50% 0%, rgba(249,115,22,.07) 0%, transparent 55%);
+  pointer-events: none;
+}
+
+.form-container {
+  width: 100%; max-width: 440px; position: relative; z-index: 1;
+  animation: formIn .7s cubic-bezier(.16,1,.3,1) both;
+}
+@keyframes formIn { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:none} }
+
+/* mobile logo */
+.mobile-logo {
+  display: none; align-items: center; gap: 10px; margin-bottom: 32px; justify-content: center;
+}
+@media(max-width:960px) { .mobile-logo { display: flex; } }
+.mobile-logo-mark {
+  width:38px; height:38px; border-radius:10px;
+  background:linear-gradient(135deg,var(--ember),var(--ember3));
+  display:flex; align-items:center; justify-content:center; font-size:18px;
+}
+.mobile-logo-text { font-family:'Bebas Neue',sans-serif; font-size:22px; letter-spacing:.1em; }
+
+/* ─── TAB BAR ─── */
+.tab-bar {
+  display: flex; gap: 4px;
+  background: rgba(255,255,255,.03);
+  border: 1px solid var(--border);
+  border-radius: 14px; padding: 5px; margin-bottom: 24px;
+}
+.tab-btn {
+  flex: 1; padding: 10px 8px; border-radius: 10px;
+  font-family: 'Cabinet Grotesk', sans-serif;
+  font-size: 13px; font-weight: 700; letter-spacing: .02em;
+  cursor: none; border: none;
+  color: var(--muted); background: transparent;
+  transition: all .25s cubic-bezier(.16,1,.3,1);
+}
+.tab-btn.active {
+  background: linear-gradient(135deg, var(--ember), var(--ember3));
+  color: white; box-shadow: 0 4px 16px rgba(249,115,22,.4);
+}
+.tab-btn:hover:not(.active) { color: var(--white); background: rgba(255,255,255,.05); }
+
+/* ─── FORM CARD ─── */
+.form-card {
+  background: var(--ink2);
+  border: 1px solid var(--border);
+  border-radius: 24px; overflow: hidden;
+  box-shadow: 0 32px 80px rgba(0,0,0,.5), 0 0 0 1px rgba(249,115,22,.04) inset;
+}
+
+.form-card-head {
+  padding: 28px 32px 0;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 24px; margin-bottom: 0;
+}
+.form-card-body { padding: 28px 32px 32px; }
+
+.form-eyebrow {
+  font-family: 'DM Mono', monospace; font-size: 10px;
+  letter-spacing: .18em; text-transform: uppercase; color: var(--ember);
+  margin-bottom: 10px;
+}
+.form-title {
+  font-family: 'Bebas Neue', sans-serif; font-size: 32px;
+  letter-spacing: .02em; line-height: 1; color: var(--white); margin-bottom: 8px;
+}
+.form-title em { color: var(--ember); font-style: normal; }
+.form-sub { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+/* ─── FIELD ─── */
+.field { margin-bottom: 16px; }
+.field-row { display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px; }
+.field label {
+  display: block; font-size: 11px; font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase;
+  color: rgba(255,249,242,.5); margin-bottom: 8px;
+}
+.field-row label { margin-bottom: 0; }
+.forgot-link {
+  font-size: 12px; color: var(--ember); text-decoration: none;
+  transition: opacity .2s; cursor: none; font-weight: 600;
+}
+.forgot-link:hover { opacity: .7; }
+
+.field input, .field select {
+  width: 100%;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 12px; padding: 13px 16px;
+  color: var(--white); font-size: 14px;
+  font-family: 'Cabinet Grotesk', sans-serif;
+  outline: none; cursor: none;
+  transition: border-color .2s, box-shadow .2s, background .2s;
+}
+.field input::placeholder { color: rgba(124,106,86,.6); }
+.field input:focus, .field select:focus {
+  border-color: rgba(249,115,22,.45);
+  box-shadow: 0 0 0 3px rgba(249,115,22,.1);
+  background: rgba(249,115,22,.03);
+}
+.field select { cursor: none; }
+.field select option { background: var(--ink3); }
+
+/* pw wrap */
+.pw-wrap { position: relative; }
+.pw-wrap input { padding-right: 52px; }
+.pw-toggle {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1);
+  border-radius: 8px; padding: 4px 10px;
+  font-size: 11px; font-weight: 600; color: var(--muted);
+  cursor: none; font-family: 'DM Mono', monospace; letter-spacing: .04em;
+  transition: all .2s;
+}
+.pw-toggle:hover { background: rgba(249,115,22,.12); border-color: rgba(249,115,22,.3); color: var(--ember); }
+
+/* two-col */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* ─── STRENGTH METER ─── */
+.strength-wrap { margin-top: 10px; }
+.strength-bars { display: flex; gap: 5px; margin-bottom: 6px; }
+.strength-bar {
+  flex: 1; height: 4px; border-radius: 100px;
+  background: rgba(255,255,255,.07);
+  transition: background .3s;
+}
+.strength-bar.weak { background: #ef4444; }
+.strength-bar.fair { background: var(--ember); }
+.strength-bar.strong { background: #22c55e; }
+.strength-meta { display: flex; justify-content: space-between; align-items: center; }
+.strength-label { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; letter-spacing: .06em; }
+.strength-label.weak { color: #ef4444; }
+.strength-label.fair { color: var(--ember); }
+.strength-label.strong { color: #22c55e; }
+
+/* ─── POLICY CHECKLIST ─── */
+.policy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 12px; }
+.policy-row {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 12px; color: var(--muted); font-weight: 500;
+  transition: color .25s;
+}
+.policy-row.ok { color: #22c55e; }
+.policy-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: rgba(255,255,255,.15); flex-shrink: 0;
+  transition: background .25s;
+}
+.policy-row.ok .policy-dot { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,.4); }
+
+/* ─── OTP BOXES ─── */
+.otp-grid { display: flex; gap: 8px; }
+.otp-box {
+  flex: 1; aspect-ratio: 1;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 12px;
+  text-align: center; font-size: 22px;
+  font-family: 'Bebas Neue', sans-serif; color: var(--ember);
+  outline: none; caret-color: var(--ember);
+  transition: border-color .2s, box-shadow .2s;
+}
+.otp-box:focus {
+  border-color: rgba(249,115,22,.5);
+  box-shadow: 0 0 0 3px rgba(249,115,22,.12);
+}
+.otp-box.filled { background: rgba(249,115,22,.05); border-color: rgba(249,115,22,.3); }
+
+/* ─── DIVIDER ─── */
+.divider { display: flex; align-items: center; gap: 12px; margin: 20px 0; }
+.divider::before, .divider::after { content:''; flex:1; height:1px; background: var(--border); }
+.divider span { font-size: 11px; color: var(--muted2); letter-spacing: .08em; font-family: 'DM Mono', monospace; }
+
+/* ─── BUTTONS ─── */
+.btn-primary {
+  width: 100%; padding: 14px; border-radius: 12px;
+  background: linear-gradient(135deg, var(--ember), var(--ember3));
+  color: white; font-size: 14px; font-weight: 700; letter-spacing: .04em;
+  border: none; cursor: none; font-family: 'Cabinet Grotesk', sans-serif;
+  box-shadow: 0 8px 28px rgba(249,115,22,.35), inset 0 1px 0 rgba(255,255,255,.12);
+  transition: all .25s; position: relative; overflow: hidden;
+}
+.btn-primary::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,.1), transparent);
+  opacity: 0; transition: opacity .2s;
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 14px 44px rgba(249,115,22,.55); }
+.btn-primary:hover::after { opacity: 1; }
+.btn-primary:active { transform: none; }
+.btn-primary.loading { pointer-events: none; opacity: .7; }
+
+.btn-ghost {
+  padding: 14px; border-radius: 12px;
+  background: rgba(255,255,255,.04); border: 1px solid var(--border);
+  color: var(--muted); font-size: 14px; font-weight: 600;
+  cursor: none; font-family: 'Cabinet Grotesk', sans-serif; transition: all .2s;
+}
+.btn-ghost:hover { border-color: rgba(249,115,22,.3); color: var(--white); background: rgba(249,115,22,.05); }
+
+.btn-row { display: flex; gap: 10px; }
+.btn-row .btn-primary { flex: 1; }
+.btn-row .btn-ghost { flex: 0 0 auto; padding: 14px 20px; }
+
+/* ─── SECURITY NOTE ─── */
+.security-note {
+  background: rgba(249,115,22,.05);
+  border: 1px solid rgba(249,115,22,.12);
+  border-radius: 12px; padding: 14px 16px; margin-top: 16px;
+  display: flex; gap: 12px; align-items: flex-start;
+}
+.security-note-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+.security-note-text { font-size: 12px; color: var(--muted); line-height: 1.6; }
+.security-note-text strong { color: rgba(255,249,242,.7); font-weight: 600; }
+
+/* ─── OTP STEP ─── */
+.otp-step {
+  display: none; padding-top: 20px;
+  border-top: 1px solid var(--border);
+  animation: stepIn .4s cubic-bezier(.16,1,.3,1) both;
+}
+.otp-step.visible { display: block; }
+@keyframes stepIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:none} }
+
+.otp-hint { font-size: 12px; color: var(--muted); text-align: center; margin-top: 10px; }
+.otp-hint a { color: var(--ember); cursor: none; text-decoration: none; }
+.otp-hint a:hover { text-decoration: underline; }
+
+/* ─── STEP DOTS ─── */
+.step-dots { display: flex; gap: 6px; align-items: center; margin-bottom: 20px; }
+.step-dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.12); transition: all .3s; }
+.step-dot.done { background: #22c55e; }
+.step-dot.active { background: var(--ember); box-shadow: 0 0 8px rgba(249,115,22,.5); width: 20px; border-radius: 100px; }
+
+/* ─── PANEL TRANSITION ─── */
+.form-panel { display: none; }
+.form-panel.active {
+  display: block;
+  animation: panelIn .35s cubic-bezier(.16,1,.3,1) both;
+}
+@keyframes panelIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+
+/* ─── ALERT ─── */
+.alert {
+  border-radius: 10px; padding: 11px 14px;
+  font-size: 13px; display: flex; align-items: center; gap: 10px;
+  margin-bottom: 16px; display: none;
+}
+.alert.error { background: rgba(239,68,68,.08); border:1px solid rgba(239,68,68,.2); color: #fca5a5; }
+.alert.success { background: rgba(34,197,94,.07); border:1px solid rgba(34,197,94,.2); color: #86efac; }
+.alert.show { display: flex; animation: alertIn .3s ease both; }
+@keyframes alertIn { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:none} }
+
+/* ─── FOOTER NOTE ─── */
+.form-footer-note { text-align: center; font-size: 11px; color: var(--muted2); margin-top: 16px; font-family: 'DM Mono', monospace; letter-spacing: .04em; }
 </style>
 {% endblock %}
+
 {% block body %}
+<div id="a-cur"></div>
+<div id="a-ring"></div>
+
 <div class="auth-shell">
-  <div class="min-h-screen grid lg:grid-cols-[1.05fr_.95fr]">
-    <section class="hidden lg:flex items-stretch p-8">
-      <div class="hero-card w-full rounded-[28px] p-10 flex flex-col justify-between">
-        <div>
-          <div class="inline-flex items-center gap-3 rounded-full border border-white/10 px-4 py-2 text-xs text-gray-300 mb-10" style="background:rgba(255,255,255,0.03)">
-            <span class="w-2.5 h-2.5 rounded-full bg-green-400"></span>
-            Secure staff access
-          </div>
-          <h1 class="font-display text-5xl font-800 tracking-tight leading-tight max-w-lg">
-            Protect the register with stronger passwords and cleaner access control.
-          </h1>
-          <p class="text-gray-400 mt-5 max-w-xl text-base leading-7">
-            Login, reset, and account creation now push users toward high-entropy passwords and safer recovery behavior.
-          </p>
+
+  <!-- ═══ LEFT PANEL ═══ -->
+  <section class="left-panel">
+    <div class="lp-orb1"></div>
+    <div class="lp-orb2"></div>
+    <div class="lp-grid"></div>
+    <div class="lp-content">
+      <div>
+        <a href="/" class="lp-logo">
+          <div class="lp-logo-mark">☕</div>
+          <span class="lp-logo-text">POS Cafe</span>
+        </a>
+
+        <div class="lp-badge">
+          <div class="lp-badge-dot"></div>
+          <span>Authorized Staff Access</span>
         </div>
-        <div class="grid md:grid-cols-3 gap-4 mt-12">
-          <div class="card p-4 rounded-2xl" style="background:rgba(255,255,255,0.03)">
-            <div class="text-brand-500 text-sm uppercase tracking-wider mb-2">Policy</div>
-            <div class="text-sm text-gray-300 leading-6">12+ chars, mixed case, number, symbol, and no obvious weak passwords.</div>
+
+        <h1 class="lp-headline">
+          Protect the<br>register with<br><em>smarter</em> access.
+        </h1>
+        <p class="lp-sub">Strong passwords, OTP recovery, and role-based routing keep your cafe data secure — without slowing down service.</p>
+
+        <div class="lp-cards">
+          <div class="lp-card">
+            <div class="lp-card-tag">🔑 Password Policy</div>
+            <div class="lp-card-text">12+ characters, mixed case, numbers, symbols — and no common weak passwords. Enforced on both client and server.</div>
           </div>
-          <div class="card p-4 rounded-2xl" style="background:rgba(255,255,255,0.03)">
-            <div class="text-brand-500 text-sm uppercase tracking-wider mb-2">Recovery</div>
-            <div class="text-sm text-gray-300 leading-6">Password resets are gated by OTP and the same password policy.</div>
+          <div class="lp-card">
+            <div class="lp-card-tag">📧 OTP Recovery</div>
+            <div class="lp-card-text">Password resets are gated by email OTP verification. No security questions, no guesswork.</div>
           </div>
-          <div class="card p-4 rounded-2xl" style="background:rgba(255,255,255,0.03)">
-            <div class="text-brand-500 text-sm uppercase tracking-wider mb-2">Access</div>
-            <div class="text-sm text-gray-300 leading-6">Role-based routing keeps admin, POS, and staff views separated.</div>
+          <div class="lp-card">
+            <div class="lp-card-tag">👤 Role-Based Access</div>
+            <div class="lp-card-text">Admin, POS operator, and kitchen staff each get exactly the view they need — nothing more.</div>
           </div>
         </div>
       </div>
-    </section>
 
-    <section class="auth-panel flex items-center justify-center p-4 sm:p-8">
-      <div class="relative z-10 w-full max-w-lg">
-        <div class="lg:hidden text-center mb-8">
-          <div class="inline-flex items-center justify-center w-16 h-16 brand-gradient rounded-2xl mb-4 shadow-lg shadow-orange-900/40">
-            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c1.657 0 3-1.567 3-3.5S13.657 4 12 4 9 5.567 9 7.5 10.343 11 12 11zm0 0c-3.314 0-6 2.686-6 6v1h12v-1c0-3.314-2.686-6-6-6z"/></svg>
+      <div class="lp-footer">
+        <div class="lp-footer-dot"></div>
+        <span>© 2024 POS Cafe · All systems operational</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ RIGHT PANEL ═══ -->
+  <section class="right-panel">
+    <div class="form-container">
+
+      <!-- mobile logo -->
+      <div class="mobile-logo">
+        <div class="mobile-logo-mark">☕</div>
+        <span class="mobile-logo-text">POS Cafe</span>
+      </div>
+
+      <!-- TAB BAR -->
+      <div class="tab-bar">
+        <button class="tab-btn active" id="tab-login" onclick="switchTab('login')">Login</button>
+        <button class="tab-btn" id="tab-signup" onclick="switchTab('signup')">Sign Up</button>
+        <button class="tab-btn" id="tab-reset" onclick="switchTab('reset')">Reset</button>
+      </div>
+
+      <!-- FORM CARD -->
+      <div class="form-card">
+
+        <!-- ── LOGIN ── -->
+        <div class="form-panel active" id="form-login">
+          <div class="form-card-head">
+            <div class="form-eyebrow">Staff Login</div>
+            <div class="form-title">Welcome <em>back.</em></div>
+            <div class="form-sub">Use your assigned credentials to open a register session.</div>
           </div>
-          <h1 class="font-display text-3xl font-800 tracking-tight text-white">POS Cafe</h1>
-          <p class="text-gray-500 text-sm mt-1">Secure restaurant access</p>
+          <div class="form-card-body">
+            <div class="alert error" id="login-alert">
+              <span>⚠</span><span id="login-alert-msg">Invalid email or password.</span>
+            </div>
+            <div class="field">
+              <label>Email address</label>
+              <input type="email" id="login-email" placeholder="you@cafe.com" autocomplete="username">
+            </div>
+            <div class="field">
+              <div class="field-row">
+                <label>Password</label>
+                <a href="#" class="forgot-link" onclick="switchTab('reset'); return false;">Forgot password?</a>
+              </div>
+              <div class="pw-wrap">
+                <input type="password" id="login-password" placeholder="••••••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+                <button type="button" class="pw-toggle" onclick="togglePassword('login-password', this)">Show</button>
+              </div>
+            </div>
+            <button class="btn-primary" id="login-btn" onclick="doLogin()" style="margin-top:8px">
+              Open Session →
+            </button>
+            <div class="security-note">
+              <span class="security-note-icon">🔒</span>
+              <span class="security-note-text"><strong>Secure session:</strong> Passwords are bcrypt-hashed. Sessions expire automatically after inactivity.</span>
+            </div>
+          </div>
         </div>
 
-        <div class="card p-1 mb-5 flex rounded-2xl">
-          <button onclick="switchTab('login')" id="tab-login" class="flex-1 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 text-white" style="background:rgba(249,115,22,0.16);color:#f97316">Login</button>
-          <button onclick="switchTab('signup')" id="tab-signup" class="flex-1 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 text-gray-500">Sign Up</button>
-          <button onclick="switchTab('reset')" id="tab-reset" class="flex-1 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 text-gray-500">Reset</button>
+        <!-- ── SIGN UP ── -->
+        <div class="form-panel" id="form-signup">
+          <div class="form-card-head">
+            <div class="form-eyebrow">Create Account</div>
+            <div class="form-title">Set up <em>access.</em></div>
+            <div class="form-sub">Choose a strong password. Weak passwords are rejected server-side too.</div>
+          </div>
+          <div class="form-card-body">
+            <div class="alert error" id="signup-alert">
+              <span>⚠</span><span id="signup-alert-msg">Please fill in all fields.</span>
+            </div>
+            <div class="field">
+              <label>Full name</label>
+              <input type="text" id="signup-name" placeholder="Your full name" autocomplete="name">
+            </div>
+            <div class="field">
+              <label>Work email</label>
+              <input type="email" id="signup-email" placeholder="you@cafe.com" autocomplete="email" oninput="renderPasswordPolicy('signup')">
+            </div>
+            <div class="field">
+              <label>Password</label>
+              <div class="pw-wrap">
+                <input type="password" id="signup-password" placeholder="Create a strong password" autocomplete="new-password" oninput="renderPasswordPolicy('signup')">
+                <button type="button" class="pw-toggle" onclick="togglePassword('signup-password', this)">Show</button>
+              </div>
+              <!-- strength meter -->
+              <div class="strength-wrap">
+                <div class="strength-bars">
+                  <div class="strength-bar" id="su-b1"></div>
+                  <div class="strength-bar" id="su-b2"></div>
+                  <div class="strength-bar" id="su-b3"></div>
+                  <div class="strength-bar" id="su-b4"></div>
+                </div>
+                <div class="strength-meta">
+                  <span class="strength-label" id="su-strength-label">Enter a password</span>
+                  <span id="signup-meter-label" style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace"></span>
+                </div>
+              </div>
+              <div class="policy-grid" id="signup-rules"></div>
+            </div>
+            <div class="field">
+              <label>Account role</label>
+              <select id="signup-role">
+                <option value="user">Staff / POS Operator</option>
+                <option value="restaurant">Restaurant Admin</option>
+              </select>
+            </div>
+            <button class="btn-primary" id="signup-btn" onclick="doSignup()" style="margin-top:4px">
+              Create Account →
+            </button>
+          </div>
         </div>
 
-        <div class="hero-card rounded-[28px] p-6 sm:p-8">
-          <div id="form-login">
-            <div class="mb-7">
-              <p class="text-xs uppercase tracking-[0.3em] text-gray-500 mb-3">Staff Login</p>
-              <h2 class="font-display text-2xl font-700">Welcome back</h2>
-              <p class="text-sm text-gray-400 mt-2">Use your assigned staff credentials to open a register session.</p>
-            </div>
-            <div class="space-y-4">
-              <div>
-                <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Email</label>
-                <input type="email" id="login-email" placeholder="you@cafe.com" autocomplete="username">
-              </div>
-              <div class="password-wrap">
-                <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Password</label>
-                <input type="password" id="login-password" placeholder="••••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
-                <button type="button" class="password-toggle" onclick="togglePassword('login-password', this)">Show</button>
-              </div>
-              <button onclick="doLogin()" class="btn-primary w-full py-3 rounded-xl text-white font-medium mt-2">
-                Open Session →
-              </button>
-            </div>
-            <div class="mt-6 rounded-2xl border border-white/8 bg-white/3 p-4">
-              <div class="text-xs uppercase tracking-wider text-gray-500 mb-2">Security note</div>
-              <p class="text-sm text-gray-400 leading-6">Passwords are stored hashed. New passwords must be strong, and reset requests require OTP verification.</p>
-            </div>
+        <!-- ── RESET ── -->
+        <div class="form-panel" id="form-reset">
+          <div class="form-card-head">
+            <div class="form-eyebrow">Password Recovery</div>
+            <div class="form-title">Reset <em>access.</em></div>
+            <div class="form-sub">OTP verification required before a new password can be saved.</div>
           </div>
+          <div class="form-card-body">
+            <!-- step indicator -->
+            <div class="step-dots">
+              <div class="step-dot active" id="rst-d1"></div>
+              <div class="step-dot" id="rst-d2"></div>
+              <div class="step-dot" id="rst-d3"></div>
+            </div>
 
-          <div id="form-signup" class="hidden">
-            <div class="mb-7">
-              <p class="text-xs uppercase tracking-[0.3em] text-gray-500 mb-3">Create Account</p>
-              <h2 class="font-display text-2xl font-700">Set up a staff login</h2>
-              <p class="text-sm text-gray-400 mt-2">Choose a unique password. Weak passwords are rejected server-side too.</p>
+            <div class="alert error" id="reset-alert">
+              <span>⚠</span><span id="reset-alert-msg">Something went wrong.</span>
             </div>
-            <div class="space-y-4">
-              <div>
-                <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Full Name</label>
-                <input type="text" id="signup-name" placeholder="Your Name" autocomplete="name">
-              </div>
-              <div>
-                <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Email</label>
-                <input type="email" id="signup-email" placeholder="you@cafe.com" autocomplete="email" oninput="renderPasswordPolicy('signup')">
-              </div>
-              <div class="password-wrap">
-                <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Password</label>
-                <input type="password" id="signup-password" placeholder="Create a strong password" minlength="12" autocomplete="new-password" oninput="renderPasswordPolicy('signup')">
-                <button type="button" class="password-toggle" onclick="togglePassword('signup-password', this)">Show</button>
-              </div>
-              <div class="space-y-2">
-                <div class="flex items-center justify-between text-xs text-gray-500">
-                  <span>Password strength</span>
-                  <span id="signup-meter-label" class="text-gray-400">Too short</span>
-                </div>
-                <div class="meter-track">
-                  <div id="signup-meter-fill" class="meter-fill"></div>
-                </div>
-              </div>
-              <div class="grid sm:grid-cols-2 gap-2" id="signup-rules"></div>
-              <div>
-                <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Account Type</label>
-                <select id="signup-role">
-                  <option value="user">Staff</option>
-                  <option value="restaurant">Restaurant / Admin</option>
-                </select>
-              </div>
-              <button onclick="doSignup()" class="btn-primary w-full py-3 rounded-xl text-white font-medium mt-2">
-                Create Account →
-              </button>
+            <div class="alert success" id="reset-success">
+              <span>✓</span><span id="reset-success-msg">OTP sent to your email.</span>
             </div>
-          </div>
 
-          <div id="form-reset" class="hidden">
-            <div class="mb-7">
-              <p class="text-xs uppercase tracking-[0.3em] text-gray-500 mb-3">Password Recovery</p>
-              <h2 class="font-display text-2xl font-700">Reset access securely</h2>
-              <p class="text-sm text-gray-400 mt-2">OTP verification is required before a new password can be saved.</p>
-            </div>
-            <div class="space-y-4">
-              <div>
-                <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Email</label>
+            <!-- Step 1: email -->
+            <div id="rst-step1">
+              <div class="field">
+                <label>Email address</label>
                 <input type="email" id="reset-email" placeholder="you@cafe.com" autocomplete="email" oninput="syncResetEmail(); renderPasswordPolicy('reset')">
               </div>
-              <div class="flex gap-3">
-                <button onclick="requestResetOtp()" class="btn-primary flex-1 py-3 rounded-xl text-white font-medium">Send OTP</button>
-                <button onclick="switchTab('login')" class="btn-ghost px-4 py-3 rounded-xl text-sm">Back</button>
+              <div class="btn-row">
+                <button class="btn-primary" id="send-otp-btn" onclick="requestResetOtp()">Send OTP →</button>
+                <button class="btn-ghost" onclick="switchTab('login')">Back</button>
               </div>
-              <div id="reset-step-2" class="hidden pt-4 space-y-4 border-t border-border">
-                <div>
-                  <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">OTP Code</label>
-                  <input type="text" id="reset-otp" placeholder="123456" maxlength="6" inputmode="numeric">
-                </div>
-                <div class="password-wrap">
-                  <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">New Password</label>
-                  <input type="password" id="reset-password" placeholder="Create a strong password" minlength="12" autocomplete="new-password" oninput="renderPasswordPolicy('reset')">
-                  <button type="button" class="password-toggle" onclick="togglePassword('reset-password', this)">Show</button>
-                </div>
-                <div class="space-y-2">
-                  <div class="flex items-center justify-between text-xs text-gray-500">
-                    <span>Password strength</span>
-                    <span id="reset-meter-label" class="text-gray-400">Too short</span>
-                  </div>
-                  <div class="meter-track">
-                    <div id="reset-meter-fill" class="meter-fill"></div>
-                  </div>
-                </div>
-                <div class="grid sm:grid-cols-2 gap-2" id="reset-rules"></div>
-                <div>
-                  <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Confirm New Password</label>
-                  <input type="password" id="reset-confirm-password" placeholder="Confirm new password" autocomplete="new-password">
-                </div>
-                <button onclick="completeReset()" class="btn-primary w-full py-3 rounded-xl text-white font-medium mt-2">
-                  Update Password →
-                </button>
+            </div>
+
+            <!-- Step 2: OTP + new password -->
+            <div class="otp-step" id="reset-step-2">
+              <div class="step-dots" style="margin-top:20px">
+                <div class="step-dot done"></div>
+                <div class="step-dot active"></div>
+                <div class="step-dot"></div>
               </div>
+
+              <div class="field">
+                <label>6-digit OTP</label>
+                <div class="otp-grid" id="otp-boxes">
+                  <input class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" id="otp0">
+                  <input class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" id="otp1">
+                  <input class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" id="otp2">
+                  <input class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" id="otp3">
+                  <input class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" id="otp4">
+                  <input class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" id="otp5">
+                </div>
+                <p class="otp-hint">Didn't receive it? <a href="#" id="resend-link" onclick="resendOtp(event)">Resend</a> <span id="resend-timer"></span></p>
+              </div>
+
+              <div class="field">
+                <label>New password</label>
+                <div class="pw-wrap">
+                  <input type="password" id="reset-password" placeholder="Create a strong password" autocomplete="new-password" oninput="renderPasswordPolicy('reset')">
+                  <button type="button" class="pw-toggle" onclick="togglePassword('reset-password', this)">Show</button>
+                </div>
+                <div class="strength-wrap">
+                  <div class="strength-bars">
+                    <div class="strength-bar" id="rs-b1"></div>
+                    <div class="strength-bar" id="rs-b2"></div>
+                    <div class="strength-bar" id="rs-b3"></div>
+                    <div class="strength-bar" id="rs-b4"></div>
+                  </div>
+                  <div class="strength-meta">
+                    <span class="strength-label" id="rs-strength-label">Enter a password</span>
+                  </div>
+                </div>
+                <div class="policy-grid" id="reset-rules"></div>
+              </div>
+
+              <div class="field">
+                <label>Confirm new password</label>
+                <input type="password" id="reset-confirm-password" placeholder="Re-enter password" autocomplete="new-password">
+              </div>
+
+              <button class="btn-primary" id="complete-reset-btn" onclick="completeReset()">
+                Update Password →
+              </button>
             </div>
           </div>
         </div>
 
-        <p class="text-center text-xs text-gray-600 mt-5">
-          Access is restricted to authorized staff accounts.
-        </p>
-      </div>
-    </section>
-  </div>
-</div>
+      </div><!-- /form-card -->
+
+      <p class="form-footer-note">Access restricted to authorized staff only.</p>
+
+    </div><!-- /form-container -->
+  </section>
+
+</div><!-- /auth-shell -->
 {% endblock %}
+
 {% block scripts %}
 <script>
-let resetEmailValue = '';
+/* ══════════════════════════════════
+   CURSOR
+══════════════════════════════════ */
+const aC=document.getElementById('a-cur'),aR=document.getElementById('a-ring');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;aC.style.left=mx+'px';aC.style.top=my+'px'});
+(function loop(){rx+=(mx-rx)*.1;ry+=(my-ry)*.1;aR.style.left=rx+'px';aR.style.top=ry+'px';requestAnimationFrame(loop)})();
+document.querySelectorAll('a,button,input,select,.lp-card').forEach(el=>{
+  el.addEventListener('mouseenter',()=>document.body.classList.add('c-hover'));
+  el.addEventListener('mouseleave',()=>document.body.classList.remove('c-hover'));
+});
 
+/* ══════════════════════════════════
+   TAB SWITCHER
+══════════════════════════════════ */
 function switchTab(tab) {
-  document.getElementById('form-login').classList.toggle('hidden', tab !== 'login');
-  document.getElementById('form-signup').classList.toggle('hidden', tab !== 'signup');
-  document.getElementById('form-reset').classList.toggle('hidden', tab !== 'reset');
-  document.getElementById('tab-login').style.cssText = tab === 'login' ? 'background:rgba(249,115,22,0.16);color:#f97316' : 'color:#6b7280';
-  document.getElementById('tab-signup').style.cssText = tab === 'signup' ? 'background:rgba(249,115,22,0.16);color:#f97316' : 'color:#6b7280';
-  document.getElementById('tab-reset').style.cssText = tab === 'reset' ? 'background:rgba(249,115,22,0.16);color:#f97316' : 'color:#6b7280';
-  if (tab === 'signup' || tab === 'reset') renderPasswordPolicy(tab);
+  ['login','signup','reset'].forEach(t=>{
+    document.getElementById('form-'+t).classList.toggle('active', t===tab);
+    document.getElementById('tab-'+t).classList.toggle('active', t===tab);
+  });
+  clearAlerts();
+  if(tab==='signup') renderPasswordPolicy('signup');
+  if(tab==='reset') { renderPasswordPolicy('reset'); resetStepDots(1); }
 }
 
-function syncResetEmail() {
-  resetEmailValue = document.getElementById('reset-email').value.trim();
+function clearAlerts() {
+  document.querySelectorAll('.alert').forEach(a=>{a.classList.remove('show');});
 }
 
-function togglePassword(inputId, button) {
-  const input = document.getElementById(inputId);
-  const isPassword = input.type === 'password';
-  input.type = isPassword ? 'text' : 'password';
-  button.textContent = isPassword ? 'Hide' : 'Show';
+function showAlert(id, msg, type='error') {
+  const el = document.getElementById(id);
+  const msgEl = document.getElementById(id+'-msg');
+  if(msgEl) msgEl.textContent = msg;
+  el.className = 'alert ' + type + ' show';
 }
 
-function getPasswordChecks(password, email = '') {
-  const localPart = (email || '').toLowerCase().split('@')[0] || '';
-  const lower = (password || '').toLowerCase();
+/* ══════════════════════════════════
+   STEP DOTS (RESET)
+══════════════════════════════════ */
+function resetStepDots(step) {
+  const d = ['rst-d1','rst-d2','rst-d3'];
+  d.forEach((id,i)=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.className = 'step-dot ' + (i+1 < step ? 'done' : i+1 === step ? 'active' : '');
+  });
+}
+
+/* ══════════════════════════════════
+   PASSWORD TOGGLE
+══════════════════════════════════ */
+function togglePassword(id, btn) {
+  const inp = document.getElementById(id);
+  const show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  btn.textContent = show ? 'Hide' : 'Show';
+}
+
+/* ══════════════════════════════════
+   PASSWORD CHECKS
+══════════════════════════════════ */
+function getPasswordChecks(pw, email='') {
+  const local = (email||'').toLowerCase().split('@')[0] || '';
+  const lo = (pw||'').toLowerCase();
   return [
-    { key: 'len', label: '12+ characters', ok: password.length >= 12 },
-    { key: 'lower', label: 'Lowercase letter', ok: /[a-z]/.test(password) },
-    { key: 'upper', label: 'Uppercase letter', ok: /[A-Z]/.test(password) },
-    { key: 'digit', label: 'Number', ok: /\d/.test(password) },
-    { key: 'symbol', label: 'Symbol', ok: /[^A-Za-z0-9]/.test(password) },
-    { key: 'space', label: 'No spaces', ok: !/\s/.test(password) },
-    { key: 'email', label: 'Not your email name', ok: !localPart || !lower.includes(localPart) }
+    { label:'12+ characters',      ok: pw.length >= 12 },
+    { label:'Lowercase letter',    ok: /[a-z]/.test(pw) },
+    { label:'Uppercase letter',    ok: /[A-Z]/.test(pw) },
+    { label:'Number',              ok: /\d/.test(pw) },
+    { label:'Symbol (!@#…)',       ok: /[^A-Za-z0-9]/.test(pw) },
+    { label:'No spaces',           ok: pw.length > 0 && !/\s/.test(pw) },
+    { label:'Not your email name', ok: !local || !lo.includes(local) },
   ];
 }
 
 function renderPasswordPolicy(prefix) {
-  const passwordInput = document.getElementById(prefix + '-password');
-  if (!passwordInput) return;
-  const emailInput = document.getElementById(prefix + '-email');
-  const password = passwordInput.value || '';
-  const email = emailInput ? emailInput.value.trim() : '';
-  const checks = getPasswordChecks(password, email);
-  const passed = checks.filter(item => item.ok).length;
-  const fill = document.getElementById(prefix + '-meter-fill');
-  const label = document.getElementById(prefix + '-meter-label');
-  const rules = document.getElementById(prefix + '-rules');
+  const pwEl = document.getElementById(prefix+'-password');
+  if(!pwEl) return;
+  const emailEl = document.getElementById(prefix+'-email');
+  const pw = pwEl.value || '';
+  const email = emailEl ? emailEl.value.trim() : '';
+  const checks = getPasswordChecks(pw, email);
+  const passed = checks.filter(c=>c.ok).length;
+  const total = checks.length;
+  const pct = Math.round((passed/total)*100);
 
-  if (fill) {
-    const pct = Math.round((passed / checks.length) * 100);
-    fill.style.width = pct + '%';
-    fill.style.background = passed <= 2 ? '#ef4444' : passed <= 4 ? '#f97316' : '#22c55e';
+  /* bars */
+  const barIds = prefix==='signup'
+    ? ['su-b1','su-b2','su-b3','su-b4']
+    : ['rs-b1','rs-b2','rs-b3','rs-b4'];
+  const cls = passed <= 2 ? 'weak' : passed <= 4 ? 'fair' : 'strong';
+  barIds.forEach((id,i)=>{
+    const bar = document.getElementById(id);
+    if(!bar) return;
+    bar.className = 'strength-bar' + (pw && (i+1) <= Math.ceil(passed/total*4) ? ' '+cls : '');
+  });
+
+  /* label */
+  const sLabel = document.getElementById((prefix==='signup'?'su':'rs')+'-strength-label');
+  if(sLabel) {
+    sLabel.textContent = !pw ? 'Enter a password' : passed<=2?'Weak':passed<=4?'Fair':'Strong';
+    sLabel.className = 'strength-label' + (pw ? ' '+cls : '');
   }
 
-  if (label) {
-    label.textContent = passed <= 2 ? 'Weak' : passed <= 4 ? 'Fair' : 'Strong';
-    label.className = passed <= 2 ? 'text-red-400' : passed <= 4 ? 'text-orange-400' : 'text-green-400';
-  }
-
-  if (rules) {
-    rules.innerHTML = checks.map(item => `
-      <div class="policy-row ${item.ok ? 'ok' : ''}">
+  /* rules */
+  const rulesEl = document.getElementById(prefix+'-rules');
+  if(rulesEl) {
+    rulesEl.innerHTML = checks.map(c=>`
+      <div class="policy-row ${c.ok?'ok':''}">
         <span class="policy-dot"></span>
-        <span>${item.label}</span>
-      </div>
-    `).join('');
+        <span>${c.label}</span>
+      </div>`).join('');
   }
 }
 
-async function requestResetOtp() {
-  const email = document.getElementById('reset-email').value.trim();
-  if (!email) return toast('Enter your email', 'error');
-  const r = await api('/api/password-reset/request', 'POST', { email });
-  if (r.error) return toast(r.error, 'error');
-  document.getElementById('reset-step-2').classList.remove('hidden');
-  toast(r.message || 'OTP sent to your email');
+/* ══════════════════════════════════
+   OTP BOXES
+══════════════════════════════════ */
+const otpBoxes = [0,1,2,3,4,5].map(i=>document.getElementById('otp'+i));
+otpBoxes.forEach((box,i)=>{
+  if(!box) return;
+  box.addEventListener('input',()=>{
+    box.value = box.value.replace(/\D/g,'');
+    box.classList.toggle('filled', !!box.value);
+    if(box.value && i < 5) otpBoxes[i+1].focus();
+  });
+  box.addEventListener('keydown',e=>{
+    if(e.key==='Backspace' && !box.value && i>0) otpBoxes[i-1].focus();
+  });
+  box.addEventListener('paste',e=>{
+    e.preventDefault();
+    const paste = e.clipboardData.getData('text').replace(/\D/g,'').slice(0,6);
+    paste.split('').forEach((c,j)=>{ if(otpBoxes[j]){otpBoxes[j].value=c;otpBoxes[j].classList.add('filled');} });
+    const last = Math.min(paste.length, 5);
+    if(otpBoxes[last]) otpBoxes[last].focus();
+  });
+});
+
+function getOtp() { return otpBoxes.map(b=>b?b.value:'').join(''); }
+
+/* ══════════════════════════════════
+   RESEND TIMER
+══════════════════════════════════ */
+let resendInterval = null;
+function startResendTimer(secs=60) {
+  const link = document.getElementById('resend-link');
+  const timer = document.getElementById('resend-timer');
+  if(link) { link.style.pointerEvents='none'; link.style.opacity='.4'; }
+  let t = secs;
+  if(resendInterval) clearInterval(resendInterval);
+  resendInterval = setInterval(()=>{
+    if(timer) timer.textContent = `(${t}s)`;
+    t--;
+    if(t < 0) {
+      clearInterval(resendInterval);
+      if(timer) timer.textContent = '';
+      if(link) { link.style.pointerEvents=''; link.style.opacity='1'; }
+    }
+  }, 1000);
 }
 
-async function completeReset() {
-  const email = document.getElementById('reset-email').value.trim();
-  const otp = document.getElementById('reset-otp').value.trim();
-  const password = document.getElementById('reset-password').value;
-  const confirm_password = document.getElementById('reset-confirm-password').value;
-  if (!email || !otp || !password || !confirm_password) return toast('Fill all fields', 'error');
-  const r = await api('/api/password-reset/complete', 'POST', { email, otp, password, confirm_password });
-  if (r.error) return toast(r.error, 'error');
-  toast('Password updated successfully');
-  setTimeout(() => location.href = '/auth', 600);
+function resendOtp(e) {
+  e.preventDefault();
+  requestResetOtp(true);
 }
 
+/* ══════════════════════════════════
+   RESET EMAIL SYNC
+══════════════════════════════════ */
+let resetEmailValue = '';
+function syncResetEmail() {
+  resetEmailValue = document.getElementById('reset-email').value.trim();
+}
+
+/* ══════════════════════════════════
+   LOADING STATE
+══════════════════════════════════ */
+function setLoading(btnId, loading) {
+  const btn = document.getElementById(btnId);
+  if(!btn) return;
+  btn.classList.toggle('loading', loading);
+  btn.textContent = loading ? 'Please wait…' : btn.dataset.label || btn.textContent;
+}
+
+/* ══════════════════════════════════
+   API HELPER (from base.html)
+══════════════════════════════════ */
+async function api(url, method='GET', body=null) {
+  try {
+    const opts = { method, headers:{'Content-Type':'application/json'} };
+    if(body) opts.body = JSON.stringify(body);
+    const res = await fetch(url, opts);
+    return await res.json();
+  } catch(e) { return { error: 'Network error. Please try again.' }; }
+}
+
+/* ══════════════════════════════════
+   LOGIN
+══════════════════════════════════ */
 async function doLogin() {
+  clearAlerts();
   const email = document.getElementById('login-email').value.trim();
-  const password = document.getElementById('login-password').value;
-  if (!email || !password) return toast('Fill all fields', 'error');
-  const r = await api('/api/login', 'POST', { email, password });
-  if (r.error) return toast(r.error, 'error');
-  toast('Welcome back, ' + r.name + '!');
-  setTimeout(() => location.href = r.role === 'restaurant' ? '/backend' : '/pos', 600);
+  const pw = document.getElementById('login-password').value;
+  if(!email || !pw) return showAlert('login-alert', 'Please enter your email and password.');
+  setLoading('login-btn', true);
+  const r = await api('/api/login', 'POST', { email, password: pw });
+  setLoading('login-btn', false);
+  if(r.error) return showAlert('login-alert', r.error);
+  showAlert('login-alert', 'Welcome back, '+r.name+'!', 'success');
+  setTimeout(()=> location.href = r.role==='restaurant' ? '/backend' : '/pos', 700);
 }
 
+/* ══════════════════════════════════
+   SIGNUP
+══════════════════════════════════ */
 async function doSignup() {
+  clearAlerts();
   const name = document.getElementById('signup-name').value.trim();
   const email = document.getElementById('signup-email').value.trim();
-  const password = document.getElementById('signup-password').value;
+  const pw = document.getElementById('signup-password').value;
   const role = document.getElementById('signup-role').value;
-  if (!name || !email || !password) return toast('Fill all fields', 'error');
-  const checks = getPasswordChecks(password, email);
-  if (checks.some(item => !item.ok)) {
-    return toast('Use a stronger password first', 'error');
-  }
-  const r = await api('/api/signup', 'POST', { name, email, password, role });
-  if (r.error) return toast(r.error, 'error');
-  toast('Account created!');
-  setTimeout(() => location.href = r.role === 'restaurant' ? '/backend' : '/pos', 600);
+  if(!name||!email||!pw) return showAlert('signup-alert','Please fill in all fields.');
+  const checks = getPasswordChecks(pw, email);
+  if(checks.some(c=>!c.ok)) return showAlert('signup-alert','Strengthen your password — all checks must pass.');
+  setLoading('signup-btn', true);
+  const r = await api('/api/signup', 'POST', { name, email, password: pw, role });
+  setLoading('signup-btn', false);
+  if(r.error) return showAlert('signup-alert', r.error);
+  showAlert('signup-alert', 'Account created! Redirecting…', 'success');
+  setTimeout(()=> location.href = r.role==='restaurant' ? '/backend' : '/pos', 700);
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+/* ══════════════════════════════════
+   RESET — SEND OTP
+══════════════════════════════════ */
+async function requestResetOtp(isResend=false) {
+  clearAlerts();
+  const email = document.getElementById('reset-email').value.trim();
+  if(!email) return showAlert('reset-alert','Enter your email address first.');
+  setLoading('send-otp-btn', true);
+  const r = await api('/api/password-reset/request', 'POST', { email });
+  setLoading('send-otp-btn', false);
+  if(r.error) return showAlert('reset-alert', r.error);
+
+  showAlert('reset-success', r.message || 'OTP sent to your email.', 'success');
+
+  /* show OTP step */
+  const step2 = document.getElementById('reset-step-2');
+  step2.classList.add('visible');
+  resetStepDots(2);
+  startResendTimer(60);
+  otpBoxes[0] && otpBoxes[0].focus();
+}
+
+/* ══════════════════════════════════
+   RESET — COMPLETE
+══════════════════════════════════ */
+async function completeReset() {
+  clearAlerts();
+  const email = document.getElementById('reset-email').value.trim();
+  const otp = getOtp();
+  const pw = document.getElementById('reset-password').value;
+  const cpw = document.getElementById('reset-confirm-password').value;
+
+  if(!otp || otp.length < 6) return showAlert('reset-alert','Enter the 6-digit OTP.');
+  if(!pw || !cpw) return showAlert('reset-alert','Fill in your new password fields.');
+  if(pw !== cpw) return showAlert('reset-alert','Passwords do not match.');
+
+  const checks = getPasswordChecks(pw, email);
+  if(checks.some(c=>!c.ok)) return showAlert('reset-alert','Password does not meet all requirements.');
+
+  setLoading('complete-reset-btn', true);
+  const r = await api('/api/password-reset/complete', 'POST', { email, otp, password:pw, confirm_password:cpw });
+  setLoading('complete-reset-btn', false);
+  if(r.error) return showAlert('reset-alert', r.error);
+
+  resetStepDots(3);
+  showAlert('reset-success', 'Password updated! Redirecting to login…', 'success');
+  setTimeout(()=>{ switchTab('login'); }, 1200);
+}
+
+/* ══════════════════════════════════
+   INIT
+══════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', ()=>{
   switchTab('login');
   renderPasswordPolicy('signup');
   renderPasswordPolicy('reset');
+
+  /* pre-fill tab from hash */
+  const hash = location.hash.replace('#','');
+  if(['login','signup','reset'].includes(hash)) switchTab(hash);
 });
 </script>
 {% endblock %}
