@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — POS Cafe{% endblock %}
+{% block extra_head %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  .stat-card { transition:transform .2s; }
+  .stat-card:hover { transform:translateY(-2px); }
+  .period-btn { transition:all .2s; }
+  .period-btn.active { background:rgba(249,115,22,0.15); color:#f97316; border-color:rgba(249,115,22,0.3); }
+</style>
+{% endblock %}
+{% block body %}
+<div class="flex h-screen overflow-hidden">
+  <!-- Sidebar -->
+  <div style="width:220px;min-width:220px;background:#111" class="border-r border-border flex flex-col">
+    <div class="p-5 border-b border-border">
+      <div class="font-display font-700 text-white">Dashboard</div>
+      <div class="text-xs text-gray-500 mt-0.5">{{ user_name }}</div>
+    </div>
+    <nav class="flex-1 p-3 space-y-1">
+      <a href="/pos" class="nav-link flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg> POS Terminal
+      </a>
+      <a href="/backend" class="nav-link flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/></svg> Back-end Config
+      </a>
+    </nav>
+  </div>
+
+  <div class="flex-1 overflow-auto">
+    <!-- Header -->
+    <div class="border-b border-border px-6 py-4 flex items-center justify-between" style="background:#111;position:sticky;top:0;z-index:10">
+      <h2 class="font-display text-xl font-700">Reports & Analytics</h2>
+      <div class="flex gap-2">
+        <button class="period-btn active border border-border px-4 py-1.5 rounded-lg text-sm" onclick="setPeriod('today',this)">Today</button>
+        <button class="period-btn border border-border px-4 py-1.5 rounded-lg text-sm text-gray-500" onclick="setPeriod('week',this)">Week</button>
+        <button class="period-btn border border-border px-4 py-1.5 rounded-lg text-sm text-gray-500" onclick="setPeriod('month',this)">Month</button>
+        <button onclick="printReport()" class="btn-ghost px-4 py-1.5 rounded-lg text-sm flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg> Export
+        </button>
+      </div>
+    </div>
+
+    <div class="p-6 space-y-6">
+      <!-- Stats Row -->
+      <div class="grid grid-cols-3 gap-4">
+        <div class="stat-card card p-5" style="border-radius:16px">
+          <div class="text-xs text-gray-500 uppercase tracking-wider mb-3">Total Sales</div>
+          <div class="font-display text-3xl font-800 text-brand-500" id="stat-sales">₹0</div>
+          <div class="text-xs text-gray-600 mt-2">Paid orders only</div>
+        </div>
+        <div class="stat-card card p-5" style="border-radius:16px">
+          <div class="text-xs text-gray-500 uppercase tracking-wider mb-3">Total Orders</div>
+          <div class="font-display text-3xl font-800 text-white" id="stat-orders">0</div>
+          <div class="text-xs text-gray-600 mt-2">Completed transactions</div>
+        </div>
+        <div class="stat-card card p-5" style="border-radius:16px">
+          <div class="text-xs text-gray-500 uppercase tracking-wider mb-3">Avg. Order</div>
+          <div class="font-display text-3xl font-800 text-white" id="stat-avg">₹0</div>
+          <div class="text-xs text-gray-600 mt-2">Per transaction</div>
+        </div>
+      </div>
+
+      <!-- Charts Row -->
+      <div class="grid grid-cols-2 gap-4">
+        <div class="card p-5" style="border-radius:16px">
+          <div class="font-display font-700 mb-4">Payment Methods</div>
+          <div style="height:200px;position:relative">
+            <canvas id="chart-methods"></canvas>
+          </div>
+        </div>
+        <div class="card p-5" style="border-radius:16px">
+          <div class="font-display font-700 mb-4">Top Products</div>
+          <div id="top-products" class="space-y-3"></div>
+        </div>
+      </div>
+
+      <!-- Payment breakdown table -->
+      <div class="card p-5" style="border-radius:16px">
+        <div class="font-display font-700 mb-4">Payment Breakdown</div>
+        <div id="pay-breakdown" class="grid grid-cols-3 gap-4"></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let methodChart = null;
+let currentPeriod = 'today';
+
+async function loadStats(period) {
+  const d = await api('/api/dashboard/stats?period='+period);
+  document.getElementById('stat-sales').textContent = '₹'+d.total_sales.toLocaleString();
+  document.getElementById('stat-orders').textContent = d.total_orders;
+  document.getElementById('stat-avg').textContent = '₹'+d.avg_order;
+  renderMethodChart(d.by_method);
+  renderTopProducts(d.top_products);
+  renderPayBreakdown(d.by_method, d.total_sales);
+}
+
+function renderMethodChart(byMethod) {
+  const ctx = document.getElementById('chart-methods').getContext('2d');
+  if (methodChart) methodChart.destroy();
+  const labels = Object.keys(byMethod).map(k=>k==='cash'?'Cash':k==='upi'?'UPI':'Card');
+  const values = Object.values(byMethod);
+  if (!values.length) return;
+  methodChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data: values, backgroundColor: ['#22c55e','#f97316','#3b82f6'], borderWidth: 0 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#9ca3af', font: { size: 12 } } } },
+      cutout: '70%'
+    }
+  });
+}
+
+function renderTopProducts(products) {
+  const el = document.getElementById('top-products');
+  const max = products[0]?.qty || 1;
+  el.innerHTML = products.map((p,i)=>`
+    <div class="flex items-center gap-3">
+      <span class="text-xs text-gray-600 w-4">${i+1}</span>
+      <div class="flex-1">
+        <div class="text-sm mb-1">${p.name}</div>
+        <div class="h-1.5 rounded-full bg-gray-800 overflow-hidden">
+          <div class="h-full brand-gradient rounded-full" style="width:${(p.qty/max*100).toFixed(0)}%;transition:width .6s"></div>
+        </div>
+      </div>
+      <span class="text-xs text-gray-500 w-8 text-right">${p.qty}</span>
+    </div>`).join('');
+}
+
+function renderPayBreakdown(byMethod, total) {
+  const el = document.getElementById('pay-breakdown');
+  const icons = {cash:'💵',upi:'📱',digital:'💳',card:'💳',''  :'—'};
+  const names = {cash:'Cash',upi:'UPI / QR',digital:'Card',card:'Card'};
+  el.innerHTML = Object.entries(byMethod).map(([k,v])=>`
+    <div class="card p-4" style="border-radius:12px">
+      <div class="text-xl mb-2">${icons[k]||'💰'}</div>
+      <div class="text-xs text-gray-500 mb-1">${names[k]||k}</div>
+      <div class="font-display font-800 text-lg text-white">₹${v.toFixed(0)}</div>
+      <div class="text-xs text-gray-600">${total?((v/total)*100).toFixed(1):0}% of total</div>
+    </div>`).join('');
+}
+
+function setPeriod(p, btn) {
+  currentPeriod = p;
+  document.querySelectorAll('.period-btn').forEach(b=>{b.classList.remove('active');b.classList.add('text-gray-500')});
+  btn.classList.add('active'); btn.classList.remove('text-gray-500');
+  loadStats(p);
+}
+
+function printReport() { window.print(); }
+
+loadStats('today');
+</script>
+{% endblock %}

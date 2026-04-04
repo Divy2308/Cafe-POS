@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Kitchen Display — POS Cafe{% endblock %}
+{% block extra_head %}
+<style>
+  body { background:#080808; }
+  .ticket { transition:all .2s; cursor:pointer; }
+  .ticket:hover { transform:translateY(-2px); box-shadow:0 12px 40px rgba(0,0,0,0.4); }
+  .ticket.to_cook { border-top:3px solid #ef4444; }
+  .ticket.preparing { border-top:3px solid #f97316; }
+  .ticket.completed { border-top:3px solid #22c55e; opacity:0.7; }
+  .item-line { cursor:pointer; transition:all .15s; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.06); }
+  .item-line:hover { background:rgba(255,255,255,0.04); }
+  .item-line.done { text-decoration:line-through; color:#4a4a4a; }
+  .stage-col { min-height:200px; }
+  .badge-cook { background:rgba(239,68,68,0.15); color:#ef4444; }
+  .badge-prep { background:rgba(249,115,22,0.15); color:#f97316; }
+  .badge-done { background:rgba(34,197,94,0.15); color:#22c55e; }
+  .ping-dot { width:8px;height:8px;border-radius:50%;background:#22c55e;animation:ping 1.5s infinite; }
+  @keyframes ping { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.4)} }
+  .col-header { position:sticky; top:0; z-index:10; backdrop-filter:blur(12px); padding:16px; margin-bottom:12px; border-radius:12px; }
+  .to-cook-header { background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.2); }
+  .preparing-header { background:rgba(249,115,22,0.08); border:1px solid rgba(249,115,22,0.2); }
+  .completed-header { background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.2); }
+</style>
+{% endblock %}
+{% block body %}
+<div class="flex flex-col h-screen">
+  <!-- Header -->
+  <div class="border-b border-border px-6 py-3 flex items-center justify-between" style="background:#0f0f0f">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 brand-gradient rounded-lg flex items-center justify-center">
+        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"/></svg>
+      </div>
+      <span class="font-display font-700 text-lg">Kitchen Display</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <div class="ping-dot"></div>
+      <span class="text-xs text-gray-500">Live</span>
+      <span id="clock" class="text-sm text-gray-400 font-mono"></span>
+    </div>
+  </div>
+
+  <!-- Columns -->
+  <div class="flex-1 overflow-hidden grid grid-cols-3 gap-4 p-4" style="grid-template-columns:1fr 1fr 1fr">
+    <!-- To Cook -->
+    <div class="stage-col overflow-auto">
+      <div class="col-header to-cook-header">
+        <div class="flex items-center justify-between">
+          <span class="font-display font-700 text-red-400">To Cook</span>
+          <span id="count-to_cook" class="tag badge-cook">0</span>
+        </div>
+        <div class="text-xs text-gray-600 mt-1">Click ticket to start preparing</div>
+      </div>
+      <div id="col-to_cook" class="space-y-3 px-1"></div>
+    </div>
+    <!-- Preparing -->
+    <div class="stage-col overflow-auto">
+      <div class="col-header preparing-header">
+        <div class="flex items-center justify-between">
+          <span class="font-display font-700 text-orange-400">Preparing</span>
+          <span id="count-preparing" class="tag badge-prep">0</span>
+        </div>
+        <div class="text-xs text-gray-600 mt-1">Click item to mark done</div>
+      </div>
+      <div id="col-preparing" class="space-y-3 px-1"></div>
+    </div>
+    <!-- Completed -->
+    <div class="stage-col overflow-auto">
+      <div class="col-header completed-header">
+        <div class="flex items-center justify-between">
+          <span class="font-display font-700 text-green-400">Completed</span>
+          <span id="count-completed" class="tag badge-done">0</span>
+        </div>
+        <div class="text-xs text-gray-600 mt-1">Ready to serve</div>
+      </div>
+      <div id="col-completed" class="space-y-3 px-1"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let tickets = [];
+const socket = io();
+
+socket.on('new_ticket', t => { tickets.push(t); render(); toast('New order: '+t.order_number); });
+socket.on('ticket_update', d => {
+  const t = tickets.find(t=>t.id===d.id);
+  if (t) { t.status=d.status; render(); }
+});
+
+async function loadTickets() {
+  tickets = await api('/api/kitchen/tickets');
+  render();
+}
+
+function render() {
+  ['to_cook','preparing','completed'].forEach(stage=>{
+    const col = document.getElementById('col-'+stage);
+    const stageTix = tickets.filter(t=>t.status===stage);
+    document.getElementById('count-'+stage).textContent = stageTix.length;
+    col.innerHTML = stageTix.map(t=>renderTicket(t)).join('');
+  });
+}
+
+function renderTicket(t) {
+  const age = Math.floor((Date.now() - new Date(t.sent_at+'Z').getTime()) / 60000);
+  const itemsHtml = t.items.map(i=>`
+    <div class="item-line flex items-center justify-between ${i.status==='completed'?'done':''}" onclick="event.stopPropagation();markItem(${t.id},${i.id})">
+      <span class="text-sm">${i.name}</span>
+      <span class="text-xs font-700 text-gray-400">×${i.qty}</span>
+    </div>`).join('');
+  return `
+    <div class="ticket card p-4 ${t.status}" onclick="advanceTicket(${t.id})" style="border-radius:14px">
+      <div class="flex items-start justify-between mb-3">
+        <div>
+          <div class="font-display font-800 text-base">${t.order_number}</div>
+          <div class="text-xs text-gray-500">Table ${t.table}</div>
+        </div>
+        <div class="text-xs text-gray-600">${age}m ago</div>
+      </div>
+      <div class="space-y-0">${itemsHtml}</div>
+      <div class="mt-3 pt-2 border-t border-border">
+        <div class="text-xs text-gray-600">${t.status==='to_cook'?'Tap → Start preparing':t.status==='preparing'?'Tap → Mark completed':'Served'}</div>
+      </div>
+    </div>`;
+}
+
+async function advanceTicket(id) {
+  const r = await api('/api/kitchen/tickets/'+id+'/advance','POST');
+  const t = tickets.find(t=>t.id===id);
+  if (t&&r.status) { t.status=r.status; render(); }
+}
+
+async function markItem(ticketId, itemId) {
+  const t = tickets.find(t=>t.id===ticketId);
+  if (!t) return;
+  const item = t.items.find(i=>i.id===itemId);
+  if (item) { item.status = item.status==='completed'?'to_cook':'completed'; render(); }
+}
+
+// Clock
+setInterval(()=>{ document.getElementById('clock').textContent = new Date().toLocaleTimeString(); },1000);
+loadTickets();
+setInterval(loadTickets, 30000);
+</script>
+{% endblock %}

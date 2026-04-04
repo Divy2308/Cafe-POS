@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Login — POS Cafe{% endblock %}
+{% block body %}
+<div class="min-h-screen flex items-center justify-center p-4" style="background:radial-gradient(ellipse at 60% 20%,rgba(249,115,22,0.08) 0%,transparent 60%),#0a0a0a">
+  <div class="w-full max-w-md">
+    <!-- Logo -->
+    <div class="text-center mb-10">
+      <div class="inline-flex items-center justify-center w-16 h-16 brand-gradient rounded-2xl mb-4 shadow-lg shadow-orange-900/40">
+        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+      </div>
+      <h1 class="font-display text-3xl font-800 tracking-tight text-white">POS Cafe</h1>
+      <p class="text-gray-500 text-sm mt-1">Restaurant Management System</p>
+    </div>
+
+    <!-- Tabs -->
+    <div class="card p-1 mb-6 flex" style="border-radius:14px">
+      <button onclick="switchTab('login')" id="tab-login" class="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-white" style="background:rgba(249,115,22,0.15);color:#f97316">Login</button>
+      <button onclick="switchTab('signup')" id="tab-signup" class="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-gray-500">Sign Up</button>
+    </div>
+
+    <!-- Login Form -->
+    <div id="form-login" class="card p-8" style="border-radius:16px">
+      <h2 class="font-display text-xl font-600 mb-6">Welcome back</h2>
+      <div class="space-y-4">
+        <div>
+          <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Email</label>
+          <input type="email" id="login-email" placeholder="you@cafe.com">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Password</label>
+          <input type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <button onclick="doLogin()" class="btn-primary w-full py-3 rounded-xl text-white font-medium mt-2">
+          Open Session →
+        </button>
+      </div>
+      <p class="text-center text-gray-600 text-xs mt-6">Demo: admin@cafe.com / password</p>
+    </div>
+
+    <!-- Signup Form -->
+    <div id="form-signup" class="card p-8 hidden" style="border-radius:16px">
+      <h2 class="font-display text-xl font-600 mb-6">Create account</h2>
+      <div class="space-y-4">
+        <div>
+          <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Full Name</label>
+          <input type="text" id="signup-name" placeholder="Your Name">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Email</label>
+          <input type="email" id="signup-email" placeholder="you@cafe.com">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Password</label>
+          <input type="password" id="signup-password" placeholder="••••••••">
+        </div>
+        <button onclick="doSignup()" class="btn-primary w-full py-3 rounded-xl text-white font-medium mt-2">
+          Create Account →
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function switchTab(tab) {
+  document.getElementById('form-login').classList.toggle('hidden', tab!=='login');
+  document.getElementById('form-signup').classList.toggle('hidden', tab!=='signup');
+  document.getElementById('tab-login').style.cssText = tab==='login' ? 'background:rgba(249,115,22,0.15);color:#f97316' : 'color:#6b7280';
+  document.getElementById('tab-signup').style.cssText = tab==='signup' ? 'background:rgba(249,115,22,0.15);color:#f97316' : 'color:#6b7280';
+}
+async function doLogin() {
+  const email = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+  if (!email || !password) return toast('Fill all fields', 'error');
+  const r = await api('/api/login','POST',{email,password});
+  if (r.error) return toast(r.error,'error');
+  toast('Welcome back, '+r.name+'!');
+  setTimeout(()=>location.href='/pos',600);
+}
+async function doSignup() {
+  const name = document.getElementById('signup-name').value;
+  const email = document.getElementById('signup-email').value;
+  const password = document.getElementById('signup-password').value;
+  if (!name||!email||!password) return toast('Fill all fields','error');
+  const r = await api('/api/signup','POST',{name,email,password});
+  if (r.error) return toast(r.error,'error');
+  toast('Account created!');
+  setTimeout(()=>location.href='/pos',600);
+}
+</script>
+{% endblock %}

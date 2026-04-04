@@ -1,0 +1,7 @@
+flask
+flask-sqlalchemy
+flask-socketio
+flask-cors
+qrcode[pil]
+pillow
+werkzeug

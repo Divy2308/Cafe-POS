@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Odoo POS Cafe{% endblock %}</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: { sans: ['DM Sans','sans-serif'], display: ['Syne','sans-serif'] },
+      colors: {
+        brand: { 50:'#fff7ed', 100:'#ffedd5', 400:'#fb923c', 500:'#f97316', 600:'#ea580c', 700:'#c2410c', 900:'#431407' },
+        surface: '#0f0f0f', card: '#1a1a1a', border: '#2a2a2a'
+      }
+    }
+  }
+}
+</script>
+<style>
+  body { background:#0a0a0a; color:#f0f0f0; font-family:'DM Sans',sans-serif; }
+  .brand-gradient { background: linear-gradient(135deg, #f97316, #ea580c); }
+  .glass { background:rgba(255,255,255,0.04); backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.08); }
+  .nav-link { transition:all .2s; }
+  .nav-link:hover { background:rgba(249,115,22,0.12); color:#f97316; }
+  .nav-link.active { background:rgba(249,115,22,0.18); color:#f97316; border-left:3px solid #f97316; }
+  .btn-primary { background:linear-gradient(135deg,#f97316,#ea580c); transition:all .2s; }
+  .btn-primary:hover { transform:translateY(-1px); box-shadow:0 8px 24px rgba(249,115,22,0.4); }
+  .btn-ghost { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); transition:all .2s; }
+  .btn-ghost:hover { background:rgba(255,255,255,0.1); }
+  input, select, textarea { background:#1a1a1a; border:1px solid #2a2a2a; color:#f0f0f0; border-radius:8px; padding:10px 14px; width:100%; transition:border .2s; outline:none; }
+  input:focus, select:focus, textarea:focus { border-color:#f97316; }
+  .card { background:#1a1a1a; border:1px solid #2a2a2a; border-radius:12px; }
+  .tag { display:inline-block; padding:2px 10px; border-radius:20px; font-size:11px; font-weight:500; }
+  ::-webkit-scrollbar { width:4px; } ::-webkit-scrollbar-track { background:#0a0a0a; } ::-webkit-scrollbar-thumb { background:#2a2a2a; border-radius:4px; }
+  .toast { position:fixed; top:20px; right:20px; z-index:9999; background:#1a1a1a; border:1px solid #2a2a2a; border-radius:10px; padding:14px 20px; box-shadow:0 20px 60px rgba(0,0,0,0.6); transform:translateX(120%); transition:transform .3s; }
+  .toast.show { transform:translateX(0); }
+  .toast.success { border-left:3px solid #22c55e; }
+  .toast.error { border-left:3px solid #ef4444; }
+</style>
+{% block extra_head %}{% endblock %}
+</head>
+<body>
+{% block body %}{% endblock %}
+<div id="toast" class="toast"></div>
+<script>
+function toast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = `toast ${type} show`;
+  setTimeout(()=>t.className='toast',3000);
+}
+async function api(url, method='GET', data=null) {
+  const opts = { method, headers:{'Content-Type':'application/json'} };
+  if (data) opts.body = JSON.stringify(data);
+  const r = await fetch(url, opts);
+  return r.json();
+}
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

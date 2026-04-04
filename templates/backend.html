@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+{% block title %}Backend Config — POS Cafe{% endblock %}
+{% block extra_head %}
+<style>
+  .tab-btn { transition:all .2s; border-bottom:2px solid transparent; }
+  .tab-btn.active { color:#f97316; border-bottom-color:#f97316; }
+  .tab-content { display:none; }
+  .tab-content.active { display:block; animation:fadeIn .2s; }
+  @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  .product-row { transition:background .15s; }
+  .product-row:hover { background:rgba(255,255,255,0.02); }
+  .toggle { position:relative; width:44px; height:24px; }
+  .toggle input { opacity:0; width:0; height:0; }
+  .toggle-slider { position:absolute; inset:0; background:#2a2a2a; border-radius:24px; cursor:pointer; transition:.2s; }
+  .toggle-slider:before { content:''; position:absolute; width:18px; height:18px; left:3px; top:3px; background:#555; border-radius:50%; transition:.2s; }
+  .toggle input:checked + .toggle-slider { background:#f97316; }
+  .toggle input:checked + .toggle-slider:before { transform:translateX(20px); background:white; }
+</style>
+{% endblock %}
+{% block body %}
+<div class="flex h-screen overflow-hidden">
+  <!-- Sidebar -->
+  <div style="width:220px;min-width:220px;background:#111" class="border-r border-border flex flex-col">
+    <div class="p-5 border-b border-border">
+      <div class="font-display font-700 text-white">Back-end Config</div>
+      <div class="text-xs text-gray-500 mt-0.5">{{ user_name }}</div>
+    </div>
+    <nav class="flex-1 p-3 space-y-1">
+      <a href="/pos" class="nav-link flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg> Back to POS
+      </a>
+      <a href="/dashboard" class="nav-link flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg> Dashboard
+      </a>
+    </nav>
+  </div>
+
+  <div class="flex-1 flex flex-col overflow-hidden">
+    <!-- Tabs -->
+    <div class="border-b border-border px-6 flex gap-6" style="background:#111">
+      <button class="tab-btn active py-4 text-sm font-medium" onclick="switchTab('products',this)">Products</button>
+      <button class="tab-btn py-4 text-sm font-medium text-gray-500" onclick="switchTab('floors',this)">Floors & Tables</button>
+      <button class="tab-btn py-4 text-sm font-medium text-gray-500" onclick="switchTab('payments',this)">Payment Methods</button>
+    </div>
+
+    <div class="flex-1 overflow-auto p-6">
+
+      <!-- ═══ PRODUCTS TAB ═══ -->
+      <div id="tab-products" class="tab-content active">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="font-display text-xl font-700">Products</h2>
+          <button onclick="openProductModal()" class="btn-primary px-4 py-2 rounded-xl text-white text-sm font-medium">+ Add Product</button>
+        </div>
+        <div class="card overflow-hidden">
+          <table class="w-full">
+            <thead><tr class="border-b border-border">
+              <th class="text-left px-4 py-3 text-xs text-gray-500 uppercase tracking-wider">Name</th>
+              <th class="text-left px-4 py-3 text-xs text-gray-500 uppercase tracking-wider">Category</th>
+              <th class="text-left px-4 py-3 text-xs text-gray-500 uppercase tracking-wider">Price</th>
+              <th class="text-left px-4 py-3 text-xs text-gray-500 uppercase tracking-wider">Tax %</th>
+              <th class="text-left px-4 py-3 text-xs text-gray-500 uppercase tracking-wider">Status</th>
+              <th class="px-4 py-3"></th>
+            </tr></thead>
+            <tbody id="products-table"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ═══ FLOORS TAB ═══ -->
+      <div id="tab-floors" class="tab-content">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="font-display text-xl font-700">Floors & Tables</h2>
+          <div class="flex gap-2">
+            <button onclick="openFloorModal()" class="btn-ghost px-4 py-2 rounded-xl text-sm">+ Add Floor</button>
+            <button onclick="openTableModal()" class="btn-primary px-4 py-2 rounded-xl text-white text-sm font-medium">+ Add Table</button>
+          </div>
+        </div>
+        <div id="floors-list" class="space-y-4"></div>
+      </div>
+
+      <!-- ═══ PAYMENTS TAB ═══ -->
+      <div id="tab-payments" class="tab-content">
+        <div class="mb-6">
+          <h2 class="font-display text-xl font-700 mb-1">Payment Methods</h2>
+          <p class="text-gray-500 text-sm">Enable or disable payment methods for checkout</p>
+        </div>
+        <div id="pay-methods-list" class="space-y-4 max-w-xl"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Product Modal -->
+<div id="product-modal" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-50" onclick="if(event.target===this)closeProductModal()">
+  <div class="card p-8 w-full max-w-md" style="border-radius:20px">
+    <h3 class="font-display text-xl font-700 mb-6">Add Product</h3>
+    <div class="space-y-4">
+      <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Name</label><input id="p-name" placeholder="Pizza Margherita"></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Price (₹)</label><input id="p-price" type="number" placeholder="350"></div>
+        <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Tax %</label><input id="p-tax" type="number" placeholder="5"></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Category</label><input id="p-category" placeholder="Food"></div>
+        <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Unit</label><input id="p-unit" placeholder="pcs"></div>
+      </div>
+      <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Description</label><textarea id="p-desc" rows="2" placeholder="Short description"></textarea></div>
+    </div>
+    <div class="flex gap-3 mt-6">
+      <button onclick="closeProductModal()" class="btn-ghost flex-1 py-2.5 rounded-xl text-sm">Cancel</button>
+      <button onclick="saveProduct()" class="btn-primary flex-1 py-2.5 rounded-xl text-white text-sm font-medium">Save Product</button>
+    </div>
+  </div>
+</div>
+
+<!-- Floor Modal -->
+<div id="floor-modal" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-50" onclick="if(event.target===this)this.classList.add('hidden')">
+  <div class="card p-8 w-full max-w-sm" style="border-radius:20px">
+    <h3 class="font-display text-xl font-700 mb-6">Add Floor</h3>
+    <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Floor Name</label><input id="f-name" placeholder="Ground Floor"></div>
+    <div class="flex gap-3 mt-6">
+      <button onclick="document.getElementById('floor-modal').classList.add('hidden')" class="btn-ghost flex-1 py-2.5 rounded-xl text-sm">Cancel</button>
+      <button onclick="saveFloor()" class="btn-primary flex-1 py-2.5 rounded-xl text-white text-sm font-medium">Add Floor</button>
+    </div>
+  </div>
+</div>
+
+<!-- Table Modal -->
+<div id="table-modal" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-50" onclick="if(event.target===this)this.classList.add('hidden')">
+  <div class="card p-8 w-full max-w-sm" style="border-radius:20px">
+    <h3 class="font-display text-xl font-700 mb-6">Add Table</h3>
+    <div class="space-y-4">
+      <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Table Number</label><input id="t-number" placeholder="7"></div>
+      <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Seats</label><input id="t-seats" type="number" placeholder="4"></div>
+      <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Floor</label><select id="t-floor"></select></div>
+    </div>
+    <div class="flex gap-3 mt-6">
+      <button onclick="document.getElementById('table-modal').classList.add('hidden')" class="btn-ghost flex-1 py-2.5 rounded-xl text-sm">Cancel</button>
+      <button onclick="saveTable()" class="btn-primary flex-1 py-2.5 rounded-xl text-white text-sm font-medium">Add Table</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let allProducts=[], allCats=[], allFloors=[], allPayments=[];
+
+async function init() {
+  const [pd, fl, pm] = await Promise.all([api('/api/products/all'), api('/api/floors'), api('/api/payment-methods')]);
+  allProducts=pd.products; allCats=pd.categories; allFloors=fl; allPayments=pm;
+  renderProductsTable(); renderFloors(); renderPayments();
+}
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-content').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el=>{el.classList.remove('active');el.classList.add('text-gray-500')});
+  document.getElementById('tab-'+name).classList.add('active');
+  btn.classList.add('active'); btn.classList.remove('text-gray-500');
+}
+
+// Products
+function renderProductsTable() {
+  const tbody = document.getElementById('products-table');
+  const catMap = Object.fromEntries(allCats.map(c=>[c.id,c.name]));
+  tbody.innerHTML = allProducts.map(p=>`
+    <tr class="product-row border-b border-border/50">
+      <td class="px-4 py-3 text-sm font-medium">${p.name}</td>
+      <td class="px-4 py-3 text-sm text-gray-400">${catMap[p.category_id]||'—'}</td>
+      <td class="px-4 py-3 text-sm text-brand-500 font-700">₹${p.price}</td>
+      <td class="px-4 py-3 text-sm text-gray-400">${p.tax}%</td>
+      <td class="px-4 py-3"><span class="tag ${p.active?'bg-green-900/40 text-green-400':'bg-gray-800 text-gray-500'}">${p.active?'Active':'Inactive'}</span></td>
+      <td class="px-4 py-3 text-right">
+        <button onclick="toggleProduct(${p.id},${p.active})" class="text-xs text-gray-500 hover:text-orange-400 transition-colors">${p.active?'Deactivate':'Activate'}</button>
+      </td>
+    </tr>`).join('');
+}
+
+function openProductModal() { document.getElementById('product-modal').classList.remove('hidden'); }
+function closeProductModal() { document.getElementById('product-modal').classList.add('hidden'); }
+
+async function saveProduct() {
+  const d = { name:document.getElementById('p-name').value, price:document.getElementById('p-price').value,
+    tax:document.getElementById('p-tax').value, category:document.getElementById('p-category').value,
+    unit:document.getElementById('p-unit').value, description:document.getElementById('p-desc').value };
+  if (!d.name||!d.price) return toast('Name and price required','error');
+  const r = await api('/api/products','POST',d);
+  if (r.ok) { toast('Product added!'); closeProductModal(); const pd=await api('/api/products/all'); allProducts=pd.products; allCats=pd.categories; renderProductsTable(); }
+}
+
+async function toggleProduct(id, active) {
+  await api('/api/products/'+id,'PUT',{active:!active});
+  const pd=await api('/api/products/all'); allProducts=pd.products; renderProductsTable();
+  toast(active?'Product deactivated':'Product activated');
+}
+
+// Floors
+function renderFloors() {
+  const el = document.getElementById('floors-list');
+  el.innerHTML = allFloors.map(f=>`
+    <div class="card p-5" style="border-radius:16px">
+      <div class="font-display font-700 mb-4">${f.name}</div>
+      <div class="grid gap-3" style="grid-template-columns:repeat(auto-fill,minmax(120px,1fr))">
+        ${f.tables.map(t=>`
+          <div class="border border-border rounded-xl p-3 text-center">
+            <div class="font-display text-xl font-800">T${t.number}</div>
+            <div class="text-xs text-gray-500">${t.seats} seats</div>
+            <button onclick="deleteTable(${t.id})" class="text-xs text-red-500 mt-1">Remove</button>
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function openFloorModal() { document.getElementById('floor-modal').classList.remove('hidden'); }
+
+async function saveFloor() {
+  const name = document.getElementById('f-name').value;
+  if (!name) return toast('Enter floor name','error');
+  await api('/api/floors','POST',{name});
+  document.getElementById('floor-modal').classList.add('hidden');
+  allFloors = await api('/api/floors');
+  renderFloors(); toast('Floor added!');
+}
+
+function openTableModal() {
+  const sel = document.getElementById('t-floor');
+  sel.innerHTML = allFloors.map(f=>`<option value="${f.id}">${f.name}</option>`).join('');
+  document.getElementById('table-modal').classList.remove('hidden');
+}
+
+async function saveTable() {
+  const d = { number:document.getElementById('t-number').value, seats:document.getElementById('t-seats').value, floor_id:document.getElementById('t-floor').value };
+  if (!d.number) return toast('Enter table number','error');
+  await api('/api/tables','POST',d);
+  document.getElementById('table-modal').classList.add('hidden');
+  allFloors = await api('/api/floors'); renderFloors(); toast('Table added!');
+}
+
+async function deleteTable(id) {
+  if (!confirm('Remove this table?')) return;
+  await api('/api/tables/'+id,'DELETE');
+  allFloors = await api('/api/floors'); renderFloors(); toast('Table removed');
+}
+
+// Payments
+function renderPayments() {
+  const el = document.getElementById('pay-methods-list');
+  el.innerHTML = allPayments.map(m=>`
+    <div class="card p-5" style="border-radius:16px">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">${m.type==='cash'?'💵':m.type==='upi'?'📱':'💳'}</span>
+          <div>
+            <div class="font-medium text-sm">${m.name}</div>
+            <div class="text-xs text-gray-500 capitalize">${m.type}</div>
+          </div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" ${m.enabled?'checked':''} onchange="togglePayment(${m.id},this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      ${m.type==='upi'?`<div>
+        <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">UPI ID</label>
+        <div class="flex gap-2">
+          <input id="upi-id-${m.id}" value="${m.upi_id}" placeholder="yourname@ybl" class="text-sm">
+          <button onclick="saveUPI(${m.id})" class="btn-ghost px-3 py-2 rounded-lg text-xs whitespace-nowrap">Save</button>
+        </div>
+      </div>`:''}
+    </div>`).join('');
+}
+
+async function togglePayment(id, enabled) {
+  await api('/api/payment-methods/'+id,'PUT',{enabled});
+  toast(enabled?'Payment method enabled':'Disabled');
+}
+
+async function saveUPI(id) {
+  const upi_id = document.getElementById('upi-id-'+id).value;
+  await api('/api/payment-methods/'+id,'PUT',{upi_id});
+  toast('UPI ID saved!');
+}
+
+init();
+</script>
+{% endblock %}
