@@ -1,197 +1,158 @@
 {% extends "base.html" %}
-{% block title %}Sign In — POS Cafe{% endblock %}
-{% block extra_head %}
-<style>
-  .portal-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); }
-  .portal-card.active { border-color: rgba(249,115,22,0.6); box-shadow: 0 0 0 1px rgba(249,115,22,0.2), 0 24px 60px rgba(249,115,22,0.12); }
-  .mode-pill { transition: all .2s; }
-  .mode-pill.active { background: rgba(249,115,22,0.16); color: #f97316; }
-  .clerk-shell { min-height: 420px; }
-</style>
-{% endblock %}
+{% block title %}Login — POS Cafe{% endblock %}
 {% block body %}
-<div class="min-h-screen flex items-center justify-center p-4" style="background:radial-gradient(circle at top, rgba(249,115,22,0.12), transparent 40%), linear-gradient(180deg, #090909 0%, #111 100%)">
-  <div class="w-full max-w-6xl grid lg:grid-cols-[1.05fr_0.95fr] gap-6 items-center">
-    <div class="space-y-6">
-      <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border text-xs text-gray-400 bg-black/30">
-        Clerk authentication
+<div class="min-h-screen flex items-center justify-center p-4" style="background:radial-gradient(ellipse at 60% 20%,rgba(249,115,22,0.08) 0%,transparent 60%),#0a0a0a">
+  <div class="w-full max-w-md">
+    <div class="text-center mb-10">
+      <div class="inline-flex items-center justify-center w-16 h-16 brand-gradient rounded-2xl mb-4 shadow-lg shadow-orange-900/40">
+        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
       </div>
-      <div>
-        <h1 class="font-display text-4xl md:text-5xl font-800 tracking-tight text-white leading-tight">
-          Separate sign in for staff and restaurant access.
-        </h1>
-        <p class="text-gray-400 mt-4 max-w-xl">
-          Customers and restaurant operators can use different sign-in paths. Clerk handles the identity layer, and Flask keeps the existing POS session and route structure.
-        </p>
+      <h1 class="font-display text-3xl font-800 tracking-tight text-white">POS Cafe</h1>
+      <p class="text-gray-500 text-sm mt-1">Restaurant Management System</p>
+    </div>
+
+    <div class="card p-1 mb-6 flex" style="border-radius:14px">
+      <button onclick="switchTab('login')" id="tab-login" class="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-white" style="background:rgba(249,115,22,0.15);color:#f97316">Login</button>
+      <button onclick="switchTab('signup')" id="tab-signup" class="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-gray-500">Sign Up</button>
+      <button onclick="switchTab('reset')" id="tab-reset" class="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-gray-500">Forgot Password</button>
+    </div>
+
+    <div id="form-login" class="card p-8" style="border-radius:16px">
+      <h2 class="font-display text-xl font-600 mb-6">Welcome back</h2>
+      <div class="space-y-4">
+        <div>
+          <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Email</label>
+          <input type="email" id="login-email" placeholder="you@cafe.com">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Password</label>
+          <input type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <button onclick="doLogin()" class="btn-primary w-full py-3 rounded-xl text-white font-medium mt-2">
+          Open Session →
+        </button>
       </div>
-      <div class="grid sm:grid-cols-2 gap-4 max-w-2xl">
-        <div class="card p-5">
-          <div class="text-sm text-gray-400 mb-2">User portal</div>
-          <div class="font-display text-xl font-700">POS / cashier access</div>
-          <p class="text-sm text-gray-500 mt-2">Use this path for the terminal and register flow.</p>
+      <p class="text-center text-gray-600 text-xs mt-6">Demo: admin@cafe.com / password</p>
+    </div>
+
+    <div id="form-signup" class="card p-8 hidden" style="border-radius:16px">
+      <h2 class="font-display text-xl font-600 mb-6">Create account</h2>
+      <div class="space-y-4">
+        <div>
+          <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Full Name</label>
+          <input type="text" id="signup-name" placeholder="Your Name">
         </div>
-        <div class="card p-5">
-          <div class="text-sm text-gray-400 mb-2">Restaurant portal</div>
-          <div class="font-display text-xl font-700">Backend / admin access</div>
-          <p class="text-sm text-gray-500 mt-2">Use this path for product, floor, and payment setup.</p>
+        <div>
+          <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Email</label>
+          <input type="email" id="signup-email" placeholder="you@cafe.com">
         </div>
+        <div>
+          <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Password</label>
+          <input type="password" id="signup-password" placeholder="••••••••">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Account Type</label>
+          <select id="signup-role">
+            <option value="user">User</option>
+            <option value="restaurant">Restaurant / Admin</option>
+          </select>
+        </div>
+        <button onclick="doSignup()" class="btn-primary w-full py-3 rounded-xl text-white font-medium mt-2">
+          Create Account →
+        </button>
       </div>
     </div>
 
-    <div class="card p-6 md:p-8" style="border-radius:22px">
-      <div class="flex gap-2 p-1 mb-5 rounded-2xl bg-black/30 border border-border">
-        <button id="mode-user" class="mode-pill flex-1 py-3 rounded-xl text-sm font-medium active" onclick="setMode('user')">User Login</button>
-        <button id="mode-restaurant" class="mode-pill flex-1 py-3 rounded-xl text-sm font-medium text-gray-500" onclick="setMode('restaurant')">Restaurant Login</button>
-      </div>
-
-      <div class="clerk-shell">
-        <div id="mode-copy" class="mb-4">
-          <div class="text-sm uppercase tracking-[0.2em] text-gray-500">User Login</div>
-          <h2 class="font-display text-2xl font-700 mt-2 text-white">Sign in to the POS terminal</h2>
-          <p class="text-sm text-gray-500 mt-2">This path opens the register after Clerk verifies your session.</p>
+    <div id="form-reset" class="card p-8 hidden" style="border-radius:16px">
+      <h2 class="font-display text-xl font-600 mb-2">Reset password</h2>
+      <p class="text-sm text-gray-500 mb-6">Enter your email, then use the code sent to you to set a new password.</p>
+      <div class="space-y-4">
+        <div>
+          <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Email</label>
+          <input type="email" id="reset-email" placeholder="you@cafe.com" oninput="syncResetEmail()">
         </div>
-
-        {% if clerk_publishable_key and clerk_js_url %}
-        <div id="clerk-target" class="rounded-2xl overflow-hidden border border-border min-h-[340px]"></div>
-        <div class="flex flex-wrap gap-3 mt-5">
-          <button id="sync-button" onclick="syncClerkSession()" class="btn-primary px-4 py-2.5 rounded-xl text-white text-sm font-medium">Continue</button>
-          <button id="signup-button" onclick="openClerkSignup()" class="btn-ghost px-4 py-2.5 rounded-xl text-sm">Create account</button>
-          <button onclick="refreshClerk()" class="btn-ghost px-4 py-2.5 rounded-xl text-sm">Refresh Clerk</button>
+        <div class="flex gap-3">
+          <button onclick="requestResetOtp()" class="btn-primary flex-1 py-3 rounded-xl text-white font-medium">Send OTP</button>
+          <button onclick="switchTab('login')" class="btn-ghost px-4 py-3 rounded-xl text-sm">Back</button>
         </div>
-        {% else %}
-        <div class="card p-5 border border-dashed border-orange-800/60 bg-orange-950/10">
-          <div class="font-display text-lg font-700 text-white">Clerk is not configured</div>
-          <p class="text-sm text-gray-400 mt-2">
-            Set `CLERK_PUBLISHABLE_KEY` and `CLERK_FRONTEND_API_URL` so the sign-in widget can load.
-          </p>
+        <div id="reset-step-2" class="hidden pt-2 space-y-4 border-t border-border">
+          <div>
+            <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">OTP Code</label>
+            <input type="text" id="reset-otp" placeholder="123456" maxlength="6">
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">New Password</label>
+            <input type="password" id="reset-password" placeholder="New password">
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Confirm New Password</label>
+            <input type="password" id="reset-confirm-password" placeholder="Confirm new password">
+          </div>
+          <button onclick="completeReset()" class="btn-primary w-full py-3 rounded-xl text-white font-medium mt-2">
+            Update Password →
+          </button>
         </div>
-        {% endif %}
       </div>
     </div>
   </div>
 </div>
 {% endblock %}
 {% block scripts %}
-{% if clerk_publishable_key and clerk_js_url %}
-<script src="{{ clerk_js_url }}" data-clerk-publishable-key="{{ clerk_publishable_key }}" async crossorigin="anonymous"></script>
 <script>
-let selectedPortal = {{ portal|tojson }};
+let resetEmailValue = '';
 
-function updateModeUi() {
-  const userActive = selectedPortal === 'user';
-  document.getElementById('mode-user').classList.toggle('active', userActive);
-  document.getElementById('mode-restaurant').classList.toggle('active', !userActive);
-  document.getElementById('mode-user').classList.toggle('text-gray-500', !userActive);
-  document.getElementById('mode-restaurant').classList.toggle('text-gray-500', userActive);
-  document.getElementById('mode-copy').innerHTML = userActive ? `
-    <div class="text-sm uppercase tracking-[0.2em] text-gray-500">User Login</div>
-    <h2 class="font-display text-2xl font-700 mt-2 text-white">Sign in to the POS terminal</h2>
-    <p class="text-sm text-gray-500 mt-2">This path opens the register after Clerk verifies your session.</p>
-  ` : `
-    <div class="text-sm uppercase tracking-[0.2em] text-gray-500">Restaurant Login</div>
-    <h2 class="font-display text-2xl font-700 mt-2 text-white">Sign in to restaurant tools</h2>
-    <p class="text-sm text-gray-500 mt-2">This path opens backend and dashboard access after Clerk verifies your session.</p>
-  `;
-  const signup = document.getElementById('signup-button');
-  signup.style.display = userActive ? 'inline-flex' : 'none';
+function switchTab(tab) {
+  document.getElementById('form-login').classList.toggle('hidden', tab!=='login');
+  document.getElementById('form-signup').classList.toggle('hidden', tab!=='signup');
+  document.getElementById('form-reset').classList.toggle('hidden', tab!=='reset');
+  document.getElementById('tab-login').style.cssText = tab==='login' ? 'background:rgba(249,115,22,0.15);color:#f97316' : 'color:#6b7280';
+  document.getElementById('tab-signup').style.cssText = tab==='signup' ? 'background:rgba(249,115,22,0.15);color:#f97316' : 'color:#6b7280';
+  document.getElementById('tab-reset').style.cssText = tab==='reset' ? 'background:rgba(249,115,22,0.15);color:#f97316' : 'color:#6b7280';
 }
 
-function setMode(mode) {
-  selectedPortal = mode;
-  const url = new URL(window.location.href);
-  url.searchParams.set('portal', mode);
-  window.history.replaceState({}, '', url);
-  updateModeUi();
-  renderClerk();
+function syncResetEmail() {
+  resetEmailValue = document.getElementById('reset-email').value.trim();
 }
 
-async function refreshClerk() {
-  if (!window.Clerk) {
-    toast('Clerk is still loading', 'error');
-    return;
-  }
-  await renderClerk(true);
+async function requestResetOtp() {
+  const email = document.getElementById('reset-email').value.trim();
+  if (!email) return toast('Enter your email', 'error');
+  const r = await api('/api/password-reset/request', 'POST', { email });
+  if (r.error) return toast(r.error, 'error');
+  document.getElementById('reset-step-2').classList.remove('hidden');
+  toast(r.message || 'OTP sent to your email');
 }
 
-async function renderClerk(force = false) {
-  if (!window.Clerk) return;
-  const target = document.getElementById('clerk-target');
-  if (!target) return;
-  if (force) target.innerHTML = '';
-  if (target.dataset.rendered === selectedPortal && !force) return;
-  target.innerHTML = '';
-  await Clerk.load();
-  Clerk.mountSignIn(target, {
-    routing: 'virtual',
-    signUpUrl: '/auth?portal=user',
-  });
-  target.dataset.rendered = selectedPortal;
+async function completeReset() {
+  const email = document.getElementById('reset-email').value.trim();
+  const otp = document.getElementById('reset-otp').value.trim();
+  const password = document.getElementById('reset-password').value;
+  const confirm_password = document.getElementById('reset-confirm-password').value;
+  if (!email || !otp || !password || !confirm_password) return toast('Fill all fields', 'error');
+  const r = await api('/api/password-reset/complete', 'POST', { email, otp, password, confirm_password });
+  if (r.error) return toast(r.error, 'error');
+  toast('Password updated successfully');
+  setTimeout(() => location.href = '/auth', 600);
 }
-
-async function openClerkSignup() {
-  if (!window.Clerk) return toast('Clerk is still loading', 'error');
-  if (selectedPortal !== 'user') return;
-  await Clerk.openSignUp({ routing: 'virtual' });
+async function doLogin() {
+  const email = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+  if (!email || !password) return toast('Fill all fields', 'error');
+  const r = await api('/api/login','POST',{email,password});
+  if (r.error) return toast(r.error,'error');
+  toast('Welcome back, '+r.name+'!');
+  setTimeout(()=>location.href=r.role === 'restaurant' ? '/backend' : '/pos',600);
 }
-
-async function syncClerkSession() {
-  if (!window.Clerk) return toast('Clerk is still loading', 'error');
-  await Clerk.load();
-
-  if (!Clerk.user || !Clerk.session) {
-    toast('Finish signing in with Clerk first', 'error');
-    return;
-  }
-
-  const token = await Clerk.session.getToken({ skipCache: true });
-  if (!token) {
-    toast('Unable to read Clerk session token', 'error');
-    return;
-  }
-
-  const payload = {
-    portal: selectedPortal,
-    name: Clerk.user.fullName || Clerk.user.firstName || Clerk.user.username || 'Clerk User',
-    email: Clerk.user.primaryEmailAddress?.emailAddress || '',
-  };
-
-  const r = await fetch('/api/auth/clerk', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify(payload),
-  });
-  const data = await r.json();
-  if (!r.ok) return toast(data.error || 'Auth failed', 'error');
-
-  toast(`Welcome back, ${data.name}!`);
-  setTimeout(() => {
-    location.href = data.portal === 'restaurant' ? '/backend' : '/pos';
-  }, 500);
+async function doSignup() {
+  const name = document.getElementById('signup-name').value;
+  const email = document.getElementById('signup-email').value;
+  const password = document.getElementById('signup-password').value;
+  const role = document.getElementById('signup-role').value;
+  if (!name||!email||!password) return toast('Fill all fields','error');
+  const r = await api('/api/signup','POST',{name,email,password,role});
+  if (r.error) return toast(r.error,'error');
+  toast('Account created!');
+  setTimeout(()=>location.href=r.role === 'restaurant' ? '/backend' : '/pos',600);
 }
-
-async function bootAuth() {
-  updateModeUi();
-  if (!window.Clerk) {
-    setTimeout(bootAuth, 100);
-    return;
-  }
-  await renderClerk(true);
-
-  try {
-    await Clerk.load();
-    if (Clerk.user && Clerk.session) {
-      await syncClerkSession();
-    }
-  } catch (err) {
-    console.error(err);
-    toast('Clerk failed to initialize', 'error');
-  }
-}
-
-window.addEventListener('load', bootAuth);
 </script>
-{% endif %}
 {% endblock %}

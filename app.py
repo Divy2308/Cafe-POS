@@ -3,28 +3,49 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
-import qrcode, io, base64, json, os, urllib.request
-import jwt
+import qrcode, io, base64, json
+import os
+import secrets
+import smtplib
 from datetime import datetime, timedelta
 from functools import wraps
+from email.message import EmailMessage
+
+try:
+    import resend
+except ImportError:
+    resend = None
+
+env_path = os.path.join(os.path.dirname(__file__), '.env')
+if os.path.exists(env_path):
+    with open(env_path, 'r', encoding='utf-8') as env_file:
+        for raw_line in env_file:
+            line = raw_line.strip()
+            if not line or line.startswith('#') or '=' not in line:
+                continue
+            key, value = line.split('=', 1)
+            os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'pos-cafe-hackathon-2024'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///pos.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-CLERK_PUBLISHABLE_KEY = os.getenv('CLERK_PUBLISHABLE_KEY', '')
-CLERK_FRONTEND_API_URL = os.getenv('CLERK_FRONTEND_API_URL', '')
-CLERK_JS_URL = os.getenv(
-    'CLERK_JS_URL',
-    f"{CLERK_FRONTEND_API_URL.rstrip('/')}/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
-    if CLERK_FRONTEND_API_URL else ''
-)
-CLERK_JWKS_URL = os.getenv('CLERK_JWKS_URL', 'https://api.clerk.com/v1/jwks')
-CLERK_ISSUER = os.getenv('CLERK_ISSUER', '')
-CLERK_ROLE_DEFAULT = 'user'
+SMTP_HOST = os.getenv('SMTP_HOST', '').strip()
+SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
+SMTP_USER = os.getenv('SMTP_USER', '').strip()
+SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', '').strip()
+SMTP_FROM = os.getenv('SMTP_FROM', SMTP_USER or 'no-reply@pos-cafe.local').strip()
+SMTP_USE_TLS = os.getenv('SMTP_USE_TLS', '1').strip() != '0'
+RESEND_API_KEY = os.getenv('RESEND_API_KEY', '').strip()
+RESEND_FROM = os.getenv(
+    'RESEND_FROM',
+    os.getenv('EMAIL_FROM', 'POS Cafe <onboarding@resend.dev>')
+).strip()
+if RESEND_API_KEY and resend is not None:
+    resend.api_key = RESEND_API_KEY
 
-_clerk_jwks_cache = {'keys': None, 'fetched_at': None}
+PASSWORD_RESET_CODES = {}
 
 db = SQLAlchemy(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
@@ -128,160 +149,89 @@ def get_current_user():
         return User.query.get(session['user_id'])
     return None
 
-def get_current_portal():
-    return session.get('portal_role', CLERK_ROLE_DEFAULT)
-
-def portal_required(*allowed_roles):
-    def decorator(f):
-        @wraps(f)
-        def decorated(*args, **kwargs):
-            if 'user_id' not in session:
-                return redirect(url_for('auth'))
-            if allowed_roles and session.get('portal_role') not in allowed_roles:
-                target = allowed_roles[0] if allowed_roles else CLERK_ROLE_DEFAULT
-                return redirect(url_for('auth', portal=target))
-            return f(*args, **kwargs)
-        return decorated
-    return decorator
-
-def api_portal_required(*allowed_roles):
-    def decorator(f):
-        @wraps(f)
-        def decorated(*args, **kwargs):
-            if 'user_id' not in session:
-                return jsonify({'error': 'unauthorized'}), 401
-            if allowed_roles and session.get('portal_role') not in allowed_roles:
-                return jsonify({'error': 'forbidden'}), 403
-            return f(*args, **kwargs)
-        return decorated
-    return decorator
-
-def _fetch_clerk_jwks():
-    if _clerk_jwks_cache['keys'] is not None:
-        return _clerk_jwks_cache['keys']
-    with urllib.request.urlopen(CLERK_JWKS_URL, timeout=10) as response:
-        payload = json.loads(response.read().decode('utf-8'))
-    keys = payload.get('keys', [])
-    _clerk_jwks_cache['keys'] = keys
-    _clerk_jwks_cache['fetched_at'] = datetime.utcnow()
-    return keys
-
-def verify_clerk_token(token):
-    header = jwt.get_unverified_header(token)
-    kid = header.get('kid')
-    if not kid:
-        raise ValueError('Missing Clerk key id')
-
-    jwk = next((key for key in _fetch_clerk_jwks() if key.get('kid') == kid), None)
-    if not jwk:
-        _clerk_jwks_cache['keys'] = None
-        jwk = next((key for key in _fetch_clerk_jwks() if key.get('kid') == kid), None)
-    if not jwk:
-        raise ValueError('Unable to find Clerk signing key')
-
-    public_key = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(jwk))
-    decode_opts = {'verify_aud': False}
-    kwargs = {'algorithms': ['RS256'], 'options': decode_opts}
-    if CLERK_ISSUER:
-        kwargs['issuer'] = CLERK_ISSUER
-    return jwt.decode(token, public_key, **kwargs)
-
-def sync_clerk_session(claims, portal, name=None, email=None):
-    clerk_id = claims.get('sub')
-    if not clerk_id:
+def find_user_by_email(email):
+    email = (email or '').strip()
+    if not email:
         return None
+    return User.query.filter(db.func.lower(User.email) == email.lower()).first()
 
-    fake_email = f'clerk-{clerk_id}@clerk.local'
-    display_name = (name or email or 'Clerk User').strip() if isinstance(name or email, str) else 'Clerk User'
-    u = User.query.filter_by(email=fake_email).first()
-    if not u:
-        u = User(
-            name=display_name,
-            email=fake_email,
-            password=generate_password_hash(clerk_id),
-            role=portal,
-        )
-        db.session.add(u)
-    else:
-        u.name = display_name
-        u.role = portal
-    db.session.commit()
+def send_reset_email(email, otp):
+    subject = 'POS Cafe password reset code'
+    body = (
+        f'Your POS Cafe password reset code is {otp}. '
+        'This code expires in 10 minutes.'
+    )
 
-    session.clear()
-    session['user_id'] = u.id
-    session['user_name'] = u.name
-    session['portal_role'] = portal
-    session['auth_provider'] = 'clerk'
-    session['clerk_user_id'] = clerk_id
-    session['clerk_session_id'] = claims.get('sid', '')
-    session['user_email'] = email or fake_email
-    return u
+    if RESEND_API_KEY:
+        if resend is None:
+            return False
+        try:
+            result = resend.Emails.send({
+                'from': RESEND_FROM,
+                'to': [email],
+                'subject': subject,
+                'text': body,
+                'html': f'<p>{body}</p>',
+            })
+            if isinstance(result, dict):
+                return bool(result.get('id'))
+            return bool(getattr(result, 'id', result))
+        except Exception:
+            return False
+
+    if not SMTP_HOST:
+        return False
+
+    msg = EmailMessage()
+    msg['Subject'] = subject
+    msg['From'] = SMTP_FROM
+    msg['To'] = email
+    msg.set_content(body)
+
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as smtp:
+        if SMTP_USE_TLS:
+            smtp.starttls()
+        if SMTP_USER:
+            smtp.login(SMTP_USER, SMTP_PASSWORD)
+        smtp.send_message(msg)
+    return True
+
+def cleanup_reset_codes():
+    now = datetime.utcnow()
+    expired = [email for email, record in PASSWORD_RESET_CODES.items() if record['expires_at'] <= now]
+    for email in expired:
+        PASSWORD_RESET_CODES.pop(email, None)
 
 # ─── Auth Routes ───────────────────────────────────────────
 @app.route('/')
 def index():
     if 'user_id' in session:
-        if session.get('portal_role') == 'restaurant':
+        if session.get('user_role') == 'restaurant':
             return redirect(url_for('backend'))
         return redirect(url_for('pos'))
     return redirect(url_for('auth'))
 
 @app.route('/auth')
 def auth():
-    portal = request.args.get('portal', CLERK_ROLE_DEFAULT)
-    if portal not in ['user', 'restaurant']:
-        portal = CLERK_ROLE_DEFAULT
-    return render_template(
-        'auth.html',
-        portal=portal,
-        clerk_publishable_key=CLERK_PUBLISHABLE_KEY,
-        clerk_js_url=CLERK_JS_URL,
-    )
-
-@app.route('/api/auth/clerk', methods=['POST'])
-def clerk_login():
-    d = request.json or {}
-    token = request.headers.get('Authorization', '')
-    if token.startswith('Bearer '):
-        token = token[7:].strip()
-    token = token or d.get('token', '')
-    if not token:
-        return jsonify({'error': 'Missing Clerk token'}), 400
-
-    try:
-        claims = verify_clerk_token(token)
-    except Exception:
-        return jsonify({'error': 'Invalid Clerk session'}), 401
-
-    portal = d.get('portal', CLERK_ROLE_DEFAULT)
-    if portal not in ['user', 'restaurant']:
-        portal = CLERK_ROLE_DEFAULT
-
-    email = d.get('email') or ''
-    name = d.get('name') or d.get('full_name') or email or 'Clerk User'
-    user = sync_clerk_session(claims, portal, name=name, email=email)
-    if not user:
-        return jsonify({'error': 'Unable to create local session'}), 500
-
-    return jsonify({
-        'ok': True,
-        'name': user.name,
-        'portal': portal,
-        'user_id': user.id,
-        'clerk_user_id': claims.get('sub'),
-    })
+    return render_template('auth.html')
 
 @app.route('/api/signup', methods=['POST'])
 def signup():
     d = request.json
     if User.query.filter_by(email=d['email']).first():
         return jsonify({'error': 'Email already exists'}), 400
-    u = User(name=d['name'], email=d['email'], password=generate_password_hash(d['password']))
+    role = d.get('role', 'user')
+    if role == 'admin':
+        role = 'restaurant'
+    if role not in ('user', 'restaurant'):
+        role = 'user'
+    u = User(name=d['name'], email=d['email'], password=generate_password_hash(d['password']), role=role)
     db.session.add(u)
     db.session.commit()
     session['user_id'] = u.id
     session['user_name'] = u.name
-    return jsonify({'ok': True, 'name': u.name})
+    session['user_role'] = u.role
+    return jsonify({'ok': True, 'name': u.name, 'role': u.role})
 
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -291,26 +241,96 @@ def login():
         return jsonify({'error': 'Invalid credentials'}), 401
     session['user_id'] = u.id
     session['user_name'] = u.name
-    return jsonify({'ok': True, 'name': u.name})
+    session['user_role'] = 'restaurant' if (u.role in ('restaurant', 'admin')) else 'user'
+    return jsonify({'ok': True, 'name': u.name, 'role': session['user_role']})
 
 @app.route('/api/logout', methods=['POST'])
 def logout():
     session.clear()
     return jsonify({'ok': True})
 
+@app.route('/api/password-reset/request', methods=['POST'])
+def password_reset_request():
+    cleanup_reset_codes()
+    d = request.json or {}
+    email = (d.get('email') or '').strip()
+    if not email:
+        return jsonify({'error': 'Email is required'}), 400
+
+    user = find_user_by_email(email)
+    if not user:
+        return jsonify({'error': 'No account found for that email'}), 404
+
+    otp = f'{secrets.randbelow(1000000):06d}'
+    PASSWORD_RESET_CODES[email.lower()] = {
+        'otp': otp,
+        'expires_at': datetime.utcnow() + timedelta(minutes=10),
+        'attempts': 0,
+    }
+
+    email_sent = False
+    try:
+        email_sent = send_reset_email(user.email, otp)
+    except Exception:
+        return jsonify({'error': 'Email provider rejected the message. Check RESEND_FROM and verified domain.'}), 500
+
+    if not email_sent:
+        PASSWORD_RESET_CODES.pop(email.lower(), None)
+        return jsonify({'error': 'Unable to send reset code right now'}), 500
+
+    return jsonify({'ok': True, 'message': 'Reset code sent to your email'})
+
+@app.route('/api/password-reset/complete', methods=['POST'])
+def password_reset_complete():
+    cleanup_reset_codes()
+    d = request.json or {}
+    email = (d.get('email') or '').strip()
+    otp = (d.get('otp') or '').strip()
+    password = d.get('password') or ''
+    confirm_password = d.get('confirm_password') or ''
+
+    if not email or not otp or not password or not confirm_password:
+        return jsonify({'error': 'Fill all fields'}), 400
+    if password != confirm_password:
+        return jsonify({'error': 'Passwords do not match'}), 400
+    if len(password) < 6:
+        return jsonify({'error': 'Password must be at least 6 characters'}), 400
+
+    record = PASSWORD_RESET_CODES.get(email.lower())
+    if not record:
+        return jsonify({'error': 'Reset code not found or expired'}), 400
+    if record['expires_at'] < datetime.utcnow():
+        PASSWORD_RESET_CODES.pop(email.lower(), None)
+        return jsonify({'error': 'Reset code expired'}), 400
+    if record['otp'] != otp:
+        record['attempts'] += 1
+        if record['attempts'] >= 5:
+            PASSWORD_RESET_CODES.pop(email.lower(), None)
+            return jsonify({'error': 'Too many invalid attempts'}), 400
+        return jsonify({'error': 'Invalid reset code'}), 400
+
+    user = find_user_by_email(email)
+    if not user:
+        PASSWORD_RESET_CODES.pop(email.lower(), None)
+        return jsonify({'error': 'Account not found'}), 404
+
+    user.password = generate_password_hash(password)
+    db.session.commit()
+    PASSWORD_RESET_CODES.pop(email.lower(), None)
+    return jsonify({'ok': True})
+
 # ─── Pages ────────────────────────────────────────────────
 @app.route('/pos')
-@portal_required('user', 'restaurant')
 def pos():
     return render_template('pos.html', user_name=session.get('user_name'))
 
 @app.route('/backend')
-@portal_required('restaurant')
 def backend():
+    if session.get('user_role') != 'restaurant':
+        return redirect(url_for('pos'))
     return render_template('backend.html', user_name=session.get('user_name'))
 
 @app.route('/kitchen')
-@portal_required('restaurant')
 def kitchen():
     return render_template('kitchen.html')
 
@@ -319,8 +339,9 @@ def customer():
     return render_template('customer.html')
 
 @app.route('/dashboard')
-@portal_required('restaurant')
 def dashboard():
+    if session.get('user_role') != 'restaurant':
+        return redirect(url_for('pos'))
     return render_template('dashboard.html', user_name=session.get('user_name'))
 
 # ─── API: Products ─────────────────────────────────────────
@@ -336,7 +357,6 @@ def get_products():
 
 @app.route('/api/products/all', methods=['GET'])
 @login_required
-@api_portal_required('restaurant')
 def get_all_products():
     products = Product.query.all()
     cats = Category.query.all()
@@ -347,7 +367,6 @@ def get_all_products():
 
 @app.route('/api/products', methods=['POST'])
 @login_required
-@api_portal_required('restaurant')
 def add_product():
     d = request.json
     cat = Category.query.filter_by(name=d.get('category','')).first()
@@ -363,7 +382,6 @@ def add_product():
 
 @app.route('/api/products/<int:pid>', methods=['PUT'])
 @login_required
-@api_portal_required('restaurant')
 def update_product(pid):
     p = Product.query.get_or_404(pid)
     d = request.json
@@ -377,7 +395,6 @@ def update_product(pid):
 
 @app.route('/api/products/<int:pid>', methods=['DELETE'])
 @login_required
-@api_portal_required('restaurant')
 def delete_product(pid):
     p = Product.query.get_or_404(pid)
     p.active = False
@@ -396,7 +413,6 @@ def get_floors():
 
 @app.route('/api/floors', methods=['POST'])
 @login_required
-@api_portal_required('restaurant')
 def add_floor():
     d = request.json
     f = Floor(name=d['name'])
@@ -406,7 +422,6 @@ def add_floor():
 
 @app.route('/api/tables', methods=['POST'])
 @login_required
-@api_portal_required('restaurant')
 def add_table():
     d = request.json
     t = Table(number=d['number'], seats=int(d.get('seats',4)), floor_id=int(d['floor_id']))
@@ -416,7 +431,6 @@ def add_table():
 
 @app.route('/api/tables/<int:tid>', methods=['DELETE'])
 @login_required
-@api_portal_required('restaurant')
 def delete_table(tid):
     t = Table.query.get_or_404(tid)
     t.active = False
@@ -431,7 +445,6 @@ def get_payment_methods():
 
 @app.route('/api/payment-methods/<int:mid>', methods=['PUT'])
 @login_required
-@api_portal_required('restaurant')
 def update_payment_method(mid):
     m = PaymentMethod.query.get_or_404(mid)
     d = request.json
@@ -557,7 +570,6 @@ def get_table_order(tid):
 
 # ─── API: Kitchen ──────────────────────────────────────────
 @app.route('/api/kitchen/tickets', methods=['GET'])
-@api_portal_required('restaurant')
 def get_tickets():
     tickets = KitchenTicket.query.filter(KitchenTicket.status != 'completed').order_by(KitchenTicket.sent_at).all()
     result = []
@@ -573,7 +585,6 @@ def get_tickets():
     return jsonify(result)
 
 @app.route('/api/kitchen/tickets/<int:kid>/advance', methods=['POST'])
-@api_portal_required('restaurant')
 def advance_ticket(kid):
     kt = KitchenTicket.query.get_or_404(kid)
     stages = ['to_cook','preparing','completed']
@@ -587,7 +598,6 @@ def advance_ticket(kid):
 # ─── API: Dashboard ────────────────────────────────────────
 @app.route('/api/dashboard/stats', methods=['GET'])
 @login_required
-@api_portal_required('restaurant')
 def dashboard_stats():
     period = request.args.get('period','today')
     now = datetime.utcnow()
@@ -650,9 +660,25 @@ def seed_data():
         db.session.add(m)
     db.session.commit()
 
+def ensure_default_accounts():
+    admin_email = 'admin@cafe.com'
+    admin = User.query.filter_by(email=admin_email).first()
+    if not admin:
+        admin = User(
+            name='Admin',
+            email=admin_email,
+            password=generate_password_hash('password'),
+            role='restaurant',
+        )
+        db.session.add(admin)
+    else:
+        admin.role = 'restaurant'
+    db.session.commit()
+
 with app.app_context():
     db.create_all()
     seed_data()
+    ensure_default_accounts()
 
 if __name__ == '__main__':
     socketio.run(app, debug=True, port=5000)

@@ -5,4 +5,4 @@ flask-cors
 qrcode[pil]
 pillow
 werkzeug
-PyJWT
+resend
