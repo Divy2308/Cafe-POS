@@ -3,7 +3,8 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
-import qrcode, io, base64, json
+import qrcode, io, base64, json, os, urllib.request
+import jwt
 from datetime import datetime, timedelta
 from functools import wraps
 
@@ -11,6 +12,19 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'pos-cafe-hackathon-2024'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///pos.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+CLERK_PUBLISHABLE_KEY = os.getenv('CLERK_PUBLISHABLE_KEY', '')
+CLERK_FRONTEND_API_URL = os.getenv('CLERK_FRONTEND_API_URL', '')
+CLERK_JS_URL = os.getenv(
+    'CLERK_JS_URL',
+    f"{CLERK_FRONTEND_API_URL.rstrip('/')}/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
+    if CLERK_FRONTEND_API_URL else ''
+)
+CLERK_JWKS_URL = os.getenv('CLERK_JWKS_URL', 'https://api.clerk.com/v1/jwks')
+CLERK_ISSUER = os.getenv('CLERK_ISSUER', '')
+CLERK_ROLE_DEFAULT = 'user'
+
+_clerk_jwks_cache = {'keys': None, 'fetched_at': None}
 
 db = SQLAlchemy(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
@@ -114,16 +128,148 @@ def get_current_user():
         return User.query.get(session['user_id'])
     return None
 
+def get_current_portal():
+    return session.get('portal_role', CLERK_ROLE_DEFAULT)
+
+def portal_required(*allowed_roles):
+    def decorator(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            if 'user_id' not in session:
+                return redirect(url_for('auth'))
+            if allowed_roles and session.get('portal_role') not in allowed_roles:
+                target = allowed_roles[0] if allowed_roles else CLERK_ROLE_DEFAULT
+                return redirect(url_for('auth', portal=target))
+            return f(*args, **kwargs)
+        return decorated
+    return decorator
+
+def api_portal_required(*allowed_roles):
+    def decorator(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            if 'user_id' not in session:
+                return jsonify({'error': 'unauthorized'}), 401
+            if allowed_roles and session.get('portal_role') not in allowed_roles:
+                return jsonify({'error': 'forbidden'}), 403
+            return f(*args, **kwargs)
+        return decorated
+    return decorator
+
+def _fetch_clerk_jwks():
+    if _clerk_jwks_cache['keys'] is not None:
+        return _clerk_jwks_cache['keys']
+    with urllib.request.urlopen(CLERK_JWKS_URL, timeout=10) as response:
+        payload = json.loads(response.read().decode('utf-8'))
+    keys = payload.get('keys', [])
+    _clerk_jwks_cache['keys'] = keys
+    _clerk_jwks_cache['fetched_at'] = datetime.utcnow()
+    return keys
+
+def verify_clerk_token(token):
+    header = jwt.get_unverified_header(token)
+    kid = header.get('kid')
+    if not kid:
+        raise ValueError('Missing Clerk key id')
+
+    jwk = next((key for key in _fetch_clerk_jwks() if key.get('kid') == kid), None)
+    if not jwk:
+        _clerk_jwks_cache['keys'] = None
+        jwk = next((key for key in _fetch_clerk_jwks() if key.get('kid') == kid), None)
+    if not jwk:
+        raise ValueError('Unable to find Clerk signing key')
+
+    public_key = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(jwk))
+    decode_opts = {'verify_aud': False}
+    kwargs = {'algorithms': ['RS256'], 'options': decode_opts}
+    if CLERK_ISSUER:
+        kwargs['issuer'] = CLERK_ISSUER
+    return jwt.decode(token, public_key, **kwargs)
+
+def sync_clerk_session(claims, portal, name=None, email=None):
+    clerk_id = claims.get('sub')
+    if not clerk_id:
+        return None
+
+    fake_email = f'clerk-{clerk_id}@clerk.local'
+    display_name = (name or email or 'Clerk User').strip() if isinstance(name or email, str) else 'Clerk User'
+    u = User.query.filter_by(email=fake_email).first()
+    if not u:
+        u = User(
+            name=display_name,
+            email=fake_email,
+            password=generate_password_hash(clerk_id),
+            role=portal,
+        )
+        db.session.add(u)
+    else:
+        u.name = display_name
+        u.role = portal
+    db.session.commit()
+
+    session.clear()
+    session['user_id'] = u.id
+    session['user_name'] = u.name
+    session['portal_role'] = portal
+    session['auth_provider'] = 'clerk'
+    session['clerk_user_id'] = clerk_id
+    session['clerk_session_id'] = claims.get('sid', '')
+    session['user_email'] = email or fake_email
+    return u
+
 # ─── Auth Routes ───────────────────────────────────────────
 @app.route('/')
 def index():
     if 'user_id' in session:
+        if session.get('portal_role') == 'restaurant':
+            return redirect(url_for('backend'))
         return redirect(url_for('pos'))
     return redirect(url_for('auth'))
 
 @app.route('/auth')
 def auth():
-    return render_template('auth.html')
+    portal = request.args.get('portal', CLERK_ROLE_DEFAULT)
+    if portal not in ['user', 'restaurant']:
+        portal = CLERK_ROLE_DEFAULT
+    return render_template(
+        'auth.html',
+        portal=portal,
+        clerk_publishable_key=CLERK_PUBLISHABLE_KEY,
+        clerk_js_url=CLERK_JS_URL,
+    )
+
+@app.route('/api/auth/clerk', methods=['POST'])
+def clerk_login():
+    d = request.json or {}
+    token = request.headers.get('Authorization', '')
+    if token.startswith('Bearer '):
+        token = token[7:].strip()
+    token = token or d.get('token', '')
+    if not token:
+        return jsonify({'error': 'Missing Clerk token'}), 400
+
+    try:
+        claims = verify_clerk_token(token)
+    except Exception:
+        return jsonify({'error': 'Invalid Clerk session'}), 401
+
+    portal = d.get('portal', CLERK_ROLE_DEFAULT)
+    if portal not in ['user', 'restaurant']:
+        portal = CLERK_ROLE_DEFAULT
+
+    email = d.get('email') or ''
+    name = d.get('name') or d.get('full_name') or email or 'Clerk User'
+    user = sync_clerk_session(claims, portal, name=name, email=email)
+    if not user:
+        return jsonify({'error': 'Unable to create local session'}), 500
+
+    return jsonify({
+        'ok': True,
+        'name': user.name,
+        'portal': portal,
+        'user_id': user.id,
+        'clerk_user_id': claims.get('sub'),
+    })
 
 @app.route('/api/signup', methods=['POST'])
 def signup():
@@ -154,18 +300,17 @@ def logout():
 
 # ─── Pages ────────────────────────────────────────────────
 @app.route('/pos')
+@portal_required('user', 'restaurant')
 def pos():
-    if 'user_id' not in session:
-        return redirect(url_for('auth'))
     return render_template('pos.html', user_name=session.get('user_name'))
 
 @app.route('/backend')
+@portal_required('restaurant')
 def backend():
-    if 'user_id' not in session:
-        return redirect(url_for('auth'))
     return render_template('backend.html', user_name=session.get('user_name'))
 
 @app.route('/kitchen')
+@portal_required('restaurant')
 def kitchen():
     return render_template('kitchen.html')
 
@@ -174,9 +319,8 @@ def customer():
     return render_template('customer.html')
 
 @app.route('/dashboard')
+@portal_required('restaurant')
 def dashboard():
-    if 'user_id' not in session:
-        return redirect(url_for('auth'))
     return render_template('dashboard.html', user_name=session.get('user_name'))
 
 # ─── API: Products ─────────────────────────────────────────
@@ -192,6 +336,7 @@ def get_products():
 
 @app.route('/api/products/all', methods=['GET'])
 @login_required
+@api_portal_required('restaurant')
 def get_all_products():
     products = Product.query.all()
     cats = Category.query.all()
@@ -202,6 +347,7 @@ def get_all_products():
 
 @app.route('/api/products', methods=['POST'])
 @login_required
+@api_portal_required('restaurant')
 def add_product():
     d = request.json
     cat = Category.query.filter_by(name=d.get('category','')).first()
@@ -217,6 +363,7 @@ def add_product():
 
 @app.route('/api/products/<int:pid>', methods=['PUT'])
 @login_required
+@api_portal_required('restaurant')
 def update_product(pid):
     p = Product.query.get_or_404(pid)
     d = request.json
@@ -230,6 +377,7 @@ def update_product(pid):
 
 @app.route('/api/products/<int:pid>', methods=['DELETE'])
 @login_required
+@api_portal_required('restaurant')
 def delete_product(pid):
     p = Product.query.get_or_404(pid)
     p.active = False
@@ -248,6 +396,7 @@ def get_floors():
 
 @app.route('/api/floors', methods=['POST'])
 @login_required
+@api_portal_required('restaurant')
 def add_floor():
     d = request.json
     f = Floor(name=d['name'])
@@ -257,6 +406,7 @@ def add_floor():
 
 @app.route('/api/tables', methods=['POST'])
 @login_required
+@api_portal_required('restaurant')
 def add_table():
     d = request.json
     t = Table(number=d['number'], seats=int(d.get('seats',4)), floor_id=int(d['floor_id']))
@@ -266,6 +416,7 @@ def add_table():
 
 @app.route('/api/tables/<int:tid>', methods=['DELETE'])
 @login_required
+@api_portal_required('restaurant')
 def delete_table(tid):
     t = Table.query.get_or_404(tid)
     t.active = False
@@ -280,6 +431,7 @@ def get_payment_methods():
 
 @app.route('/api/payment-methods/<int:mid>', methods=['PUT'])
 @login_required
+@api_portal_required('restaurant')
 def update_payment_method(mid):
     m = PaymentMethod.query.get_or_404(mid)
     d = request.json
@@ -405,6 +557,7 @@ def get_table_order(tid):
 
 # ─── API: Kitchen ──────────────────────────────────────────
 @app.route('/api/kitchen/tickets', methods=['GET'])
+@api_portal_required('restaurant')
 def get_tickets():
     tickets = KitchenTicket.query.filter(KitchenTicket.status != 'completed').order_by(KitchenTicket.sent_at).all()
     result = []
@@ -420,6 +573,7 @@ def get_tickets():
     return jsonify(result)
 
 @app.route('/api/kitchen/tickets/<int:kid>/advance', methods=['POST'])
+@api_portal_required('restaurant')
 def advance_ticket(kid):
     kt = KitchenTicket.query.get_or_404(kid)
     stages = ['to_cook','preparing','completed']
@@ -433,6 +587,7 @@ def advance_ticket(kid):
 # ─── API: Dashboard ────────────────────────────────────────
 @app.route('/api/dashboard/stats', methods=['GET'])
 @login_required
+@api_portal_required('restaurant')
 def dashboard_stats():
     period = request.args.get('period','today')
     now = datetime.utcnow()
