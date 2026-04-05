@@ -14,7 +14,7 @@
   <!-- Sidebar -->
   <div style="width:220px;min-width:220px;background:#111" class="border-r border-border flex flex-col">
     <div class="p-5 border-b border-border">
-      <div class="font-display font-700 text-white">Dashboard</div>
+      <div class="font-display font-700 text-gray-900">Dashboard</div>
       <div class="text-xs text-gray-500 mt-0.5">{{ user_name }}</div>
     </div>
     <nav class="flex-1 p-3 space-y-1">
@@ -54,12 +54,12 @@
         </div>
         <div class="stat-card card p-5" style="border-radius:16px">
           <div class="text-xs text-gray-500 uppercase tracking-wider mb-3">Total Orders</div>
-          <div class="font-display text-3xl font-800 text-white" id="stat-orders">0</div>
+          <div class="font-display text-3xl font-800 text-gray-900" id="stat-orders">0</div>
           <div class="text-xs text-gray-600 mt-2">Completed transactions</div>
         </div>
         <div class="stat-card card p-5" style="border-radius:16px">
           <div class="text-xs text-gray-500 uppercase tracking-wider mb-3">Avg. Order</div>
-          <div class="font-display text-3xl font-800 text-white" id="stat-avg">₹0</div>
+          <div class="font-display text-3xl font-800 text-gray-900" id="stat-avg">₹0</div>
           <div class="text-xs text-gray-600 mt-2">Per transaction</div>
         </div>
       </div>
@@ -147,7 +147,7 @@ function renderPayBreakdown(byMethod, total) {
     <div class="card p-4" style="border-radius:12px">
       <div class="text-xl mb-2">${icons[k]||'💰'}</div>
       <div class="text-xs text-gray-500 mb-1">${names[k]||k}</div>
-      <div class="font-display font-800 text-lg text-white">₹${v.toFixed(0)}</div>
+      <div class="font-display font-800 text-lg text-gray-900">₹${v.toFixed(0)}</div>
       <div class="text-xs text-gray-600">${total?((v/total)*100).toFixed(1):0}% of total</div>
     </div>`).join('');
 }
