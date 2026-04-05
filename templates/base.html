@@ -21,7 +21,33 @@ tailwind.config = {
 }
 </script>
 <style>
-  body { background:#0a0a0a; color:#f0f0f0; font-family:'DM Sans',sans-serif; }
+  :root {
+    --bg: #0a0a0a;
+    --text: #f0f0f0;
+    --muted: #9ca3af;
+    --card: #1a1a1a;
+    --card-2: #111111;
+    --border: #2a2a2a;
+    --input-bg: #1a1a1a;
+    --input-border: #2a2a2a;
+    --ghost-bg: rgba(255,255,255,0.06);
+    --ghost-border: rgba(255,255,255,0.1);
+    --toast-bg: #1a1a1a;
+  }
+  body[data-theme="light"] {
+    --bg: #f4f1ea;
+    --text: #1f2937;
+    --muted: #6b7280;
+    --card: #ffffff;
+    --card-2: #f8fafc;
+    --border: #e5e7eb;
+    --input-bg: #ffffff;
+    --input-border: #d1d5db;
+    --ghost-bg: rgba(15,23,42,0.04);
+    --ghost-border: rgba(15,23,42,0.08);
+    --toast-bg: #ffffff;
+  }
+  body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; transition:background .2s ease,color .2s ease; }
   .brand-gradient { background: linear-gradient(135deg, #f97316, #ea580c); }
   .glass { background:rgba(255,255,255,0.04); backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.08); }
   .nav-link { transition:all .2s; }
@@ -29,17 +55,32 @@ tailwind.config = {
   .nav-link.active { background:rgba(249,115,22,0.18); color:#f97316; border-left:3px solid #f97316; }
   .btn-primary { background:linear-gradient(135deg,#f97316,#ea580c); transition:all .2s; }
   .btn-primary:hover { transform:translateY(-1px); box-shadow:0 8px 24px rgba(249,115,22,0.4); }
-  .btn-ghost { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); transition:all .2s; }
+  .btn-ghost { background:var(--ghost-bg); border:1px solid var(--ghost-border); transition:all .2s; }
   .btn-ghost:hover { background:rgba(255,255,255,0.1); }
-  input, select, textarea { background:#1a1a1a; border:1px solid #2a2a2a; color:#f0f0f0; border-radius:8px; padding:10px 14px; width:100%; transition:border .2s; outline:none; }
+  input, select, textarea { background:var(--input-bg); border:1px solid var(--input-border); color:var(--text); border-radius:8px; padding:10px 14px; width:100%; transition:border .2s, background .2s ease, color .2s ease; outline:none; }
   input:focus, select:focus, textarea:focus { border-color:#f97316; }
-  .card { background:#1a1a1a; border:1px solid #2a2a2a; border-radius:12px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:12px; transition:background .2s ease,border-color .2s ease,color .2s ease; }
   .tag { display:inline-block; padding:2px 10px; border-radius:20px; font-size:11px; font-weight:500; }
-  ::-webkit-scrollbar { width:4px; } ::-webkit-scrollbar-track { background:#0a0a0a; } ::-webkit-scrollbar-thumb { background:#2a2a2a; border-radius:4px; }
-  .toast { position:fixed; top:20px; right:20px; z-index:9999; background:#1a1a1a; border:1px solid #2a2a2a; border-radius:10px; padding:14px 20px; box-shadow:0 20px 60px rgba(0,0,0,0.6); transform:translateX(120%); transition:transform .3s; }
+  ::-webkit-scrollbar { width:4px; } ::-webkit-scrollbar-track { background:var(--bg); } ::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+  .toast { position:fixed; top:20px; right:20px; z-index:9999; background:var(--toast-bg); border:1px solid var(--border); border-radius:10px; padding:14px 20px; box-shadow:0 20px 60px rgba(0,0,0,0.25); transform:translateX(120%); transition:transform .3s, background .2s ease, color .2s ease; }
   .toast.show { transform:translateX(0); }
   .toast.success { border-left:3px solid #22c55e; }
   .toast.error { border-left:3px solid #ef4444; }
+  body[data-theme="light"] .text-white { color:#111827 !important; }
+  body[data-theme="light"] .text-gray-400,
+  body[data-theme="light"] .text-gray-500,
+  body[data-theme="light"] .text-gray-600 { color:var(--muted) !important; }
+  body[data-theme="light"] .bg-gray-800,
+  body[data-theme="light"] .bg-black\/20,
+  body[data-theme="light"] .bg-black\/30 { background:rgba(15,23,42,0.05) !important; }
+  body[data-theme="light"] .border-border,
+  body[data-theme="light"] .border-border\/50,
+  body[data-theme="light"] .border-border\/60 { border-color:var(--border) !important; }
+  body[data-theme="light"] [style*="background:#111"] { background:#ffffff !important; }
+  body[data-theme="light"] [style*="background:#0a0a0a"] { background:#f4f1ea !important; }
+  body[data-theme="light"] [style*="background:#050505"] { background:#f4f1ea !important; }
+  body[data-theme="light"] .glass { background:#ffffff; border-color:var(--border); }
+  body[data-theme="light"] .btn-ghost:hover { background:rgba(15,23,42,0.08); }
 </style>
 {% block extra_head %}{% endblock %}
 </head>
@@ -47,6 +88,23 @@ tailwind.config = {
 {% block body %}{% endblock %}
 <div id="toast" class="toast"></div>
 <script>
+const THEME_STORAGE_KEY = 'pos-cafe-theme';
+
+function applyTheme(theme) {
+  const nextTheme = theme === 'light' ? 'light' : 'dark';
+  document.body.setAttribute('data-theme', nextTheme);
+  document.documentElement.style.colorScheme = nextTheme;
+  localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+  document.querySelectorAll('[data-theme-toggle]').forEach(btn => {
+    btn.textContent = nextTheme === 'light' ? 'Dark Mode' : 'Light Mode';
+  });
+}
+
+function toggleTheme() {
+  const current = document.body.getAttribute('data-theme') || 'dark';
+  applyTheme(current === 'light' ? 'dark' : 'light');
+}
+
 function toast(msg, type='success') {
   const t = document.getElementById('toast');
   t.textContent = msg; t.className = `toast ${type} show`;
@@ -63,6 +121,11 @@ async function api(url, method='GET', data=null) {
   }
   return payload;
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem(THEME_STORAGE_KEY) || 'dark';
+  applyTheme(saved);
+});
 </script>
 {% block scripts %}{% endblock %}
 </body>

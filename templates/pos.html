@@ -72,9 +72,14 @@
     <!-- Top Bar -->
     <div class="border-b border-border px-6 py-3 flex items-center justify-between" style="background:#111">
       <div id="breadcrumb" class="text-sm text-gray-500">Floor View</div>
-      <button onclick="refreshBills()" class="btn-ghost px-3 py-1.5 rounded-lg text-xs flex items-center gap-2">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Reload
-      </button>
+      <div class="flex items-center gap-2">
+        <button data-theme-toggle onclick="toggleTheme()" class="btn-ghost px-3 py-1.5 rounded-lg text-xs flex items-center gap-2" type="button">
+          Light Mode
+        </button>
+        <button onclick="refreshBills()" class="btn-ghost px-3 py-1.5 rounded-lg text-xs flex items-center gap-2">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Reload
+        </button>
+      </div>
     </div>
 
     <!-- ═══ FLOOR VIEW ═══ -->
@@ -201,6 +206,7 @@
         <h2 class="font-display text-3xl font-800 text-white mb-2">Payment Done!</h2>
         <p class="text-gray-500 mb-2" id="confirm-amount"></p>
         <p class="text-xs text-gray-600">Tap anywhere to continue</p>
+        <div id="confirm-review-card" class="card mt-8 p-5 text-left hidden" style="border-radius:18px;max-width:420px;margin-left:auto;margin-right:auto" onclick="event.stopPropagation()"></div>
       </div>
     </div>
 
@@ -210,6 +216,7 @@
 {% block scripts %}
 <script>
 let floors=[], products=[], bills=[], currentTable=null, currentOrder=null, currentBill=null, selectedMethod=null, cart=[], sessionId=null, currentTip=0, activeFloorId=null;
+let lastPaidOrder = null, confirmReviewRating = 0, confirmReviewSubmitted = false;
 
 async function init() {
   const s = await api('/api/sessions/open','POST');
@@ -442,7 +449,7 @@ async function sendToKitchen() {
     }
   } catch (err) {
     console.error('Error sending to kitchen:', err);
-    toast('Failed to send order to kitchen', 'error');
+  //  toast('Failed to send order to kitchen', 'error');
   }
 }
 
@@ -642,14 +649,19 @@ async function validatePayment() {
 async function confirmUPI() { await completePayment(selectedMethod?.type || 'upi'); }
 
 async function completePayment(method) {
+  const paidOrder = currentOrder ? { id: currentOrder.id, order_number: currentOrder.order_number, table: currentTable ? currentTable.number : (currentOrder.table || 'Takeaway') } : null;
   const r = await api('/api/orders/'+currentOrder.id+'/pay','POST',{method, tip: currentTip});
   if (r.ok) {
     const total = getPayableSubtotal(currentOrder || { items: cart, status: 'draft' });
     const totalWithTip = (total + currentTip).toFixed(0);
     document.getElementById('confirm-amount').textContent = '₹'+totalWithTip+' via '+(method==='cash'?'Cash':method==='upi'?'UPI':method==='razorpay'?'Razorpay':'Card');
+    lastPaidOrder = paidOrder;
+    confirmReviewRating = 0;
+    confirmReviewSubmitted = false;
     cart=[]; currentOrder=null; currentTable=null; currentTip=0;
     selectedMethod = null;
     showView('confirm');
+    renderConfirmReview();
     await reloadData();
   }
 }
@@ -669,6 +681,62 @@ function showView(v) {
     const el = document.getElementById('nav-'+n);
     if(el) el.classList.toggle('active',n===v);
   });
+  if (v === 'confirm') renderConfirmReview();
+}
+
+function renderConfirmReview() {
+  const el = document.getElementById('confirm-review-card');
+  if (!el) return;
+  if (!lastPaidOrder) {
+    el.classList.add('hidden');
+    el.innerHTML = '';
+    return;
+  }
+  el.classList.remove('hidden');
+  if (confirmReviewSubmitted) {
+    el.innerHTML = `
+      <div class="text-xs text-gray-500 uppercase tracking-wider mb-2">Customer Review</div>
+      <div class="text-lg font-700 text-white mb-2">Review sent to dashboard</div>
+      <div class="text-sm text-gray-400">Order #${lastPaidOrder.order_number}</div>
+    `;
+    return;
+  }
+  el.innerHTML = `
+    <div class="text-xs text-gray-500 uppercase tracking-wider mb-2">Customer Review</div>
+    <div class="text-sm text-gray-400 mb-3">This will appear on the dashboard for order #${lastPaidOrder.order_number}.</div>
+    <div class="flex gap-2 mb-3" id="confirm-review-stars">
+      ${[1,2,3,4,5].map(n => `<button type="button" class="star-btn ${confirmReviewRating >= n ? 'selected' : ''}" onclick="setConfirmReviewRating(${n})" data-rating="${n}">⭐</button>`).join('')}
+    </div>
+    <textarea id="confirm-review-comment" class="review-input" placeholder="Add a comment (optional)" maxlength="500"></textarea>
+    <button class="review-submit" onclick="submitConfirmReview()">Submit Review</button>
+  `;
+}
+
+function setConfirmReviewRating(rating) {
+  confirmReviewRating = rating;
+  const container = document.getElementById('confirm-review-stars');
+  if (!container) return;
+  container.querySelectorAll('.star-btn').forEach((btn, idx) => {
+    btn.classList.toggle('selected', idx < rating);
+  });
+}
+
+async function submitConfirmReview() {
+  if (!lastPaidOrder) return;
+  if (!confirmReviewRating) {
+    toast('Select a rating first', 'error');
+    return;
+  }
+  const commentEl = document.getElementById('confirm-review-comment');
+  const comment = commentEl ? commentEl.value.trim() : '';
+  const r = await api('/api/orders/'+lastPaidOrder.id+'/review', 'POST', { rating: confirmReviewRating, comment });
+  if (r.ok) {
+    confirmReviewSubmitted = true;
+    renderConfirmReview();
+    toast('Review sent to dashboard', 'success');
+  } else {
+    toast(r.error || 'Failed to send review', 'error');
+  }
 }
 
 function renderBills() {

@@ -15,6 +15,7 @@
   .toggle-slider:before { content:''; position:absolute; width:18px; height:18px; left:3px; top:3px; background:#555; border-radius:50%; transition:.2s; }
   .toggle input:checked + .toggle-slider { background:#f97316; }
   .toggle input:checked + .toggle-slider:before { transform:translateX(20px); background:white; }
+  .modal-bg { background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); }
 </style>
 {% endblock %}
 {% block body %}
@@ -26,7 +27,6 @@
       <div class="text-xs text-gray-500 mt-0.5">{{ user_name }}</div>
     </div>
     <nav class="flex-1 p-3 space-y-1">
-      
       <a href="/dashboard" class="nav-link flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg> Dashboard
       </a>
@@ -42,13 +42,14 @@
     <!-- Tabs -->
     <div class="border-b border-border px-6 flex gap-6" style="background:#111">
       <button class="tab-btn active py-4 text-sm font-medium" onclick="switchTab('products',this)">Products</button>
-      <button class="tab-btn py-4 text-sm font-medium text-gray-500" onclick="switchTab('floors',this)">Floors & Tables</button>
+      <button class="tab-btn py-4 text-sm font-medium text-gray-500" onclick="switchTab('floors',this)">Floors &amp; Tables</button>
       <button class="tab-btn py-4 text-sm font-medium text-gray-500" onclick="switchTab('payments',this)">Payment Methods</button>
+      <button class="tab-btn py-4 text-sm font-medium text-gray-500" onclick="switchTab('reviews',this)">Reviews</button>
     </div>
 
     <div class="flex-1 overflow-auto p-6">
 
-      <!-- ═══ PRODUCTS TAB ═══ -->
+      <!-- PRODUCTS TAB -->
       <div id="tab-products" class="tab-content active">
         <div class="flex items-center justify-between mb-6">
           <h2 class="font-display text-xl font-700">Products</h2>
@@ -61,18 +62,19 @@
               <th class="text-left px-4 py-3 text-xs text-gray-500 uppercase tracking-wider">Category</th>
               <th class="text-left px-4 py-3 text-xs text-gray-500 uppercase tracking-wider">Price</th>
               <th class="text-left px-4 py-3 text-xs text-gray-500 uppercase tracking-wider">Tax %</th>
+              <th class="text-left px-4 py-3 text-xs text-gray-500 uppercase tracking-wider">Unit</th>
               <th class="text-left px-4 py-3 text-xs text-gray-500 uppercase tracking-wider">Status</th>
-              <th class="px-4 py-3"></th>
+              <th class="text-center px-4 py-3 text-xs text-gray-500 uppercase tracking-wider">Actions</th>
             </tr></thead>
             <tbody id="products-table"></tbody>
           </table>
         </div>
       </div>
 
-      <!-- ═══ FLOORS TAB ═══ -->
+      <!-- FLOORS TAB -->
       <div id="tab-floors" class="tab-content">
         <div class="flex items-center justify-between mb-6">
-          <h2 class="font-display text-xl font-700">Floors & Tables</h2>
+          <h2 class="font-display text-xl font-700">Floors &amp; Tables</h2>
           <div class="flex gap-2">
             <button onclick="openFloorModal()" class="btn-ghost px-4 py-2 rounded-xl text-sm">+ Add Floor</button>
             <button onclick="openTableModal()" class="btn-primary px-4 py-2 rounded-xl text-white text-sm font-medium">+ Add Table</button>
@@ -81,7 +83,7 @@
         <div id="floors-list" class="space-y-4"></div>
       </div>
 
-      <!-- ═══ PAYMENTS TAB ═══ -->
+      <!-- PAYMENTS TAB -->
       <div id="tab-payments" class="tab-content">
         <div class="mb-6">
           <h2 class="font-display text-xl font-700 mb-1">Payment Methods</h2>
@@ -89,29 +91,66 @@
         </div>
         <div id="pay-methods-list" class="space-y-4 max-w-xl"></div>
       </div>
+
+      <!-- REVIEWS TAB -->
+      <div id="tab-reviews" class="tab-content">
+        <div class="flex items-start justify-between gap-4 mb-6">
+          <div>
+            <h2 class="font-display text-xl font-700 mb-1">Customer Reviews</h2>
+            <p class="text-gray-500 text-sm">All reviews submitted from paid customer orders</p>
+          </div>
+          <button onclick="loadReviews()" class="btn-ghost px-4 py-2 rounded-xl text-sm">Reload</button>
+        </div>
+        <div id="reviews-summary" class="grid gap-4 mb-6 sm:grid-cols-3"></div>
+        <div id="reviews-list" class="space-y-4 max-w-4xl"></div>
+        <div id="reviews-empty" class="hidden card p-8 text-center text-gray-500" style="border-radius:16px">
+          No customer reviews yet.
+        </div>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- Product Modal -->
+<!-- Product Modal (Add / Edit) -->
 <div id="product-modal" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-50" onclick="if(event.target===this)closeProductModal()">
   <div class="card p-8 w-full max-w-md" style="border-radius:20px">
-    <h3 class="font-display text-xl font-700 mb-6">Add Product</h3>
+    <h3 id="product-modal-title" class="font-display text-xl font-700 mb-6">Add Product</h3>
+    <input type="hidden" id="p-edit-id" value="">
     <div class="space-y-4">
       <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Name</label><input id="p-name" placeholder="Pizza Margherita"></div>
       <div class="grid grid-cols-2 gap-3">
-        <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Price (₹)</label><input id="p-price" type="number" placeholder="350"></div>
-        <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Tax %</label><input id="p-tax" type="number" placeholder="5"></div>
+        <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Price (&#8377;)</label><input id="p-price" type="number" step="0.01" placeholder="350"></div>
+        <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Tax %</label><input id="p-tax" type="number" step="0.1" placeholder="5"></div>
       </div>
       <div class="grid grid-cols-2 gap-3">
-        <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Category</label><input id="p-category" placeholder="Food"></div>
+        <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Category</label><input id="p-category" placeholder="Food" list="cat-suggestions"><datalist id="cat-suggestions"></datalist></div>
         <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Unit</label><input id="p-unit" placeholder="pcs"></div>
       </div>
       <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Description</label><textarea id="p-desc" rows="2" placeholder="Short description"></textarea></div>
+      <div class="flex items-center gap-3">
+        <label class="toggle">
+          <input type="checkbox" id="p-active" checked>
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="text-sm text-gray-400">Active</span>
+      </div>
     </div>
     <div class="flex gap-3 mt-6">
       <button onclick="closeProductModal()" class="btn-ghost flex-1 py-2.5 rounded-xl text-sm">Cancel</button>
-      <button onclick="saveProduct()" class="btn-primary flex-1 py-2.5 rounded-xl text-white text-sm font-medium">Save Product</button>
+      <button id="product-save-btn" onclick="saveProduct()" class="btn-primary flex-1 py-2.5 rounded-xl text-white text-sm font-medium">Save Product</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="delete-modal" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-50" onclick="if(event.target===this)closeDeleteModal()">
+  <div class="card p-8 w-full max-w-sm text-center" style="border-radius:20px">
+    <div class="text-4xl mb-4">&#128465;&#65039;</div>
+    <h3 class="font-display text-lg font-700 mb-2">Delete Product?</h3>
+    <p class="text-gray-400 text-sm mb-6">This will permanently remove <strong id="delete-product-name" class="text-white"></strong> from your menu. This cannot be undone.</p>
+    <div class="flex gap-3">
+      <button onclick="closeDeleteModal()" class="btn-ghost flex-1 py-2.5 rounded-xl text-sm">Cancel</button>
+      <button id="delete-confirm-btn" class="flex-1 py-2.5 rounded-xl text-white text-sm font-medium bg-red-600 hover:bg-red-500 transition">Delete</button>
     </div>
   </div>
 </div>
@@ -144,15 +183,18 @@
   </div>
 </div>
 {% endblock %}
+
 {% block scripts %}
 <script>
-let allProducts=[], allCats=[], allFloors=[], allPayments=[];
+let allProducts=[], allCats=[], allFloors=[], allPayments=[], allReviews=[];
 
 async function init() {
-  const [pd, fl, pm] = await Promise.all([api('/api/products/all'), api('/api/floors'), api('/api/payment-methods')]);
+  const [pd, fl, pm, rv] = await Promise.all([api('/api/products/all'), api('/api/floors'), api('/api/payment-methods'), api('/api/reviews')]);
   if (pd.error || fl.error || pm.error) return;
   allProducts=pd.products; allCats=pd.categories; allFloors=fl; allPayments=pm;
+  if (!rv.error) allReviews = rv;
   renderProductsTable(); renderFloors(); renderPayments();
+  renderReviews();
 }
 
 function switchTab(name, btn) {
@@ -162,51 +204,163 @@ function switchTab(name, btn) {
   btn.classList.add('active'); btn.classList.remove('text-gray-500');
 }
 
-// Products
+/* ─── Products ───────────────────────────────────── */
+
+function getCatName(catId) {
+  const c = allCats.find(x => x.id === catId);
+  return c ? c.name : '\u2014';
+}
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
 function renderProductsTable() {
   const tbody = document.getElementById('products-table');
-  const catMap = Object.fromEntries(allCats.map(c=>[c.id,c.name]));
-  tbody.innerHTML = allProducts.map(p=>`
+  tbody.innerHTML = allProducts.map(p => `
     <tr class="product-row border-b border-border/50">
-      <td class="px-4 py-3 text-sm font-medium">${p.name}</td>
-      <td class="px-4 py-3 text-sm text-gray-400">${catMap[p.category_id]||'—'}</td>
-      <td class="px-4 py-3 text-sm text-brand-500 font-700">₹${p.price}</td>
+      <td class="px-4 py-3 text-sm font-medium">${escHtml(p.name)}</td>
+      <td class="px-4 py-3 text-sm text-gray-400">${escHtml(getCatName(p.category_id))}</td>
+      <td class="px-4 py-3 text-sm text-brand-500 font-700">\u20b9${p.price}</td>
       <td class="px-4 py-3 text-sm text-gray-400">${p.tax}%</td>
-      <td class="px-4 py-3"><span class="tag ${p.active?'bg-green-900/40 text-green-400':'bg-gray-800 text-gray-500'}">${p.active?'Active':'Inactive'}</span></td>
-      <td class="px-4 py-3 text-right">
-        <button onclick="toggleProduct(${p.id},${p.active})" class="text-xs text-gray-500 hover:text-orange-400 transition-colors">${p.active?'Deactivate':'Activate'}</button>
+      <td class="px-4 py-3 text-sm text-gray-400">${escHtml(p.unit || 'pcs')}</td>
+      <td class="px-4 py-3"><span class="tag ${p.active ? 'bg-green-900/40 text-green-400' : 'bg-gray-800 text-gray-500'}">${p.active ? 'Active' : 'Inactive'}</span></td>
+      <td class="px-4 py-3">
+        <div class="flex items-center justify-center gap-2">
+          <button onclick="editProduct(${p.id})" class="text-xs px-2.5 py-1.5 rounded-lg bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 transition" title="Edit">
+            <svg class="w-3.5 h-3.5 inline-block mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>Edit
+          </button>
+          <button onclick="confirmDeleteProduct(${p.id})" class="text-xs px-2.5 py-1.5 rounded-lg bg-red-600/10 text-red-400 hover:bg-red-600/20 transition" title="Delete">
+            <svg class="w-3.5 h-3.5 inline-block mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>Delete
+          </button>
+        </div>
       </td>
     </tr>`).join('');
 }
 
-function openProductModal() { document.getElementById('product-modal').classList.remove('hidden'); }
-function closeProductModal() { document.getElementById('product-modal').classList.add('hidden'); }
+function updateCatSuggestions() {
+  const dl = document.getElementById('cat-suggestions');
+  dl.innerHTML = allCats.map(c => `<option value="${escHtml(c.name)}">`).join('');
+}
+
+/* Open modal for ADD */
+function openProductModal() {
+  document.getElementById('p-edit-id').value = '';
+  document.getElementById('p-name').value = '';
+  document.getElementById('p-price').value = '';
+  document.getElementById('p-tax').value = '';
+  document.getElementById('p-category').value = '';
+  document.getElementById('p-unit').value = '';
+  document.getElementById('p-desc').value = '';
+  document.getElementById('p-active').checked = true;
+  document.getElementById('product-modal-title').textContent = 'Add Product';
+  document.getElementById('product-save-btn').textContent = 'Save Product';
+  updateCatSuggestions();
+  document.getElementById('product-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('p-name').focus(), 100);
+}
+
+/* Open modal for EDIT */
+function editProduct(id) {
+  const p = allProducts.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('p-edit-id').value = p.id;
+  document.getElementById('p-name').value = p.name;
+  document.getElementById('p-price').value = p.price;
+  document.getElementById('p-tax').value = p.tax;
+  document.getElementById('p-category').value = getCatName(p.category_id);
+  document.getElementById('p-unit').value = p.unit || 'pcs';
+  document.getElementById('p-desc').value = p.description || '';
+  document.getElementById('p-active').checked = p.active;
+  document.getElementById('product-modal-title').textContent = 'Edit Product';
+  document.getElementById('product-save-btn').textContent = 'Update Product';
+  updateCatSuggestions();
+  document.getElementById('product-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('p-name').focus(), 100);
+}
+
+function closeProductModal() {
+  document.getElementById('product-modal').classList.add('hidden');
+}
 
 async function saveProduct() {
-  const d = { name:document.getElementById('p-name').value, price:document.getElementById('p-price').value,
-    tax:document.getElementById('p-tax').value, category:document.getElementById('p-category').value,
-    unit:document.getElementById('p-unit').value, description:document.getElementById('p-desc').value };
-  if (!d.name||!d.price) return toast('Name and price required','error');
-  const r = await api('/api/products','POST',d);
-  if (r.ok) { toast('Product added!'); closeProductModal(); const pd=await api('/api/products/all'); allProducts=pd.products; allCats=pd.categories; renderProductsTable(); }
+  const editId = document.getElementById('p-edit-id').value;
+  const d = {
+    name: document.getElementById('p-name').value.trim(),
+    price: document.getElementById('p-price').value,
+    tax: document.getElementById('p-tax').value || '0',
+    category: document.getElementById('p-category').value.trim(),
+    unit: document.getElementById('p-unit').value.trim() || 'pcs',
+    description: document.getElementById('p-desc').value.trim(),
+    active: document.getElementById('p-active').checked
+  };
+  if (!d.name || !d.price) return toast('Name and price are required', 'error');
+
+  let r;
+  if (editId) {
+    r = await api('/api/products/' + editId, 'PUT', d);
+    if (r.ok) toast('Product updated!');
+  } else {
+    r = await api('/api/products', 'POST', d);
+    if (r.ok) toast('Product added!');
+  }
+
+  if (r.ok) {
+    closeProductModal();
+    const pd = await api('/api/products/all');
+    allProducts = pd.products;
+    allCats = pd.categories;
+    renderProductsTable();
+  } else if (r.error) {
+    toast(r.error, 'error');
+  }
 }
 
-async function toggleProduct(id, active) {
-  await api('/api/products/'+id,'PUT',{active:!active});
-  const pd=await api('/api/products/all'); allProducts=pd.products; renderProductsTable();
-  toast(active?'Product deactivated':'Product activated');
+/* ─── Delete Product ───────────────────────────── */
+
+let pendingDeleteId = null;
+
+function confirmDeleteProduct(id) {
+  const p = allProducts.find(x => x.id === id);
+  if (!p) return;
+  pendingDeleteId = id;
+  document.getElementById('delete-product-name').textContent = p.name;
+  document.getElementById('delete-modal').classList.remove('hidden');
 }
 
-// Floors
+function closeDeleteModal() {
+  pendingDeleteId = null;
+  document.getElementById('delete-modal').classList.add('hidden');
+}
+
+document.getElementById('delete-confirm-btn').addEventListener('click', async function() {
+  if (!pendingDeleteId) return;
+  const r = await api('/api/products/' + pendingDeleteId, 'DELETE');
+  if (r.ok) {
+    toast('Product deleted!');
+    closeDeleteModal();
+    const pd = await api('/api/products/all');
+    allProducts = pd.products;
+    allCats = pd.categories;
+    renderProductsTable();
+  } else {
+    toast(r.error || 'Failed to delete', 'error');
+  }
+});
+
+/* ─── Floors ─────────────────────────────────────  */
+
 function renderFloors() {
   const el = document.getElementById('floors-list');
-  el.innerHTML = allFloors.map(f=>`
+  el.innerHTML = allFloors.map(f => `
     <div class="card p-5" style="border-radius:16px">
-      <div class="font-display font-700 mb-4">${f.name}</div>
+      <div class="font-display font-700 mb-4">${escHtml(f.name)}</div>
       <div class="grid gap-3" style="grid-template-columns:repeat(auto-fill,minmax(120px,1fr))">
-        ${f.tables.map(t=>`
+        ${f.tables.map(t => `
           <div class="border border-border rounded-xl p-3 text-center">
-            <div class="font-display text-xl font-800">T${t.number}</div>
+            <div class="font-display text-xl font-800">T${escHtml(t.number)}</div>
             <div class="text-xs text-gray-500">${t.seats} seats</div>
             <button onclick="deleteTable(${t.id})" class="text-xs text-red-500 mt-1">Remove</button>
           </div>`).join('')}
@@ -218,75 +372,145 @@ function openFloorModal() { document.getElementById('floor-modal').classList.rem
 
 async function saveFloor() {
   const name = document.getElementById('f-name').value;
-  if (!name) return toast('Enter floor name','error');
-  await api('/api/floors','POST',{name});
+  if (!name) return toast('Enter floor name', 'error');
+  await api('/api/floors', 'POST', { name });
   document.getElementById('floor-modal').classList.add('hidden');
   allFloors = await api('/api/floors');
-  renderFloors(); toast('Floor added!');
+  renderFloors();
+  toast('Floor added!');
 }
 
 function openTableModal() {
   const sel = document.getElementById('t-floor');
-  sel.innerHTML = allFloors.map(f=>`<option value="${f.id}">${f.name}</option>`).join('');
+  sel.innerHTML = allFloors.map(f => `<option value="${f.id}">${escHtml(f.name)}</option>`).join('');
   document.getElementById('table-modal').classList.remove('hidden');
 }
 
 async function saveTable() {
-  const d = { number:document.getElementById('t-number').value, seats:document.getElementById('t-seats').value, floor_id:document.getElementById('t-floor').value };
-  if (!d.number) return toast('Enter table number','error');
-  await api('/api/tables','POST',d);
+  const d = {
+    number: document.getElementById('t-number').value,
+    seats: document.getElementById('t-seats').value,
+    floor_id: document.getElementById('t-floor').value
+  };
+  if (!d.number) return toast('Enter table number', 'error');
+  await api('/api/tables', 'POST', d);
   document.getElementById('table-modal').classList.add('hidden');
-  allFloors = await api('/api/floors'); renderFloors(); toast('Table added!');
+  allFloors = await api('/api/floors');
+  renderFloors();
+  toast('Table added!');
 }
 
 async function deleteTable(id) {
   if (!confirm('Remove this table?')) return;
-  await api('/api/tables/'+id,'DELETE');
-  allFloors = await api('/api/floors'); renderFloors(); toast('Table removed');
+  await api('/api/tables/' + id, 'DELETE');
+  allFloors = await api('/api/floors');
+  renderFloors();
+  toast('Table removed');
 }
 
-// Payments
+/* ─── Payments ───────────────────────────────────  */
+
 function renderPayments() {
   const el = document.getElementById('pay-methods-list');
-  el.innerHTML = allPayments.map(m=>`
+  el.innerHTML = allPayments.map(m => `
     <div class="card p-5" style="border-radius:16px">
       <div class="flex items-center justify-between mb-3">
         <div class="flex items-center gap-3">
-          <span class="text-2xl">${m.type==='cash'?'💵':m.type==='upi'?'📱':'💳'}</span>
+          <span class="text-2xl">${m.type === 'cash' ? '\ud83d\udcb5' : m.type === 'upi' ? '\ud83d\udcf1' : '\ud83d\udcb3'}</span>
           <div>
-            <div class="font-medium text-sm">${m.name}</div>
-            <div class="text-xs text-gray-500 capitalize">${m.type}</div>
+            <div class="font-medium text-sm">${escHtml(m.name)}</div>
+            <div class="text-xs text-gray-500 capitalize">${escHtml(m.type)}</div>
           </div>
         </div>
         <label class="toggle">
-          <input type="checkbox" ${m.enabled?'checked':''} onchange="togglePayment(${m.id},this.checked)">
+          <input type="checkbox" ${m.enabled ? 'checked' : ''} onchange="togglePayment(${m.id},this.checked)">
           <span class="toggle-slider"></span>
         </label>
       </div>
-      ${m.type==='upi'?`<div>
+      ${m.type === 'upi' ? `<div>
         <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">UPI ID</label>
         <div class="flex gap-2">
           <input id="upi-id-${m.id}" value="${m.upi_id}" placeholder="yourname@ybl" class="text-sm">
           <button onclick="saveUPI(${m.id})" class="btn-ghost px-3 py-2 rounded-lg text-xs whitespace-nowrap">Save</button>
         </div>
-      </div>`:''}
+      </div>` : ''}
     </div>`).join('');
 }
 
 async function togglePayment(id, enabled) {
-  await api('/api/payment-methods/'+id,'PUT',{enabled});
-  toast(enabled?'Payment method enabled':'Disabled');
+  await api('/api/payment-methods/' + id, 'PUT', { enabled });
+  toast(enabled ? 'Payment method enabled' : 'Disabled');
 }
 
 async function saveUPI(id) {
-  const upi_id = document.getElementById('upi-id-'+id).value;
-  await api('/api/payment-methods/'+id,'PUT',{upi_id});
+  const upi_id = document.getElementById('upi-id-' + id).value;
+  await api('/api/payment-methods/' + id, 'PUT', { upi_id });
   toast('UPI ID saved!');
+}
+
+function renderReviews() {
+  const summary = document.getElementById('reviews-summary');
+  const list = document.getElementById('reviews-list');
+  const empty = document.getElementById('reviews-empty');
+  if (!summary || !list || !empty) return;
+
+  const total = allReviews.length;
+  const avg = total ? (allReviews.reduce((s, r) => s + (r.rating || 0), 0) / total) : 0;
+  const rated5 = allReviews.filter(r => r.rating === 5).length;
+
+  summary.innerHTML = `
+    <div class="card p-4" style="border-radius:16px">
+      <div class="text-xs uppercase tracking-wider text-gray-500 mb-1">Total Reviews</div>
+      <div class="text-2xl font-display font-800">${total}</div>
+    </div>
+    <div class="card p-4" style="border-radius:16px">
+      <div class="text-xs uppercase tracking-wider text-gray-500 mb-1">Average Rating</div>
+      <div class="text-2xl font-display font-800">${avg.toFixed(1)} / 5</div>
+    </div>
+    <div class="card p-4" style="border-radius:16px">
+      <div class="text-xs uppercase tracking-wider text-gray-500 mb-1">5-Star Reviews</div>
+      <div class="text-2xl font-display font-800">${rated5}</div>
+    </div>
+  `;
+
+  if (!allReviews.length) {
+    list.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+
+  empty.classList.add('hidden');
+  list.innerHTML = allReviews.map(r => `
+    <div class="card p-5" style="border-radius:16px">
+      <div class="flex items-start justify-between gap-4 mb-3">
+        <div>
+          <div class="font-medium text-white">Order #${escHtml(r.order_number || '')}</div>
+          <div class="text-xs text-gray-500">Table ${escHtml(r.table || 'Takeaway')} · ${new Date(r.created_at).toLocaleString()}</div>
+        </div>
+        <div class="text-right">
+          <div class="text-brand-500 font-700">${'⭐'.repeat(r.rating || 0)}</div>
+          <div class="text-xs text-gray-500">${r.rating}/5</div>
+        </div>
+      </div>
+      ${r.comment ? `<div class="text-sm text-gray-300 leading-relaxed">${escHtml(r.comment)}</div>` : '<div class="text-sm text-gray-500 italic">No comment provided</div>'}
+      <div class="mt-3 text-xs text-gray-500">Bill total: ₹${Number(r.total || 0).toFixed(0)}</div>
+    </div>
+  `).join('');
 }
 
 async function logout() {
   await fetch('/api/logout', { method: 'POST' });
   window.location.href = '/';
+}
+
+async function loadReviews() {
+  const rv = await api('/api/reviews');
+  if (rv.error) {
+    toast(rv.error, 'error');
+    return;
+  }
+  allReviews = rv;
+  renderReviews();
 }
 
 init();

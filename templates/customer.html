@@ -46,6 +46,9 @@
   .order-eta { font-size: 11px; color: #f97316; font-weight: 600; margin-top: 4px; }
   .review-section { background: rgba(249,115,22,0.05); border: 2px dashed rgba(249,115,22,0.3); border-radius: 12px; padding: 16px; margin-top: 16px; }
   .review-title { font-size: 14px; font-weight: 600; color: #f97316; margin-bottom: 12px; }
+  .review-panel { background: rgba(249,115,22,0.06); border: 1px solid rgba(249,115,22,0.18); border-radius: 16px; padding: 18px; margin-bottom: 20px; }
+  .review-panel-header { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; margin-bottom: 14px; }
+  .review-panel-note { font-size: 12px; color: #9ca3af; }
   .star-rating { display: flex; gap: 8px; margin-bottom: 12px; }
   .star-btn { width: 32px; height: 32px; border: 2px solid #444; background: transparent; border-radius: 6px; color: #999; font-size: 18px; cursor: pointer; transition: all 0.2s; }
   .star-btn:hover { border-color: #f97316; color: #f97316; }
@@ -65,7 +68,12 @@
 <div style="max-width: 1400px; margin: 0 auto;">
   <!-- Header -->
   <div class="header">
-    <h1>🍽️ POS Cafe</h1>
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+      <h1 style="margin:0;">🍽️ POS Cafe</h1>
+      <button onclick="logout()" style="background:#f97316; color:white; border:none; border-radius:8px; padding:10px 16px; font-weight:700; cursor:pointer;">
+        Logout
+      </button>
+    </div>
     <div class="header-subtitle">
       <span class="live-indicator"></span>
       <span>Real-Time Order Status</span>
@@ -74,6 +82,7 @@
   </div>
 
   <!-- Orders Grid -->
+  <div id="review-panel" class="review-panel" style="display:none;"></div>
   <div id="orders-container" class="orders-grid"></div>
 
   <!-- Idle State -->
@@ -91,10 +100,14 @@
 const socket = io();
 let orders = {};
 let orderTimestamps = {};
+let latestReviewRating = 5;
+let latestReviewOrderId = null;
+const reviewedOrderIds = new Set();
 
 socket.on('new_ticket', t => { 
   if (!orders[t.order_number]) {
     orders[t.order_number] = {
+      id: t.order_id,
       order_number: t.order_number,
       table: t.table,
       status: t.status || 'sent',
@@ -144,6 +157,7 @@ async function loadOrders() {
     tickets.forEach(t => {
       if (t.status !== 'completed') {
         orders[t.order_number] = {
+          id: t.order_id,
           order_number: t.order_number,
           table: t.table,
           status: t.status,
@@ -201,21 +215,6 @@ function renderOrder(order) {
   const eta = order.status === 'preparing' ? `~${Math.max(5, 15 - prepTime)}m` : 
               order.status === 'to_cook' ? '~15m' : 'Ready now!';
   
-  const reviewSection = isPaid ? `
-    <div class="review-section">
-      <div class="review-title">📝 Share Your Feedback</div>
-      <div class="star-rating" id="star-rating-${order.order_number}">
-        <button class="star-btn" onclick="setRating('${order.order_number}', 1)" data-rating="1">⭐</button>
-        <button class="star-btn" onclick="setRating('${order.order_number}', 2)" data-rating="2">⭐</button>
-        <button class="star-btn" onclick="setRating('${order.order_number}', 3)" data-rating="3">⭐</button>
-        <button class="star-btn" onclick="setRating('${order.order_number}', 4)" data-rating="4">⭐</button>
-        <button class="star-btn" onclick="setRating('${order.order_number}', 5)" data-rating="5">⭐</button>
-      </div>
-      <textarea class="review-input" id="comment-${order.order_number}" placeholder="Share your experience... (optional)" maxlength="500"></textarea>
-      <button class="review-submit" onclick="submitReview('${order.order_number}', ${order.id})">Submit Review</button>
-    </div>
-  ` : '';
-  
   return `
     <div class="order-card ${order.status}">
       <div class="order-header">
@@ -244,8 +243,6 @@ function renderOrder(order) {
         <span class="total-label">Total</span>
         <span class="total-amount">₹${order.total.toFixed(0)}</span>
       </div>
-      
-      ${reviewSection}
     </div>
   `;
 }
@@ -260,6 +257,97 @@ function render() {
     document.getElementById('orders-container').style.display = 'grid';
     document.getElementById('idle-state').style.display = 'none';
     document.getElementById('orders-container').innerHTML = activeOrders.map(o => renderOrder(o)).join('');
+  }
+  renderReviewPanel(activeOrders);
+}
+
+function renderReviewPanel(activeOrders) {
+  const panel = document.getElementById('review-panel');
+  const paidOrders = activeOrders.filter(o => o.status === 'paid').sort((a, b) => new Date(b.sent_at || 0) - new Date(a.sent_at || 0));
+  if (!paidOrders.length) {
+    panel.style.display = 'none';
+    panel.innerHTML = '';
+    latestReviewOrderId = null;
+    return;
+  }
+
+  const latest = paidOrders[0];
+  if (latestReviewOrderId !== latest.id) {
+    latestReviewOrderId = latest.id;
+    if (!reviewedOrderIds.has(latest.id)) {
+      latestReviewRating = 5;
+    }
+  }
+  panel.style.display = 'block';
+  if (reviewedOrderIds.has(latest.id)) {
+    panel.innerHTML = `
+      <div class="review-panel-header">
+        <div>
+          <div class="review-title">✓ Review Sent</div>
+          <div class="review-panel-note">Thanks for your feedback on order #${latest.order_number.split('-')[1]}. It is already visible in the dashboard.</div>
+        </div>
+        <div class="paid-badge">Submitted</div>
+      </div>
+    `;
+    return;
+  }
+  panel.innerHTML = `
+    <div class="review-panel-header">
+      <div>
+        <div class="review-title">📝 Share Your Feedback</div>
+        <div class="review-panel-note">Your review will appear in the staff dashboard for order #${latest.order_number.split('-')[1]}.</div>
+      </div>
+      <div class="paid-badge">Paid Order</div>
+    </div>
+    <div class="review-panel-note" style="margin-bottom:10px;">Table ${latest.table}</div>
+    <div class="star-rating" id="latest-star-rating">
+      <button class="star-btn" onclick="setLatestRating(1)" data-rating="1">⭐</button>
+      <button class="star-btn" onclick="setLatestRating(2)" data-rating="2">⭐</button>
+      <button class="star-btn" onclick="setLatestRating(3)" data-rating="3">⭐</button>
+      <button class="star-btn" onclick="setLatestRating(4)" data-rating="4">⭐</button>
+      <button class="star-btn selected" onclick="setLatestRating(5)" data-rating="5">⭐</button>
+    </div>
+    <textarea class="review-input" id="latest-review-comment" placeholder="Share your experience... (optional)" maxlength="500"></textarea>
+    <button class="review-submit" onclick="submitLatestReview(${latest.id})">Submit Review</button>
+  `;
+  latestReviewRating = 5;
+}
+
+function setLatestRating(rating) {
+  latestReviewRating = rating;
+  const container = document.getElementById('latest-star-rating');
+  if (!container) return;
+  container.querySelectorAll('.star-btn').forEach((btn, idx) => {
+    btn.classList.toggle('selected', idx < rating);
+  });
+}
+
+async function submitLatestReview(orderId) {
+  const commentEl = document.getElementById('latest-review-comment');
+  const comment = commentEl ? commentEl.value.trim() : '';
+  try {
+    const response = await fetch(`/api/orders/${orderId}/review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rating: latestReviewRating, comment })
+    });
+    if (response.ok) {
+      reviewedOrderIds.add(orderId);
+      const panel = document.getElementById('review-panel');
+      panel.innerHTML = `
+        <div class="review-title">✓ Thank You for Your Review!</div>
+        <div class="review-display">
+          <div class="review-stars">${'⭐'.repeat(latestReviewRating)} (${latestReviewRating}/5 stars)</div>
+          ${comment ? `<div class="review-comment">"${comment.substring(0, 100)}${comment.length > 100 ? '...' : ''}"</div>` : ''}
+        </div>
+      `;
+      setTimeout(loadOrders, 1000);
+    } else {
+      alert('Error submitting review. Please try again.');
+    }
+  } catch (err) {
+    console.error('Review submission error:', err);
+    alert('Error submitting review');
   }
 }
 
@@ -311,5 +399,10 @@ setInterval(() => {
 
 loadOrders();
 setInterval(loadOrders, 15000);
+
+async function logout() {
+  await fetch('/api/logout', { method: 'POST' });
+  window.location.href = '/auth';
+}
 </script>
 {% endblock %}

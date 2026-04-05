@@ -1277,6 +1277,269 @@ def ensure_order_table_schema():
             conn.exec_driver_sql('ALTER TABLE "order" ADD COLUMN tip FLOAT DEFAULT 0')
             conn.commit()
 
+def ensure_demo_catalog():
+    demo_catalog = {
+        'Food': [
+            ('Margherita Pizza', 350),
+            ('Cheese Burger', 240),
+            ('Paneer Wrap', 180),
+            ('Veg Sandwich', 160),
+            ('French Fries', 120),
+            ('Chicken Burger', 260),
+            ('Pasta Alfredo', 290),
+            ('Veg Noodles', 220),
+        ],
+        'Beverages': [
+            ('Espresso', 90),
+            ('Cappuccino', 120),
+            ('Latte', 140),
+            ('Mango Shake', 150),
+            ('Lemon Soda', 70),
+            ('Iced Tea', 110),
+        ],
+        'Desserts': [
+            ('Chocolate Brownie', 130),
+            ('Vanilla Ice Cream', 100),
+            ('Cheesecake', 180),
+            ('Tiramisu', 220),
+        ],
+        'Snacks': [
+            ('Samosa', 40),
+            ('Pakora', 60),
+            ('Spring Roll', 90),
+            ('Garlic Bread', 110),
+        ],
+    }
+
+    changed = False
+    for category_name, items in demo_catalog.items():
+        category = Category.query.filter_by(name=category_name).first()
+        if not category:
+            category = Category(name=category_name)
+            db.session.add(category)
+            db.session.flush()
+            changed = True
+
+        for product_name, price in items:
+            existing = Product.query.filter_by(name=product_name, category_id=category.id).first()
+            if not existing:
+                db.session.add(Product(name=product_name, price=price, category_id=category.id))
+                changed = True
+
+    if changed:
+        db.session.commit()
+
+def ensure_demo_floors_and_tables():
+    floor_specs = {
+        'Ground Floor': ['1', '2', '3', '4', '5', '6'],
+        'First Floor': ['7', '8', '9', '10', '11', '12'],
+        'Terrace': ['13', '14', '15', '16'],
+    }
+
+    changed = False
+    for floor_name, table_numbers in floor_specs.items():
+        floor = Floor.query.filter_by(name=floor_name).first()
+        if not floor:
+            floor = Floor(name=floor_name)
+            db.session.add(floor)
+            db.session.flush()
+            changed = True
+
+        for number in table_numbers:
+            existing = Table.query.filter_by(number=number, floor_id=floor.id).first()
+            if not existing:
+                db.session.add(Table(number=number, seats=4 if int(number) <= 8 else 6, floor_id=floor.id))
+                changed = True
+
+    if changed:
+        db.session.commit()
+
+def ensure_demo_paid_orders_and_reviews():
+    target_reviews = 12
+    if Review.query.count() >= target_reviews and Order.query.filter_by(status='paid').count() >= target_reviews:
+        return
+
+    admin = User.query.filter_by(role='restaurant').first() or User.query.first()
+    if not admin:
+        return
+
+    demo_session = Session.query.filter_by(user_id=admin.id).order_by(Session.id.asc()).first()
+    if not demo_session:
+        demo_session = Session(
+            user_id=admin.id,
+            status='closed',
+            opened_at=datetime.utcnow() - timedelta(days=14),
+            closed_at=datetime.utcnow() - timedelta(days=13),
+            closing_amount=0,
+        )
+        db.session.add(demo_session)
+        db.session.flush()
+
+    product_lookup = {p.name: p for p in Product.query.all()}
+    table_lookup = {t.number: t for t in Table.query.all()}
+    now = datetime.utcnow()
+    demo_orders = [
+        {
+            'table': '1',
+            'method': 'cash',
+            'tip': 0,
+            'rating': 5,
+            'comment': 'Fast service and hot food.',
+            'items': [('Espresso', 2), ('Chocolate Brownie', 1)],
+        },
+        {
+            'table': '2',
+            'method': 'upi',
+            'tip': 10,
+            'rating': 4,
+            'comment': 'Good taste and quick billing.',
+            'items': [('Margherita Pizza', 1), ('Lemon Soda', 2)],
+        },
+        {
+            'table': '3',
+            'method': 'digital',
+            'tip': 0,
+            'rating': 5,
+            'comment': 'Friendly staff and fresh food.',
+            'items': [('Paneer Wrap', 2), ('Iced Tea', 1)],
+        },
+        {
+            'table': '4',
+            'method': 'cash',
+            'tip': 15,
+            'rating': 3,
+            'comment': 'Portion was fine, service could be faster.',
+            'items': [('Cheese Burger', 1), ('French Fries', 1), ('Cappuccino', 1)],
+        },
+        {
+            'table': '5',
+            'method': 'upi',
+            'tip': 5,
+            'rating': 5,
+            'comment': 'Loved the desserts.',
+            'items': [('Cheesecake', 1), ('Vanilla Ice Cream', 2)],
+        },
+        {
+            'table': '6',
+            'method': 'digital',
+            'tip': 0,
+            'rating': 4,
+            'comment': 'Clean table and quick checkout.',
+            'items': [('Veg Sandwich', 2), ('Mango Shake', 2)],
+        },
+        {
+            'table': '7',
+            'method': 'cash',
+            'tip': 0,
+            'rating': 4,
+            'comment': 'Nice ambience.',
+            'items': [('Pasta Alfredo', 1), ('Espresso', 1)],
+        },
+        {
+            'table': '8',
+            'method': 'upi',
+            'tip': 10,
+            'rating': 5,
+            'comment': 'Best burger in the area.',
+            'items': [('Chicken Burger', 2), ('Lemon Soda', 2)],
+        },
+        {
+            'table': '9',
+            'method': 'digital',
+            'tip': 0,
+            'rating': 4,
+            'comment': 'Great value for money.',
+            'items': [('Veg Noodles', 2), ('Garlic Bread', 1)],
+        },
+        {
+            'table': '10',
+            'method': 'cash',
+            'tip': 0,
+            'rating': 5,
+            'comment': 'Desserts were excellent.',
+            'items': [('Tiramisu', 1), ('Cappuccino', 2)],
+        },
+        {
+            'table': '11',
+            'method': 'upi',
+            'tip': 5,
+            'rating': 4,
+            'comment': 'Smooth ordering experience.',
+            'items': [('Spring Roll', 3), ('Iced Tea', 1)],
+        },
+        {
+            'table': '12',
+            'method': 'digital',
+            'tip': 0,
+            'rating': 5,
+            'comment': 'Will come again.',
+            'items': [('Pakora', 2), ('Mango Shake', 2)],
+        },
+    ]
+
+    existing_paid = Order.query.filter_by(status='paid').count()
+    needed = max(0, target_reviews - existing_paid)
+    if needed <= 0:
+        return
+
+    max_order_num = Order.query.count()
+    created = 0
+    for spec in demo_orders:
+        if created >= needed:
+            break
+        table = table_lookup.get(spec['table'])
+        items = []
+        total = 0
+        for product_name, qty in spec['items']:
+            product = product_lookup.get(product_name)
+            if not product:
+                continue
+            items.append((product, qty))
+            total += float(product.price) * qty
+
+        if not items:
+          continue
+
+        max_order_num += 1
+        order = Order(
+            order_number=f'ORD-{max_order_num:04d}',
+            table_id=table.id if table else None,
+            session_id=demo_session.id,
+            user_id=admin.id,
+            status='paid',
+            payment_method=spec['method'],
+            total=total,
+            tip=spec['tip'],
+            created_at=now - timedelta(days=created + 1),
+            sent_to_kitchen_at=now - timedelta(days=created + 1, minutes=15),
+            completed_at=now - timedelta(days=created + 1, minutes=5),
+        )
+        db.session.add(order)
+        db.session.flush()
+
+        for product, qty in items:
+            db.session.add(OrderItem(
+                order_id=order.id,
+                product_id=product.id,
+                product_name=product.name,
+                qty=qty,
+                price=product.price,
+                kitchen_status='completed',
+                started_at=now - timedelta(days=created + 1, minutes=12),
+                completed_at=now - timedelta(days=created + 1, minutes=5),
+            ))
+
+        db.session.add(Review(
+            order_id=order.id,
+            rating=spec['rating'],
+            comment=spec['comment'],
+            created_at=now - timedelta(days=created + 1),
+        ))
+        created += 1
+
+    if created:
+        db.session.commit()
+
 def ensure_default_accounts():
     admin_email = 'admin@cafe.com'
     admin = User.query.filter_by(email=admin_email).first()
@@ -1312,6 +1575,9 @@ with app.app_context():
     ensure_payment_methods()
     ensure_order_table_schema()
     ensure_default_accounts()
+    ensure_demo_catalog()
+    ensure_demo_floors_and_tables()
+    ensure_demo_paid_orders_and_reviews()
 
 if __name__ == '__main__':
     socketio.run(app, debug=True, port=5000)
