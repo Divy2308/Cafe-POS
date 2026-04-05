@@ -697,6 +697,7 @@ function renderBills() {
   empty.classList.add('hidden');
   grid.innerHTML = visibleBills.map(b => {
     const isCurrent = currentBill && b.id === currentBill.id;
+    const sentToKitchen = Boolean(b.sent_to_kitchen_at || b.status === 'sent');
     const preview = (b.items || []).slice(0, 3).map(i => `<div class="text-xs text-gray-400">${i.name} × ${i.qty}</div>`).join('');
     return `
       <div class="card p-4 rounded-2xl ${isCurrent ? 'ring-2 ring-brand-500/70 bg-brand-500/5' : ''}">
@@ -714,7 +715,7 @@ function renderBills() {
         <div class="space-y-1 mb-4">${preview}</div>
         <div class="flex gap-2">
           <button class="btn-ghost flex-1 py-2 rounded-lg text-xs" onclick="openBillForPayment(${b.id})">Open Bill</button>
-          <button class="btn-primary flex-1 py-2 rounded-lg text-xs" onclick="payBill(${b.id})">Pay Now</button>
+          ${sentToKitchen ? `<button class="btn-primary flex-1 py-2 rounded-lg text-xs" onclick="payBill(${b.id})">Pay Now</button>` : `<button class="btn-primary flex-1 py-2 rounded-lg text-xs opacity-50 cursor-not-allowed" disabled>Send to Kitchen First</button>`}
         </div>
         <button class="mt-2 w-full rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-300 hover:bg-red-500/20 transition" onclick="deleteBill(${b.id})">Delete Bill</button>
       </div>
@@ -725,6 +726,10 @@ function renderBills() {
 async function openBillForPayment(orderId) {
   const bill = bills.find(b => b.id === orderId);
   if (!bill) return toast('Bill not found', 'error');
+  if (!(bill.sent_to_kitchen_at || bill.status === 'sent')) {
+    toast('Send the order to kitchen before payment', 'error');
+    return;
+  }
   currentOrder = bill;
   currentBill = bill;
   currentTable = bill.table_id ? { id: bill.table_id, number: bill.table } : null;
