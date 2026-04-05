@@ -160,7 +160,6 @@ class Review(db.Model):
     rating = db.Column(db.Integer, default=5)  # 1-5 stars
     comment = db.Column(db.Text, default='')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    order = db.relationship('Order')
 
 # ─── Auth Helpers ──────────────────────────────────────────
 def login_required(f):
