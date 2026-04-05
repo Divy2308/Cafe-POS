@@ -114,7 +114,7 @@
           <button onclick="sendToKitchen()" class="btn-ghost w-full py-2.5 rounded-xl text-sm text-orange-400">
             Send to Kitchen
           </button>
-          <button onclick="goToPayment()" class="btn-primary w-full py-2.5 rounded-xl text-white text-sm font-medium">
+          <button id="pay-now-btn" onclick="goToPayment()" class="btn-primary w-full py-2.5 rounded-xl text-white text-sm font-medium">
             Pay Now →
           </button>
           <button onclick="clearOrder()" class="btn-ghost w-full py-2 rounded-xl text-xs text-red-400 border border-red-400/30">
@@ -387,6 +387,14 @@ function renderCart() {
   const total = cart.reduce((s,i)=>s+i.price*i.qty,0);
   document.getElementById('cart-subtotal').textContent = '₹'+total.toFixed(0);
   document.getElementById('cart-total').textContent = '₹'+total.toFixed(0);
+  updatePayButtonState();
+}
+
+function updatePayButtonState() {
+  const btn = document.getElementById('pay-now-btn');
+  if (!btn) return;
+  const canPay = Boolean(currentBill && (currentBill.sent_to_kitchen_at || currentBill.status === 'sent'));
+  btn.classList.toggle('hidden', !canPay);
 }
 
 async function createOrUpdateOrder() {
@@ -450,24 +458,14 @@ function clearOrder() {
 }
 
 async function goToPayment() {
-  let order = null;
-  if (cart.length) {
-    order = await createOrUpdateOrder();
-  } else if (currentTable) {
-    order = currentBill;
-    if (!order) {
-      const billResp = await api('/api/bills/table/'+currentTable.id);
-      order = billResp.bill || null;
-    }
-    if (order) {
-      currentBill = order;
-      currentOrder = order;
-      cart = (order.items || []).map(i=>({product_id:i.product_id,name:i.name,price:i.price,qty:i.qty}));
-    }
-  }
-  if (!order) {
-    toast('Open Bills to pay a sent order for this table.', 'error');
+  const order = currentBill || currentOrder;
+  const canPay = Boolean(order && (order.sent_to_kitchen_at || order.status === 'sent'));
+  if (!canPay) {
+    toast(currentTable ? 'Send the order to kitchen before payment.' : 'No bill to pay yet.', 'error');
     return;
+  }
+  if (!cart.length && order) {
+    cart = (order.items || []).map(i=>({product_id:i.product_id,name:i.name,price:i.price,qty:i.qty}));
   }
   await populatePaymentView(order);
 }
@@ -735,6 +733,7 @@ async function openBillForPayment(orderId) {
   currentTable = bill.table_id ? { id: bill.table_id, number: bill.table } : null;
   cart = (bill.items || []).map(i => ({ product_id: i.product_id, name: i.name, price: i.price, qty: i.qty }));
   currentTip = bill.tip || 0;
+  updatePayButtonState();
   await populatePaymentView(bill);
 }
 
