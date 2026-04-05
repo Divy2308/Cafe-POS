@@ -4,7 +4,9 @@ from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 import qrcode, io, base64, json
+import sqlite3
 import os
+import tempfile
 import secrets
 import re
 import hmac
@@ -31,10 +33,39 @@ if os.path.exists(env_path):
             key, value = line.split('=', 1)
             os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
+LEGACY_DB_PATH = os.path.join(os.path.dirname(__file__), 'instance', 'pos.db')
+DB_DIR = os.path.join(tempfile.gettempdir(), 'pos-cafe')
+DB_PATH = os.path.join(DB_DIR, 'pos_runtime.db')
+os.makedirs(DB_DIR, exist_ok=True)
+if os.path.exists(DB_PATH):
+    def _db_is_writable(path):
+        conn = None
+        try:
+            conn = sqlite3.connect(path)
+            cur = conn.cursor()
+            cur.execute('CREATE TABLE IF NOT EXISTS __db_write_test (id INTEGER)')
+            cur.execute('INSERT INTO __db_write_test (id) VALUES (1)')
+            conn.commit()
+            cur.execute('DROP TABLE __db_write_test')
+            conn.commit()
+            return True
+        except Exception:
+            return False
+        finally:
+            if conn is not None:
+                conn.close()
+
+    if not _db_is_writable(DB_PATH):
+        try:
+            os.remove(DB_PATH)
+        except Exception:
+            pass
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'pos-cafe-hackathon-2024'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///pos.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + DB_PATH.replace('\\', '/')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'connect_args': {'timeout': 30}}
 
 SMTP_HOST = os.getenv('SMTP_HOST', '').strip()
 SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
@@ -580,7 +611,15 @@ def update_product(pid):
     p.price = float(d.get('price', p.price))
     p.description = d.get('description', p.description)
     p.tax = float(d.get('tax', p.tax))
+    p.unit = d.get('unit', p.unit)
     p.active = d.get('active', p.active)
+    if 'category' in d and d['category']:
+        cat = Category.query.filter_by(name=d['category']).first()
+        if not cat:
+            cat = Category(name=d['category'])
+            db.session.add(cat)
+            db.session.flush()
+        p.category_id = cat.id
     db.session.commit()
     return jsonify({'ok':True})
 
@@ -588,7 +627,7 @@ def update_product(pid):
 @staff_required
 def delete_product(pid):
     p = Product.query.get_or_404(pid)
-    p.active = False
+    db.session.delete(p)
     db.session.commit()
     return jsonify({'ok':True})
 
@@ -627,6 +666,18 @@ def delete_table(tid):
     t.active = False
     db.session.commit()
     return jsonify({'ok':True})
+
+@app.route('/api/tables/<int:tid>/status', methods=['PUT'])
+@staff_required
+def update_table_status(tid):
+    t = Table.query.get_or_404(tid)
+    d = request.json
+    status = d.get('status', 'free')  # 'free' or 'occupied'
+    if status not in ['free', 'occupied']:
+        return jsonify({'error': 'Invalid status'}), 400
+    t.status = status
+    db.session.commit()
+    return jsonify({'ok': True, 'status': t.status})
 
 # ─── API: Payment Methods ──────────────────────────────────
 @app.route('/api/payment-methods', methods=['GET'])
@@ -755,65 +806,203 @@ def create_order():
     s = Session.query.filter_by(user_id=session['user_id'], status='open').first()
     if not s:
         return jsonify({'error':'No open session'}), 400
-    count = Order.query.count() + 1
-    order_num = f"ORD-{count:04d}"
     total = sum(item['price'] * item['qty'] for item in d['items'])
-    o = Order(order_number=order_num, table_id=d.get('table_id'), session_id=s.id,
-              user_id=session['user_id'], total=total)
-    db.session.add(o)
-    db.session.flush()
-    for item in d['items']:
-        oi = OrderItem(order_id=o.id, product_id=item['product_id'],
-                       product_name=item['name'], qty=item['qty'], price=item['price'])
-        db.session.add(oi)
-    if d.get('table_id'):
-        t = Table.query.get(d['table_id'])
-        if t: t.status = 'occupied'
+    table_id = d.get('table_id')
+    o = None
+    if table_id:
+        o = (
+            Order.query
+            .filter_by(session_id=s.id, table_id=table_id)
+            .filter(Order.status.in_(['draft', 'sent']))
+            .order_by(Order.created_at.desc())
+            .first()
+        )
+
+    if o:
+        for item in d['items']:
+            oi = OrderItem(
+                order_id=o.id,
+                product_id=item['product_id'],
+                product_name=item['name'],
+                qty=item['qty'],
+                price=item['price'],
+            )
+            db.session.add(oi)
+        o.total = (o.total or 0) + total
+        if table_id:
+            t = Table.query.get(table_id)
+            if t:
+                t.status = 'occupied'
+        order_num = o.order_number
+    else:
+        count = Order.query.count() + 1
+        order_num = f"ORD-{count:04d}"
+        o = Order(
+            order_number=order_num,
+            table_id=table_id,
+            session_id=s.id,
+            user_id=session['user_id'],
+            total=total,
+        )
+        db.session.add(o)
+        db.session.flush()
+        for item in d['items']:
+            oi = OrderItem(
+                order_id=o.id,
+                product_id=item['product_id'],
+                product_name=item['name'],
+                qty=item['qty'],
+                price=item['price'],
+            )
+            db.session.add(oi)
+        if table_id:
+            t = Table.query.get(table_id)
+            if t:
+                t.status = 'occupied'
     db.session.commit()
     return jsonify({'ok':True,'id':o.id,'order_number':order_num})
+
+def serialize_bill(order):
+    payable_total = 0 if not order.sent_to_kitchen_at and order.status != 'sent' else sum(i.qty * i.price for i in order.items)
+    return {
+        'id': order.id,
+        'order_number': order.order_number,
+        'table_id': order.table_id,
+        'table': order.table.number if order.table else 'Takeaway',
+        'status': order.status,
+        'total': payable_total,
+        'tip': order.tip,
+        'created_at': order.created_at.isoformat() if order.created_at else None,
+        'sent_to_kitchen_at': order.sent_to_kitchen_at.isoformat() if order.sent_to_kitchen_at else None,
+        'items': [{
+            'id': i.id,
+            'product_id': i.product_id,
+            'name': i.product_name,
+            'qty': i.qty,
+            'price': i.price,
+        } for i in order.items],
+    }
 
 @app.route('/api/orders/<int:oid>/send-kitchen', methods=['POST'])
 @staff_required
 def send_to_kitchen(oid):
-    o = Order.query.get_or_404(oid)
-    o.status = 'sent'
-    o.sent_to_kitchen_at = datetime.utcnow()  # Track when order is sent to kitchen
-    kt = KitchenTicket(order_id=oid)
-    db.session.add(kt)
-    for item in o.items:
-        item.kitchen_status = 'to_cook'
-    db.session.commit()
-    ticket_data = {
-        'id': kt.id,
-        'order_number': o.order_number,
-        'table': o.table.number if o.table else 'Takeaway',
-        'status': 'to_cook',
-        'total': o.total,
-        'sent_at': kt.sent_at.isoformat(),
-        'items': [{'id':i.id,'name':i.product_name,'qty':i.qty,'price':i.price,'status':i.kitchen_status} for i in o.items]
-    }
-    socketio.emit('new_ticket', ticket_data)
-    socketio.emit('order_update', {'order_number': o.order_number, 'status': 'preparing'})
-    return jsonify({'ok':True})
+    try:
+        o = Order.query.get_or_404(oid)
+        if o.status == 'paid':
+            return jsonify({'error': 'Cannot send paid order to kitchen'}), 400
+        pending_items = [item for item in o.items if item.kitchen_status == 'pending']
+        if not pending_items and o.status == 'sent':
+            return jsonify({'ok': True, 'message': 'Order already sent to kitchen'})
+
+        o.status = 'sent'
+        o.sent_to_kitchen_at = o.sent_to_kitchen_at or datetime.utcnow()
+
+        kt = KitchenTicket.query.filter_by(order_id=oid).order_by(KitchenTicket.sent_at.desc()).first()
+        created_new_ticket = False
+        if not kt or kt.status == 'completed':
+            kt = KitchenTicket(order_id=oid)
+            db.session.add(kt)
+            created_new_ticket = True
+
+        for item in pending_items:
+            item.kitchen_status = 'to_cook'
+        db.session.commit()
+        
+        ticket_data = {
+            'id': kt.id,
+            'order_id': o.id,
+            'order_number': o.order_number,
+            'table': o.table.number if o.table else 'Takeaway',
+            'status': kt.status if kt.status in ('to_cook', 'preparing', 'completed') else 'to_cook',
+            'total': o.total,
+            'sent_at': kt.sent_at.isoformat(),
+            'items': [{'id':i.id,'name':i.product_name,'qty':i.qty,'price':i.price,'status':i.kitchen_status} for i in o.items]
+        }
+        if created_new_ticket:
+            socketio.emit('new_ticket', ticket_data)
+        else:
+            socketio.emit('ticket_update', {'id': kt.id, 'status': kt.status, 'items': ticket_data['items'], 'order_number': o.order_number})
+        socketio.emit('order_update', {'order_number': o.order_number, 'status': 'preparing'})
+        return jsonify({'ok': True, 'message': 'Order sent to kitchen'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/bills', methods=['GET'])
+@staff_required
+def get_bills():
+    s = Session.query.filter_by(user_id=session['user_id'], status='open').first()
+    if not s:
+        return jsonify([])
+    orders = Order.query.filter_by(session_id=s.id, status='sent').order_by(Order.created_at.desc()).all()
+    return jsonify([serialize_bill(o) for o in orders])
+
+@app.route('/api/bills/table/<int:tid>', methods=['GET'])
+@staff_required
+def get_bill_for_table(tid):
+    s = Session.query.filter_by(user_id=session['user_id'], status='open').first()
+    if not s:
+        return jsonify({'bill': None})
+    order = (
+        Order.query
+        .filter_by(session_id=s.id, table_id=tid, status='sent')
+        .order_by(Order.created_at.desc())
+        .first()
+    )
+    if not order:
+        return jsonify({'bill': None})
+    return jsonify({'bill': serialize_bill(order)})
 
 @app.route('/api/orders/<int:oid>/pay', methods=['POST'])
 @staff_required
 def pay_order(oid):
     o = Order.query.get_or_404(oid)
     d = request.json
+    payable_total = sum(i.qty * i.price for i in o.items) if (o.sent_to_kitchen_at or o.status == 'sent') else 0
     o.status = 'paid'
     o.payment_method = d.get('method','cash')
     o.tip = d.get('tip', 0) or 0  # Add tip support
+    o.total = payable_total
     if o.table:
         o.table.status = 'free'
     db.session.commit()
     socketio.emit('order_paid', {'order_number': o.order_number, 'total': o.total, 'tip': o.tip, 'method': o.payment_method})
     return jsonify({'ok':True})
 
+@app.route('/api/orders/<int:oid>', methods=['DELETE'])
+@staff_required
+def delete_order(oid):
+    o = Order.query.get_or_404(oid)
+    if o.status == 'paid':
+        return jsonify({'error': 'Cannot delete a paid bill'}), 400
+
+    table_id = o.table_id
+    db.session.query(KitchenTicket).filter_by(order_id=o.id).delete(synchronize_session=False)
+    db.session.delete(o)
+
+    if table_id:
+        has_active_orders = (
+            Order.query
+            .filter(Order.table_id == table_id, Order.id != oid, Order.status.in_(['draft', 'sent']))
+            .first()
+        )
+        if not has_active_orders:
+            table = Table.query.get(table_id)
+            if table:
+                table.status = 'free'
+
+    db.session.commit()
+    socketio.emit('order_deleted', {'order_id': oid, 'table_id': table_id})
+    return jsonify({'ok': True})
+
 @app.route('/api/orders/table/<int:tid>', methods=['GET'])
 @staff_required
 def get_table_order(tid):
-    o = Order.query.filter_by(table_id=tid).filter(Order.status.in_(['draft','sent'])).first()
+    o = (
+        Order.query
+        .filter_by(table_id=tid, status='draft')
+        .order_by(Order.created_at.desc())
+        .first()
+    )
     if not o:
         return jsonify({'order': None})
     return jsonify({'order': {
@@ -838,6 +1027,7 @@ def get_tickets():
         
         result.append({
             'id': kt.id,
+            'order_id': o.id,
             'order_number': o.order_number,
             'table': o.table.number if o.table else 'Takeaway',
             'status': kt.status,
@@ -1077,6 +1267,16 @@ def ensure_payment_methods():
     if changed:
         db.session.commit()
 
+def ensure_order_table_schema():
+    # Older SQLite databases may not have the newer order columns added in code.
+    # Add them in-place so existing data stays intact.
+    with db.engine.connect() as conn:
+        rows = conn.exec_driver_sql('PRAGMA table_info("order")').fetchall()
+        columns = {row[1] for row in rows}
+        if 'tip' not in columns:
+            conn.exec_driver_sql('ALTER TABLE "order" ADD COLUMN tip FLOAT DEFAULT 0')
+            conn.commit()
+
 def ensure_default_accounts():
     admin_email = 'admin@cafe.com'
     admin = User.query.filter_by(email=admin_email).first()
@@ -1110,6 +1310,7 @@ with app.app_context():
     db.create_all()
     seed_data()
     ensure_payment_methods()
+    ensure_order_table_schema()
     ensure_default_accounts()
 
 if __name__ == '__main__':

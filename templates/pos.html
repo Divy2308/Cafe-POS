@@ -43,6 +43,9 @@
       <a onclick="showView('order')" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer text-sm" id="nav-order">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg> Order View
       </a>
+      <a onclick="openBillsView()" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer text-sm" id="nav-bills">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m0 0l-6-6m6 6H3m18 9v-6a2 2 0 00-2-2h-5"/></svg> Bills
+      </a>
       <hr class="border-border my-2">
       {% if user_role == 'restaurant' %}
       <a href="/dashboard" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm">
@@ -69,7 +72,7 @@
     <!-- Top Bar -->
     <div class="border-b border-border px-6 py-3 flex items-center justify-between" style="background:#111">
       <div id="breadcrumb" class="text-sm text-gray-500">Floor View</div>
-      <button onclick="reloadData()" class="btn-ghost px-3 py-1.5 rounded-lg text-xs flex items-center gap-2">
+      <button onclick="refreshBills()" class="btn-ghost px-3 py-1.5 rounded-lg text-xs flex items-center gap-2">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Reload
       </button>
     </div>
@@ -121,30 +124,49 @@
       </div>
     </div>
 
+    <!-- ═══ BILLS VIEW ═══ -->
+    <div id="view-bills" class="hidden flex-1 overflow-auto p-6">
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h2 class="font-display text-xl font-700">Bills</h2>
+          <p class="text-sm text-gray-500">Sent orders waiting for payment</p>
+        </div>
+        <button onclick="reloadData()" class="btn-ghost px-3 py-1.5 rounded-lg text-xs flex items-center gap-2">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Reload
+        </button>
+      </div>
+      <div id="bills-grid" class="grid gap-4" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr));align-content:start"></div>
+      <div id="bills-empty" class="hidden text-center py-20 text-gray-500">
+        No bills waiting for payment.
+      </div>
+    </div>
+
     <!-- ═══ PAYMENT VIEW ═══ -->
-    <div id="view-payment" class="hidden flex-1 flex items-center justify-center p-8">
-      <div class="w-full max-w-md">
+    <div id="view-payment" class="hidden flex-1 flex items-center justify-center p-4 sm:p-8">
+      <div class="w-full max-w-sm sm:max-w-md">
         <button onclick="showView('order')" class="btn-ghost px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 mb-6">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg> Back to Order
         </button>
-        <div class="card p-8" style="border-radius:20px">
-          <h2 class="font-display text-2xl font-700 mb-2">Payment</h2>
-          <div class="text-4xl font-display font-800 text-brand-500 mb-8">
+        <div class="card p-5 sm:p-6" style="border-radius:20px; max-height:calc(100vh - 7rem); overflow-y:auto;">
+          <h2 class="font-display text-xl sm:text-2xl font-700 mb-2">Payment</h2>
+          <div class="text-xs text-gray-500 uppercase tracking-wider mb-2">Bill <span id="pay-order-num" class="text-white normal-case ml-2"></span></div>
+          <div class="text-3xl sm:text-4xl font-display font-800 text-brand-500 mb-6 sm:mb-8">
             <span id="pay-subtotal">₹0</span>
-            <span class="text-lg text-gray-500 ml-2">+ <span id="pay-tip-show">₹0</span> tip</span>
+            <span class="text-base sm:text-lg text-gray-500 ml-2">+ <span id="pay-tip-show">₹0</span> tip</span>
           </div>
           <div id="pay-total" style="display:none">₹0</div>
+          <div id="bill-summary" class="mb-5 p-3 sm:p-4 rounded-xl border border-border bg-black/20 text-sm"></div>
           <p class="text-xs text-gray-500 uppercase tracking-wider mb-3">Add a Tip</p>
-          <div class="grid grid-cols-4 gap-2 mb-6">
-            <button onclick="setTip(0)" class="btn-ghost py-2 rounded-lg text-sm text-gray-500 border border-border/50 tip-btn active" data-tip="0">None</button>
-            <button onclick="setTip(5)" class="btn-ghost py-2 rounded-lg text-sm text-gray-500 border border-border/50 tip-btn" data-tip="5">5%</button>
-            <button onclick="setTip(10)" class="btn-ghost py-2 rounded-lg text-sm text-gray-500 border border-border/50 tip-btn" data-tip="10">10%</button>
-            <button onclick="setTip(15)" class="btn-ghost py-2 rounded-lg text-sm text-gray-500 border border-border/50 tip-btn" data-tip="15">15%</button>
+          <div class="grid grid-cols-4 gap-2 mb-5">
+            <button onclick="setTip(0)" class="btn-ghost py-1.5 rounded-lg text-xs text-gray-500 border border-border/50 tip-btn active" data-tip="0">None</button>
+            <button onclick="setTip(5)" class="btn-ghost py-1.5 rounded-lg text-xs text-gray-500 border border-border/50 tip-btn" data-tip="5">5%</button>
+            <button onclick="setTip(10)" class="btn-ghost py-1.5 rounded-lg text-xs text-gray-500 border border-border/50 tip-btn" data-tip="10">10%</button>
+            <button onclick="setTip(15)" class="btn-ghost py-1.5 rounded-lg text-xs text-gray-500 border border-border/50 tip-btn" data-tip="15">15%</button>
           </div>
-          <input type="number" id="custom-tip" placeholder="Enter custom tip..." class="text-sm w-full mb-4 px-3 py-2 bg-gray-800 rounded-lg border border-border text-white" onchange="setCustomTip()">
+          <input type="number" id="custom-tip" placeholder="Enter custom tip..." class="text-sm w-full mb-4 px-3 py-2 bg-gray-800 rounded-lg border border-border text-white" oninput="setCustomTip()">
           <p class="text-xs text-gray-500 uppercase tracking-wider mb-3">Select Method</p>
-          <div id="pay-methods" class="space-y-3"></div>
-          <button onclick="validatePayment()" class="btn-primary w-full py-3.5 rounded-xl text-white font-medium mt-6">
+          <div id="pay-methods" class="grid grid-cols-1 sm:grid-cols-3 gap-2"></div>
+          <button onclick="validatePayment()" class="btn-primary w-full py-3 rounded-xl text-white font-medium mt-5">
             Validate Payment →
           </button>
         </div>
@@ -187,7 +209,7 @@
 {% endblock %}
 {% block scripts %}
 <script>
-let floors=[], products=[], currentTable=null, currentOrder=null, selectedMethod=null, cart=[], sessionId=null, currentTip=0;
+let floors=[], products=[], bills=[], currentTable=null, currentOrder=null, currentBill=null, selectedMethod=null, cart=[], sessionId=null, currentTip=0, activeFloorId=null;
 
 async function init() {
   const s = await api('/api/sessions/open','POST');
@@ -197,30 +219,53 @@ async function init() {
 }
 
 async function reloadData() {
-  const [fl, pr] = await Promise.all([api('/api/floors'), api('/api/products')]);
-  floors = fl; products = pr;
+  const [fl, pr, bl] = await Promise.all([api('/api/floors'), api('/api/products'), api('/api/bills')]);
+  floors = fl; products = pr; bills = bl;
+  if (currentTable) {
+    const tableBill = bills.find(b => b.table_id === currentTable.id && b.status === 'sent');
+    currentBill = tableBill || (currentBill && currentBill.table_id === currentTable.id ? currentBill : null);
+  }
   renderFloors(); renderProducts();
+  renderBills();
+}
+
+async function refreshBills() {
+  bills = await api('/api/bills');
+  if (currentTable) {
+    const tableBill = bills.find(b => b.table_id === currentTable.id && b.status === 'sent');
+    currentBill = tableBill || (currentBill && currentBill.table_id === currentTable.id ? currentBill : null);
+  }
+  renderBills();
+}
+
+async function openBillsView() {
+  await refreshBills();
+  showView('bills');
 }
 
 // ─── Floor View ───────────────────────────────────────────
 function renderFloors() {
   const tabs = document.getElementById('floor-tabs');
-  tabs.innerHTML = floors.map((f,i)=>`<button onclick="renderTables(${f.id})" class="cat-pill px-4 py-1.5 rounded-full text-sm border border-border ${i===0?'active':''}">${f.name}</button>`).join('');
-  if (floors.length) renderTables(floors[0].id);
+  if (!activeFloorId && floors.length) activeFloorId = floors[0].id;
+  tabs.innerHTML = floors.map(f=>`<button onclick="renderTables(${f.id})" class="cat-pill px-4 py-1.5 rounded-full text-sm border border-border ${f.id===activeFloorId?'active':''}">${f.name}</button>`).join('');
+  if (floors.length) renderTables(activeFloorId || floors[0].id);
 }
 
 function renderTables(floorId) {
   const floor = floors.find(f=>f.id===floorId);
   if (!floor) return;
+  activeFloorId = floorId;
   document.querySelectorAll('.cat-pill').forEach(p=>p.classList.remove('active'));
-  event && event.target && event.target.classList && event.target.classList.add('active');
+  const activeTab = Array.from(document.querySelectorAll('#floor-tabs .cat-pill')).find(btn => btn.textContent === floor.name);
+  if (activeTab) activeTab.classList.add('active');
   const grid = document.getElementById('tables-grid');
   grid.innerHTML = floor.tables.map(t=>`
-    <div class="table-card card p-5 ${t.status==='occupied'?'occupied':'free'}" onclick="selectTable(${t.id},'${t.number}','${t.status}')">
+    <div class="table-card card p-5 ${t.status==='occupied'?'occupied':'free'}" onclick="selectTable(${t.id},'${t.number}','${t.status}')" oncontextmenu="toggleTableStatus(event,${t.id},'${t.status}')">
       <div class="font-display text-2xl font-800 mb-1">T${t.number}</div>
       <div class="text-xs text-gray-500">${t.seats} seats</div>
       <div class="mt-3">
         <span class="tag text-xs ${t.status==='occupied'?'bg-orange-900/40 text-orange-400':'bg-gray-800 text-gray-500'}">${t.status==='occupied'?'Occupied':'Free'}</span>
+        <span class="text-xs text-gray-600 ml-2">(right-click to toggle)</span>
       </div>
     </div>`).join('');
 }
@@ -228,9 +273,15 @@ function renderTables(floorId) {
 async function selectTable(id, number, status) {
   currentTable = {id, number};
   document.getElementById('order-table-label').textContent = 'Table '+number;
+  // Always start fresh when opening a table so a previous sent order
+  // cannot leak into the next ticket for the same table.
+  currentOrder = null;
+  currentBill = null;
+  cart = [];
+  document.getElementById('cart-order-num').textContent = '';
   // Check existing order
   const r = await api('/api/orders/table/'+id);
-  if (r.order) {
+  if (r.order && r.order.status === 'draft') {
     currentOrder = r.order;
     cart = r.order.items.map(i=>({product_id:i.product_id,name:i.name,price:i.price,qty:i.qty}));
     document.getElementById('cart-order-num').textContent = '#'+r.order.order_number;
@@ -238,11 +289,26 @@ async function selectTable(id, number, status) {
     currentOrder = null; cart = [];
     document.getElementById('cart-order-num').textContent = '';
   }
+  const billResp = await api('/api/bills/table/'+id);
+  currentBill = billResp.bill || null;
   renderCart();
   showView('order');
 }
 
 function backToFloor() { showView('floor'); reloadData(); }
+
+async function toggleTableStatus(e, tableId, currentStatus) {
+  e.preventDefault();
+  const newStatus = currentStatus === 'occupied' ? 'free' : 'occupied';
+  const r = await api('/api/tables/'+tableId+'/status', 'PUT', {status: newStatus});
+  if (r.ok) {
+    toast(`Table set to ${newStatus}`, 'success');
+    reloadData();
+  } else {
+    toast('Error updating table status', 'error');
+  }
+  return false;
+}
 
 // ─── Products ─────────────────────────────────────────────
 let activeCat = null;
@@ -326,10 +392,14 @@ function renderCart() {
 async function createOrUpdateOrder() {
   if (!cart.length) { toast('Add items first','error'); return null; }
   const items = cart.map(i=>({product_id:i.product_id,name:i.name,price:i.price,qty:i.qty}));
-  if (currentOrder) return currentOrder;
+  if (currentOrder && currentOrder.status === 'draft') {
+    currentOrder.items = items.map(i => ({ ...i }));
+    return currentOrder;
+  }
+  currentOrder = null;
   const r = await api('/api/orders','POST',{table_id:currentTable?.id, items});
   if (r.error) { toast(r.error,'error'); return null; }
-  currentOrder = {id:r.id, order_number:r.order_number};
+  currentOrder = {id:r.id, order_number:r.order_number, status:'draft', items: items.map(i => ({ ...i }))};
   document.getElementById('cart-order-num').textContent = '#'+r.order_number;
   return currentOrder;
 }
@@ -337,15 +407,34 @@ async function createOrUpdateOrder() {
 async function sendToKitchen() {
   const o = await createOrUpdateOrder();
   if (!o) return;
-  const r = await api('/api/orders/'+o.id+'/send-kitchen','POST');
-  if (r.ok) {
-    toast('Order sent to kitchen! 🍳');
-    // Update table status and refresh floor view
-    setTimeout(() => {
-      if (currentTable) {
-        reloadData();
+  try {
+    const r = await api('/api/orders/'+o.id+'/send-kitchen','POST');
+    if (r.ok || r.message) {
+      toast('Order sent to kitchen! 🍳', 'success');
+      cart = [];
+      currentOrder = null;
+      const billResp = await api('/api/bills/table/'+currentTable.id);
+      currentBill = billResp.bill || null;
+      document.getElementById('cart-order-num').textContent = '';
+      renderCart();
+      await reloadData();
+      await openBillsView();
+      // Update table status and refresh floor view
+      setTimeout(() => {
+        if (currentTable) {
+          reloadData();
+        }
+      }, 300);
+    } else if (r.error) {
+      if (r.error === 'forbidden') {
+        toast('This account is customer-only. Log in as staff to send orders to the kitchen.', 'error');
+        return;
       }
-    }, 300);
+      toast(r.error, 'error');
+    }
+  } catch (err) {
+    console.error('Error sending to kitchen:', err);
+    toast('Failed to send order to kitchen', 'error');
   }
 }
 
@@ -361,23 +450,79 @@ function clearOrder() {
 }
 
 async function goToPayment() {
-  const o = await createOrUpdateOrder();
-  if (!o) return;
-  const total = cart.reduce((s,i)=>s+i.price*i.qty,0);
-  currentTip = 0;  // Reset tip
-  document.getElementById('pay-subtotal').textContent = '₹'+total.toFixed(0);
-  document.getElementById('pay-tip-show').textContent = '₹0';
+  let order = null;
+  if (cart.length) {
+    order = await createOrUpdateOrder();
+  } else if (currentTable) {
+    order = currentBill;
+    if (!order) {
+      const billResp = await api('/api/bills/table/'+currentTable.id);
+      order = billResp.bill || null;
+    }
+    if (order) {
+      currentBill = order;
+      currentOrder = order;
+      cart = (order.items || []).map(i=>({product_id:i.product_id,name:i.name,price:i.price,qty:i.qty}));
+    }
+  }
+  if (!order) {
+    toast('Open Bills to pay a sent order for this table.', 'error');
+    return;
+  }
+  await populatePaymentView(order);
+}
+
+function buildBillSummary(order) {
+  const subtotal = getPayableSubtotal(order);
+  const items = (order.items || []).map(i => `
+    <div class="flex justify-between gap-4 py-1">
+      <span class="text-gray-300">${i.name} × ${i.qty}</span>
+      <span class="text-brand-500">₹${(i.price * i.qty).toFixed(0)}</span>
+    </div>
+  `).join('');
+  return {
+    items,
+    subtotal,
+    totalWithTip: subtotal + currentTip,
+  };
+}
+
+function getPayableSubtotal(order) {
+  const itemsTotal = (order.items || []).reduce((s, i) => s + (i.price * i.qty), 0);
+  const sentToKitchen = Boolean(order.sent_to_kitchen_at || order.status === 'sent');
+  return sentToKitchen ? itemsTotal : 0;
+}
+
+async function populatePaymentView(order) {
+  const bill = buildBillSummary(order);
+  currentTip = order.tip || 0;
+  const isNotSentToKitchen = !order.sent_to_kitchen_at && order.status !== 'sent';
+  document.getElementById('pay-order-num').textContent = '#'+order.order_number;
+  document.getElementById('bill-summary').innerHTML = `
+    ${isNotSentToKitchen ? '<div class="mb-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">This order has not been sent to the kitchen yet, so the payable amount is ₹0.</div>' : ''}
+    <div class="flex justify-between gap-4 py-1 border-b border-border/60">
+      <span class="text-gray-400">Table</span>
+      <span class="text-white">${currentTable ? currentTable.number : (order.table || 'Takeaway')}</span>
+    </div>
+    <div class="mt-3 space-y-1">${bill.items}</div>
+    <div class="flex justify-between gap-4 py-1 border-t border-border/60 mt-3 pt-3">
+      <span class="text-gray-400">Subtotal</span>
+      <span class="text-white">₹${bill.subtotal.toFixed(0)}</span>
+    </div>
+  `;
+  document.getElementById('pay-subtotal').textContent = '₹'+bill.subtotal.toFixed(0);
+  document.getElementById('pay-tip-show').textContent = '₹'+currentTip.toFixed(0);
   document.getElementById('custom-tip').value = '';
   document.querySelectorAll('.tip-btn').forEach(b => b.classList.remove('active'));
   document.querySelector('[data-tip="0"]').classList.add('active');
   const methods = await api('/api/payment-methods');
   const el = document.getElementById('pay-methods');
   el.innerHTML = methods.filter(m=>m.enabled).map(m=>`
-    <div class="pay-method card p-4 rounded-xl flex items-center gap-3" onclick="selectMethod('${m.type}','${m.upi_id}','${m.name.replace(/'/g,"\\'")}',${total})" id="pm-${m.type}">
-      <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background:rgba(249,115,22,0.1)">
+    <div class="pay-method card p-3 rounded-xl flex items-center gap-2 sm:gap-3 min-h-[56px]" onclick="selectMethod('${m.type}','${m.upi_id}','${m.name.replace(/'/g,"\\'")}',${bill.subtotal})" id="pm-${m.type}">
+      <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:rgba(249,115,22,0.1)">
         ${m.type==='cash'?'💵':m.type==='upi'?'📱':m.type==='razorpay'?'⚡':'💳'}
       </div>
-      <div class="font-medium text-sm">${m.name}</div>
+      <div class="font-medium text-xs sm:text-sm leading-tight">${m.name}</div>
     </div>`).join('');
   showView('payment');
 }
@@ -477,6 +622,11 @@ async function openRazorpayCheckout() {
 
 async function validatePayment() {
   if (!selectedMethod) return toast('Select a payment method','error');
+  const payableSubtotal = getPayableSubtotal(currentOrder || { items: cart, status: 'draft' });
+  if (payableSubtotal <= 0) {
+    await completePayment(selectedMethod.type || 'cash');
+    return;
+  }
   if (selectedMethod.type === 'razorpay') {
     await openRazorpayCheckout();
     return;
@@ -496,28 +646,119 @@ async function confirmUPI() { await completePayment(selectedMethod?.type || 'upi
 async function completePayment(method) {
   const r = await api('/api/orders/'+currentOrder.id+'/pay','POST',{method, tip: currentTip});
   if (r.ok) {
-    const total = cart.reduce((s,i)=>s+i.price*i.qty,0);
+    const total = getPayableSubtotal(currentOrder || { items: cart, status: 'draft' });
     const totalWithTip = (total + currentTip).toFixed(0);
     document.getElementById('confirm-amount').textContent = '₹'+totalWithTip+' via '+(method==='cash'?'Cash':method==='upi'?'UPI':method==='razorpay'?'Razorpay':'Card');
     cart=[]; currentOrder=null; currentTable=null; currentTip=0;
+    selectedMethod = null;
     showView('confirm');
+    await reloadData();
   }
 }
 
 // ─── Views ────────────────────────────────────────────────
 function showView(v) {
-  ['floor','order','payment','qr','confirm'].forEach(n=>{
+  ['floor','order','bills','payment','qr','confirm'].forEach(n=>{
     document.getElementById('view-'+n).classList.toggle('hidden', n!==v);
-    if (n!=='floor'&&n!=='order') document.getElementById('view-'+n).classList.toggle('flex', n===v);
+    if (n!=='floor'&&n!=='order'&&n!=='bills') document.getElementById('view-'+n).classList.toggle('flex', n===v);
   });
   document.getElementById('view-floor').style.display = v==='floor'?'block':'none';
   document.getElementById('view-order').style.display = v==='order'?'flex':'none';
-  const labels = {floor:'Floor View',order:'Order Screen',payment:'Payment',qr:'UPI QR',confirm:'Confirmed'};
+  document.getElementById('view-bills').style.display = v==='bills'?'block':'none';
+  const labels = {floor:'Floor View',order:'Order Screen',bills:'Bills',payment:'Payment',qr:'UPI QR',confirm:'Confirmed'};
   document.getElementById('breadcrumb').textContent = labels[v]||v;
-  ['floor','order'].forEach(n=>{
+  ['floor','order','bills'].forEach(n=>{
     const el = document.getElementById('nav-'+n);
     if(el) el.classList.toggle('active',n===v);
   });
+}
+
+function renderBills() {
+  const grid = document.getElementById('bills-grid');
+  const empty = document.getElementById('bills-empty');
+  if (!grid || !empty) return;
+  const visibleBills = [...bills];
+  if (currentBill && !visibleBills.some(b => b.id === currentBill.id)) {
+    visibleBills.unshift(currentBill);
+  }
+  visibleBills.sort((a, b) => {
+    const aCurrent = currentBill && a.id === currentBill.id ? 1 : 0;
+    const bCurrent = currentBill && b.id === currentBill.id ? 1 : 0;
+    if (aCurrent !== bCurrent) return bCurrent - aCurrent;
+    const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return bTime - aTime;
+  });
+  if (!visibleBills.length) {
+    grid.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+  grid.innerHTML = visibleBills.map(b => {
+    const isCurrent = currentBill && b.id === currentBill.id;
+    const preview = (b.items || []).slice(0, 3).map(i => `<div class="text-xs text-gray-400">${i.name} × ${i.qty}</div>`).join('');
+    return `
+      <div class="card p-4 rounded-2xl ${isCurrent ? 'ring-2 ring-brand-500/70 bg-brand-500/5' : ''}">
+        <div class="flex items-start justify-between gap-3 mb-3">
+          <div>
+            <div class="font-display text-lg font-700">#${b.order_number.split('-')[1]}</div>
+            <div class="text-xs text-gray-500">Table ${b.table}</div>
+            ${isCurrent ? '<div class="mt-1 inline-flex items-center rounded-full bg-brand-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-brand-400">Selected Table</div>' : ''}
+          </div>
+          <div class="text-right">
+            <div class="text-xs text-orange-400 uppercase tracking-wider">${b.status}</div>
+            <div class="text-lg font-700 text-brand-500">₹${b.total.toFixed(0)}</div>
+          </div>
+        </div>
+        <div class="space-y-1 mb-4">${preview}</div>
+        <div class="flex gap-2">
+          <button class="btn-ghost flex-1 py-2 rounded-lg text-xs" onclick="openBillForPayment(${b.id})">Open Bill</button>
+          <button class="btn-primary flex-1 py-2 rounded-lg text-xs" onclick="payBill(${b.id})">Pay Now</button>
+        </div>
+        <button class="mt-2 w-full rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-300 hover:bg-red-500/20 transition" onclick="deleteBill(${b.id})">Delete Bill</button>
+      </div>
+    `;
+  }).join('');
+}
+
+async function openBillForPayment(orderId) {
+  const bill = bills.find(b => b.id === orderId);
+  if (!bill) return toast('Bill not found', 'error');
+  currentOrder = bill;
+  currentBill = bill;
+  currentTable = bill.table_id ? { id: bill.table_id, number: bill.table } : null;
+  cart = (bill.items || []).map(i => ({ product_id: i.product_id, name: i.name, price: i.price, qty: i.qty }));
+  currentTip = bill.tip || 0;
+  await populatePaymentView(bill);
+}
+
+async function payBill(orderId) {
+  await openBillForPayment(orderId);
+}
+
+async function deleteBill(orderId) {
+  const bill = bills.find(b => b.id === orderId) || (currentBill && currentBill.id === orderId ? currentBill : null);
+  if (!bill) return toast('Bill not found', 'error');
+  if (!confirm(`Delete bill ${bill.order_number}? This will remove the order and its kitchen ticket.`)) return;
+  const r = await api('/api/orders/'+orderId, 'DELETE');
+  if (r.ok) {
+    if (currentBill && currentBill.id === orderId) {
+      currentBill = null;
+    }
+    if (currentOrder && currentOrder.id === orderId) {
+      currentOrder = null;
+      cart = [];
+    }
+    toast('Bill deleted', 'success');
+    await reloadData();
+    await refreshBills();
+    if (document.getElementById('view-bills') && !document.getElementById('view-bills').classList.contains('hidden')) {
+      showView('bills');
+    }
+  } else {
+    toast(r.error || 'Failed to delete bill', 'error');
+  }
 }
 
 async function closeSession() {
