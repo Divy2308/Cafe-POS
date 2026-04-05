@@ -23,6 +23,10 @@
                 <span class="text-xl">📊</span>
                 <span>Dashboard</span>
             </button>
+            <button onclick="switchTab('reviews')" class="nav-link w-full text-left px-4 py-3 rounded-lg transition-all flex items-center space-x-3">
+                <span class="text-xl">⭐</span>
+                <span>Reviews</span>
+            </button>
             <button onclick="switchTab('users')" class="nav-link w-full text-left px-4 py-3 rounded-lg transition-all flex items-center space-x-3">
                 <span class="text-xl">👥</span>
                 <span>Staff Management</span>
@@ -134,6 +138,55 @@
                             <tbody id="staffTable">
                                 <tr class="border-b border-[#2a2a2a]">
                                     <td colspan="5" class="py-8 text-center text-gray-400">Loading staff...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reviews Tab -->
+            <div id="reviews-tab" class="tab-content hidden">
+                <h2 class="text-2xl font-bold mb-6">Customer Reviews</h2>
+                
+                <div class="card p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                        <div>
+                            <div class="text-gray-400 text-sm mb-2">Total Reviews</div>
+                            <div class="text-3xl font-bold" id="totalReviews">0</div>
+                        </div>
+                        <div>
+                            <div class="text-gray-400 text-sm mb-2">Average Rating</div>
+                            <div class="text-3xl font-bold text-[#f97316]" id="avgRating">0.0</div>
+                        </div>
+                        <div>
+                            <div class="text-gray-400 text-sm mb-2">5 Star Reviews</div>
+                            <div class="text-3xl font-bold text-green-500" id="fiveStarCount">0</div>
+                        </div>
+                        <div>
+                            <div class="text-gray-400 text-sm mb-2">Latest Review</div>
+                            <div class="text-lg font-bold" id="latestReviewTime">-</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card p-6 mt-6">
+                    <h3 class="text-xl font-bold mb-4">All Reviews</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b border-[#2a2a2a]">
+                                    <th class="text-left py-3 px-4 text-gray-400 font-semibold">Order</th>
+                                    <th class="text-left py-3 px-4 text-gray-400 font-semibold">Table</th>
+                                    <th class="text-left py-3 px-4 text-gray-400 font-semibold">Rating</th>
+                                    <th class="text-left py-3 px-4 text-gray-400 font-semibold">Comment</th>
+                                    <th class="text-left py-3 px-4 text-gray-400 font-semibold">Amount</th>
+                                    <th class="text-left py-3 px-4 text-gray-400 font-semibold">Date</th>
+                                </tr>
+                            </thead>
+                            <tbody id="reviewsTable">
+                                <tr class="border-b border-[#2a2a2a]">
+                                    <td colspan="6" class="py-8 text-center text-gray-400">Loading reviews...</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -266,6 +319,7 @@ function switchTab(tab) {
     // Update page title
     const titles = {
         'overview': 'Dashboard',
+        'reviews': 'Customer Reviews',
         'users': 'Staff Management',
         'settings': 'System Settings'
     };
@@ -274,6 +328,8 @@ function switchTab(tab) {
     // Load data for specific tab
     if (tab === 'users') {
         loadStaff();
+    } else if (tab === 'reviews') {
+        loadReviews();
     }
 }
 
@@ -378,6 +434,57 @@ async function deleteUser(userId) {
             console.error('Error:', error);
             alert('Error deleting staff member');
         }
+    }
+}
+
+async function loadReviews() {
+    try {
+        const response = await fetch('/api/reviews');
+        if (response.ok) {
+            const reviews = await response.json();
+            const tbody = document.getElementById('reviewsTable');
+            tbody.innerHTML = '';
+            
+            if (reviews.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-gray-400">No reviews yet</td></tr>';
+                document.getElementById('totalReviews').textContent = '0';
+                document.getElementById('avgRating').textContent = '0.0';
+                document.getElementById('fiveStarCount').textContent = '0';
+                document.getElementById('latestReviewTime').textContent = '-';
+                return;
+            }
+
+            // Calculate stats
+            const avgRating = (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1);
+            const fiveStarCount = reviews.filter(r => r.rating === 5).length;
+            const latestTime = new Date(reviews[0].created_at).toLocaleDateString();
+
+            document.getElementById('totalReviews').textContent = reviews.length;
+            document.getElementById('avgRating').textContent = avgRating;
+            document.getElementById('fiveStarCount').textContent = fiveStarCount;
+            document.getElementById('latestReviewTime').textContent = latestTime;
+
+            reviews.forEach(review => {
+                const row = document.createElement('tr');
+                row.className = 'border-b border-[#2a2a2a] hover:bg-[#0f0f0f] transition';
+                const stars = '⭐'.repeat(review.rating) + '☆'.repeat(5 - review.rating);
+                row.innerHTML = `
+                    <td class="py-4 px-4 font-mono text-[#f97316]">${review.order_number}</td>
+                    <td class="py-4 px-4">Table ${review.table}</td>
+                    <td class="py-4 px-4">
+                        <span class="text-[#f97316] font-bold">${stars}</span>
+                        <span class="text-gray-500">${review.rating}/5</span>
+                    </td>
+                    <td class="py-4 px-4 text-gray-400 max-w-xs truncate">${review.comment || '-'}</td>
+                    <td class="py-4 px-4 text-green-500 font-semibold">₹${review.total.toFixed(0)}</td>
+                    <td class="py-4 px-4 text-gray-400 text-sm">${new Date(review.created_at).toLocaleDateString()}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading reviews:', error);
+        document.getElementById('reviewsTable').innerHTML = '<tr><td colspan="6" class="py-8 text-center text-red-400">Error loading reviews</td></tr>';
     }
 }
 

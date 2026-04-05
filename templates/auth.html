@@ -477,7 +477,7 @@ body::after {
 
         <div class="lp-badge">
           <div class="lp-badge-dot"></div>
-          <span>Authorized Staff Access</span>
+          <span>Role-Based Access</span>
         </div>
 
         <h1 class="lp-headline">
@@ -496,7 +496,7 @@ body::after {
           </div>
           <div class="lp-card">
             <div class="lp-card-tag">👤 Role-Based Access</div>
-            <div class="lp-card-text">Admin, POS operator, and kitchen staff each get exactly the view they need — nothing more.</div>
+            <div class="lp-card-text">Admin, POS operator, kitchen staff, and customers each get exactly the view they need — nothing more.</div>
           </div>
         </div>
       </div>
@@ -606,7 +606,8 @@ body::after {
             <div class="field">
               <label>Account role</label>
               <select id="signup-role">
-                <option value="user">Staff / POS Operator</option>
+                <option value="cashier">Staff / POS Operator</option>
+                <option value="customer">Customer</option>
                 <option value="restaurant">Restaurant Admin</option>
               </select>
             </div>
@@ -705,7 +706,7 @@ body::after {
 
       </div><!-- /form-card -->
 
-      <p class="form-footer-note">Access restricted to authorized staff only.</p>
+      <p class="form-footer-note">Access restricted to signed-in users.</p>
 
     </div><!-- /form-container -->
   </section>
@@ -911,6 +912,12 @@ async function api(url, method='GET', body=null) {
   } catch(e) { return { error: 'Network error. Please try again.' }; }
 }
 
+function homeForRole(role) {
+  if (role === 'restaurant') return '/backend';
+  if (role === 'customer') return '/customer';
+  return '/pos';
+}
+
 /* ══════════════════════════════════
    LOGIN
 ══════════════════════════════════ */
@@ -924,7 +931,7 @@ async function doLogin() {
   setLoading('login-btn', false);
   if(r.error) return showAlert('login-alert', r.error);
   showAlert('login-alert', 'Welcome back, '+r.name+'!', 'success');
-  setTimeout(()=> location.href = r.role==='restaurant' ? '/backend' : '/pos', 700);
+  setTimeout(()=> location.href = homeForRole(r.role), 700);
 }
 
 /* ══════════════════════════════════
@@ -944,7 +951,7 @@ async function doSignup() {
   setLoading('signup-btn', false);
   if(r.error) return showAlert('signup-alert', r.error);
   showAlert('signup-alert', 'Account created! Redirecting…', 'success');
-  setTimeout(()=> location.href = r.role==='restaurant' ? '/backend' : '/pos', 700);
+  setTimeout(()=> location.href = homeForRole(r.role), 700);
 }
 
 /* ══════════════════════════════════

@@ -7,6 +7,10 @@ import qrcode, io, base64, json
 import os
 import secrets
 import re
+import hmac
+import hashlib
+import urllib.request
+import urllib.error
 import smtplib
 from datetime import datetime, timedelta
 from functools import wraps
@@ -45,6 +49,11 @@ RESEND_FROM = os.getenv(
 ).strip()
 if RESEND_API_KEY and resend is not None:
     resend.api_key = RESEND_API_KEY
+
+RAZORPAY_KEY_ID = os.getenv('RAZORPAY_KEY_ID', '').strip()
+RAZORPAY_KEY_SECRET = os.getenv('RAZORPAY_KEY_SECRET', '').strip()
+RAZORPAY_CURRENCY = os.getenv('RAZORPAY_CURRENCY', 'INR').strip().upper() or 'INR'
+RAZORPAY_MERCHANT_NAME = os.getenv('RAZORPAY_MERCHANT_NAME', 'POS Cafe').strip() or 'POS Cafe'
 
 PASSWORD_RESET_CODES = {}
 
@@ -114,8 +123,13 @@ class Order(db.Model):
     status = db.Column(db.String(30), default='draft')  # draft, sent, paid
     payment_method = db.Column(db.String(30), default='')
     total = db.Column(db.Float, default=0)
+    tip = db.Column(db.Float, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    sent_to_kitchen_at = db.Column(db.DateTime, nullable=True)  # When sent to kitchen
+    started_at = db.Column(db.DateTime, nullable=True)  # When kitchen starts preparing
+    completed_at = db.Column(db.DateTime, nullable=True)  # When order is ready
     items = db.relationship('OrderItem', backref='order', lazy=True, cascade='all, delete-orphan')
+    reviews = db.relationship('Review', backref='order', lazy=True, cascade='all, delete-orphan')
     table = db.relationship('Table', backref='orders')
     user = db.relationship('User', backref='orders')
 
@@ -127,6 +141,8 @@ class OrderItem(db.Model):
     qty = db.Column(db.Integer, default=1)
     price = db.Column(db.Float, default=0)
     kitchen_status = db.Column(db.String(20), default='pending')  # pending, to_cook, preparing, completed
+    started_at = db.Column(db.DateTime, nullable=True)  # When item preparation starts
+    completed_at = db.Column(db.DateTime, nullable=True)  # When item is ready
     product = db.relationship('Product')
 
 class KitchenTicket(db.Model):
@@ -134,6 +150,16 @@ class KitchenTicket(db.Model):
     order_id = db.Column(db.Integer, db.ForeignKey('order.id'))
     status = db.Column(db.String(20), default='to_cook')
     sent_at = db.Column(db.DateTime, default=datetime.utcnow)
+    started_at = db.Column(db.DateTime, nullable=True)  # When preparing starts
+    completed_at = db.Column(db.DateTime, nullable=True)  # When all items completed
+    order = db.relationship('Order')
+
+class Review(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
+    rating = db.Column(db.Integer, default=5)  # 1-5 stars
+    comment = db.Column(db.Text, default='')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
     order = db.relationship('Order')
 
 # ─── Auth Helpers ──────────────────────────────────────────
@@ -145,17 +171,49 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
-def page_login_required(restaurant_only=False):
+def normalize_role(role):
+    role = (role or 'cashier').strip().lower()
+    if role == 'admin':
+        return 'restaurant'
+    if role in ('user', 'staff', 'pos'):
+        return 'cashier'
+    if role not in ('cashier', 'restaurant', 'kitchen', 'manager', 'customer'):
+        return 'cashier'
+    return role
+
+def role_home(role):
+    role = normalize_role(role)
+    if role == 'restaurant':
+        return url_for('admin_dashboard')
+    if role == 'customer':
+        return url_for('customer')
+    return url_for('pos')
+
+def page_login_required(allowed_roles=None, redirect_to=None):
     def decorator(f):
         @wraps(f)
         def decorated(*args, **kwargs):
             if 'user_id' not in session:
                 return redirect(url_for('auth'))
-            if restaurant_only and session.get('user_role') != 'restaurant':
-                return redirect(url_for('pos'))
+            role = normalize_role(session.get('user_role'))
+            if allowed_roles is not None:
+                allowed = {normalize_role(r) for r in allowed_roles}
+                if role not in allowed:
+                    return redirect(redirect_to or role_home(role))
             return f(*args, **kwargs)
         return decorated
     return decorator
+
+def staff_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user_id' not in session:
+            return jsonify({'error': 'unauthorized'}), 401
+        role = normalize_role(session.get('user_role'))
+        if role == 'customer':
+            return jsonify({'error': 'forbidden'}), 403
+        return f(*args, **kwargs)
+    return decorated
 
 def admin_required(f):
     @wraps(f)
@@ -163,8 +221,8 @@ def admin_required(f):
         if 'user_id' not in session:
             return redirect(url_for('auth'))
         user = User.query.get(session['user_id'])
-        if not user or user.role != 'restaurant':
-            return redirect(url_for('pos'))
+        if not user or normalize_role(user.role) != 'restaurant':
+            return redirect(role_home(normalize_role(session.get('user_role'))))
         return f(*args, **kwargs)
     return decorated
 
@@ -266,6 +324,46 @@ def send_reset_email(email, otp):
         smtp.send_message(msg)
     return True
 
+def call_razorpay_api(path, payload):
+    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
+        return None, 'Razorpay keys are not configured'
+
+    data = json.dumps(payload).encode('utf-8')
+    req = urllib.request.Request(
+        f'https://api.razorpay.com/v1/{path.lstrip("/")}',
+        data=data,
+        method='POST',
+        headers={
+            'Content-Type': 'application/json',
+            'Authorization': 'Basic ' + base64.b64encode(
+                f'{RAZORPAY_KEY_ID}:{RAZORPAY_KEY_SECRET}'.encode('utf-8')
+            ).decode('ascii'),
+        },
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            body = resp.read().decode('utf-8')
+            return json.loads(body), None
+    except urllib.error.HTTPError as exc:
+        try:
+            return None, json.loads(exc.read().decode('utf-8'))
+        except Exception:
+            return None, {'error': f'Razorpay HTTP {exc.code}'}
+    except Exception as exc:
+        return None, {'error': str(exc)}
+
+def verify_razorpay_signature(order_id, payment_id, signature):
+    if not RAZORPAY_KEY_SECRET:
+        return False
+    message = f'{order_id}|{payment_id}'.encode('utf-8')
+    expected = hmac.new(
+        RAZORPAY_KEY_SECRET.encode('utf-8'),
+        message,
+        hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(expected, signature or '')
+
 def cleanup_reset_codes():
     now = datetime.utcnow()
     expired = [email for email, record in PASSWORD_RESET_CODES.items() if record['expires_at'] <= now]
@@ -276,13 +374,13 @@ def cleanup_reset_codes():
 @app.route('/')
 def index():
     if 'user_id' in session:
-        if session.get('user_role') == 'restaurant':
-            return redirect(url_for('admin_dashboard'))
-        return redirect(url_for('pos'))
+        return redirect(role_home(session.get('user_role')))
     return render_template('landing.html')
 
 @app.route('/auth')
 def auth():
+    if 'user_id' in session:
+        return redirect(role_home(session.get('user_role')))
     return render_template('auth.html')
 
 @app.route('/api/signup', methods=['POST'])
@@ -293,18 +391,16 @@ def signup():
     password_error = strong_password_error(d.get('password', ''), d.get('email', ''))
     if password_error:
         return jsonify({'error': password_error}), 400
-    role = d.get('role', 'cashier')
-    if role == 'admin':
-        role = 'restaurant'
-    # Map kitchen, manager to appropriate roles
-    if role not in ('cashier', 'restaurant', 'kitchen', 'manager'):
+    role = normalize_role(d.get('role', 'cashier'))
+    # Map unsupported roles to the closest valid role.
+    if role not in ('cashier', 'restaurant', 'kitchen', 'manager', 'customer'):
         role = 'cashier'
     u = User(name=d['name'], email=d['email'], password=generate_password_hash(d['password'], method='scrypt'), role=role)
     db.session.add(u)
     db.session.commit()
     session['user_id'] = u.id
     session['user_name'] = u.name
-    session['user_role'] = 'restaurant' if role == 'restaurant' else 'user'
+    session['user_role'] = role
     return jsonify({'ok': True, 'name': u.name, 'role': u.role})
 
 @app.route('/api/login', methods=['POST'])
@@ -315,7 +411,7 @@ def login():
         return jsonify({'error': 'Invalid credentials'}), 401
     session['user_id'] = u.id
     session['user_name'] = u.name
-    session['user_role'] = 'restaurant' if (u.role in ('restaurant', 'admin')) else 'user'
+    session['user_role'] = normalize_role(u.role)
     return jsonify({'ok': True, 'name': u.name, 'role': session['user_role']})
 
 @app.route('/api/logout', methods=['POST'])
@@ -396,7 +492,7 @@ def password_reset_complete():
 
 # ─── Pages ────────────────────────────────────────────────
 @app.route('/pos')
-@page_login_required()
+@page_login_required(allowed_roles=('cashier', 'kitchen', 'manager', 'restaurant'))
 def pos():
     return render_template(
         'pos.html',
@@ -405,7 +501,7 @@ def pos():
     )
 
 @app.route('/backend')
-@page_login_required(restaurant_only=True)
+@page_login_required(allowed_roles=('restaurant',))
 def backend():
     return render_template(
         'backend.html',
@@ -422,17 +518,17 @@ def admin_dashboard():
     )
 
 @app.route('/kitchen')
-@page_login_required()
+@page_login_required(allowed_roles=('cashier', 'kitchen', 'manager', 'restaurant'))
 def kitchen():
     return render_template('kitchen.html', user_role=session.get('user_role'))
 
 @app.route('/customer')
-@page_login_required()
+@page_login_required(allowed_roles=('customer',))
 def customer():
     return render_template('customer.html', user_role=session.get('user_role'))
 
 @app.route('/dashboard')
-@page_login_required(restaurant_only=True)
+@page_login_required(allowed_roles=('restaurant',))
 def dashboard():
     return render_template(
         'dashboard.html',
@@ -452,7 +548,7 @@ def get_products():
     return jsonify(result)
 
 @app.route('/api/products/all', methods=['GET'])
-@login_required
+@staff_required
 def get_all_products():
     products = Product.query.all()
     cats = Category.query.all()
@@ -462,7 +558,7 @@ def get_all_products():
     })
 
 @app.route('/api/products', methods=['POST'])
-@login_required
+@staff_required
 def add_product():
     d = request.json
     cat = Category.query.filter_by(name=d.get('category','')).first()
@@ -477,7 +573,7 @@ def add_product():
     return jsonify({'ok':True,'id':p.id})
 
 @app.route('/api/products/<int:pid>', methods=['PUT'])
-@login_required
+@staff_required
 def update_product(pid):
     p = Product.query.get_or_404(pid)
     d = request.json
@@ -490,7 +586,7 @@ def update_product(pid):
     return jsonify({'ok':True})
 
 @app.route('/api/products/<int:pid>', methods=['DELETE'])
-@login_required
+@staff_required
 def delete_product(pid):
     p = Product.query.get_or_404(pid)
     p.active = False
@@ -508,7 +604,7 @@ def get_floors():
     return jsonify(result)
 
 @app.route('/api/floors', methods=['POST'])
-@login_required
+@staff_required
 def add_floor():
     d = request.json
     f = Floor(name=d['name'])
@@ -517,7 +613,7 @@ def add_floor():
     return jsonify({'ok':True,'id':f.id})
 
 @app.route('/api/tables', methods=['POST'])
-@login_required
+@staff_required
 def add_table():
     d = request.json
     t = Table(number=d['number'], seats=int(d.get('seats',4)), floor_id=int(d['floor_id']))
@@ -526,7 +622,7 @@ def add_table():
     return jsonify({'ok':True,'id':t.id})
 
 @app.route('/api/tables/<int:tid>', methods=['DELETE'])
-@login_required
+@staff_required
 def delete_table(tid):
     t = Table.query.get_or_404(tid)
     t.active = False
@@ -540,7 +636,7 @@ def get_payment_methods():
     return jsonify([{'id':m.id,'name':m.name,'type':m.type,'enabled':m.enabled,'upi_id':m.upi_id} for m in methods])
 
 @app.route('/api/payment-methods/<int:mid>', methods=['PUT'])
-@login_required
+@staff_required
 def update_payment_method(mid):
     m = PaymentMethod.query.get_or_404(mid)
     d = request.json
@@ -548,6 +644,60 @@ def update_payment_method(mid):
     m.upi_id = d.get('upi_id', m.upi_id)
     db.session.commit()
     return jsonify({'ok':True})
+
+@app.route('/api/razorpay/order', methods=['POST'])
+@staff_required
+def create_razorpay_order():
+    d = request.json or {}
+    order_id = d.get('order_id')
+    if not order_id:
+        return jsonify({'error': 'order_id is required'}), 400
+
+    order = Order.query.get_or_404(order_id)
+    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
+        return jsonify({'error': 'Razorpay keys are not configured'}), 400
+
+    amount_paise = int(round(float(order.total) * 100))
+    payload = {
+        'amount': amount_paise,
+        'currency': RAZORPAY_CURRENCY,
+        'receipt': order.order_number,
+        'payment_capture': 1,
+        'notes': {
+            'order_id': str(order.id),
+            'order_number': order.order_number,
+            'source': 'pos-cafe-localhost',
+        },
+    }
+    result, err = call_razorpay_api('orders', payload)
+    if err:
+        message = err.get('error') if isinstance(err, dict) else str(err)
+        return jsonify({'error': message or 'Unable to create Razorpay order'}), 400
+
+    return jsonify({
+        'ok': True,
+        'razorpay_order_id': result.get('id'),
+        'amount': result.get('amount'),
+        'currency': result.get('currency'),
+        'key_id': RAZORPAY_KEY_ID,
+        'merchant_name': RAZORPAY_MERCHANT_NAME,
+        'order_number': order.order_number,
+        'customer_name': session.get('user_name', 'Customer'),
+    })
+
+@app.route('/api/razorpay/verify', methods=['POST'])
+@staff_required
+def verify_razorpay_payment():
+    d = request.json or {}
+    order_id = d.get('razorpay_order_id')
+    payment_id = d.get('razorpay_payment_id')
+    signature = d.get('razorpay_signature')
+    order_number = d.get('order_number')
+    if not order_id or not payment_id or not signature:
+        return jsonify({'error': 'Missing Razorpay verification fields'}), 400
+    if not verify_razorpay_signature(order_id, payment_id, signature):
+        return jsonify({'error': 'Invalid Razorpay signature'}), 400
+    return jsonify({'ok': True, 'order_number': order_number})
 
 # ─── API: QR Code ──────────────────────────────────────────
 @app.route('/api/qr/<string:upi_id>/<float:amount>')
@@ -568,7 +718,7 @@ def qr_image():
 
 # ─── API: Sessions ─────────────────────────────────────────
 @app.route('/api/sessions/current', methods=['GET'])
-@login_required
+@staff_required
 def current_session():
     s = Session.query.filter_by(user_id=session['user_id'], status='open').first()
     if s:
@@ -576,7 +726,7 @@ def current_session():
     return jsonify({'id':None})
 
 @app.route('/api/sessions/open', methods=['POST'])
-@login_required
+@staff_required
 def open_session():
     existing = Session.query.filter_by(user_id=session['user_id'], status='open').first()
     if existing:
@@ -587,7 +737,7 @@ def open_session():
     return jsonify({'id':s.id,'opened_at':s.opened_at.isoformat()})
 
 @app.route('/api/sessions/close', methods=['POST'])
-@login_required
+@staff_required
 def close_session():
     s = Session.query.filter_by(user_id=session['user_id'], status='open').first()
     if s:
@@ -600,7 +750,7 @@ def close_session():
 
 # ─── API: Orders ───────────────────────────────────────────
 @app.route('/api/orders', methods=['POST'])
-@login_required
+@staff_required
 def create_order():
     d = request.json
     s = Session.query.filter_by(user_id=session['user_id'], status='open').first()
@@ -624,10 +774,11 @@ def create_order():
     return jsonify({'ok':True,'id':o.id,'order_number':order_num})
 
 @app.route('/api/orders/<int:oid>/send-kitchen', methods=['POST'])
-@login_required
+@staff_required
 def send_to_kitchen(oid):
     o = Order.query.get_or_404(oid)
     o.status = 'sent'
+    o.sent_to_kitchen_at = datetime.utcnow()  # Track when order is sent to kitchen
     kt = KitchenTicket(order_id=oid)
     db.session.add(kt)
     for item in o.items:
@@ -638,27 +789,30 @@ def send_to_kitchen(oid):
         'order_number': o.order_number,
         'table': o.table.number if o.table else 'Takeaway',
         'status': 'to_cook',
-        'items': [{'name':i.product_name,'qty':i.qty,'id':i.id} for i in o.items]
+        'total': o.total,
+        'sent_at': kt.sent_at.isoformat(),
+        'items': [{'id':i.id,'name':i.product_name,'qty':i.qty,'price':i.price,'status':i.kitchen_status} for i in o.items]
     }
     socketio.emit('new_ticket', ticket_data)
     socketio.emit('order_update', {'order_number': o.order_number, 'status': 'preparing'})
     return jsonify({'ok':True})
 
 @app.route('/api/orders/<int:oid>/pay', methods=['POST'])
-@login_required
+@staff_required
 def pay_order(oid):
     o = Order.query.get_or_404(oid)
     d = request.json
     o.status = 'paid'
     o.payment_method = d.get('method','cash')
+    o.tip = d.get('tip', 0) or 0  # Add tip support
     if o.table:
         o.table.status = 'free'
     db.session.commit()
-    socketio.emit('order_paid', {'order_number': o.order_number, 'total': o.total, 'method': o.payment_method})
+    socketio.emit('order_paid', {'order_number': o.order_number, 'total': o.total, 'tip': o.tip, 'method': o.payment_method})
     return jsonify({'ok':True})
 
 @app.route('/api/orders/table/<int:tid>', methods=['GET'])
-@login_required
+@staff_required
 def get_table_order(tid):
     o = Order.query.filter_by(table_id=tid).filter(Order.status.in_(['draft','sent'])).first()
     if not o:
@@ -674,30 +828,96 @@ def get_tickets():
     tickets = KitchenTicket.query.filter(KitchenTicket.status != 'completed').order_by(KitchenTicket.sent_at).all()
     result = []
     for kt in tickets:
+        o = kt.order
+        total_price = sum(i.qty * i.price for i in o.items)
+        
+        # Calculate time elapsed in each stage
+        now = datetime.utcnow()
+        time_in_preparation = 0
+        if kt.started_at:
+            time_in_preparation = int((now - kt.started_at).total_seconds() / 60)
+        
         result.append({
             'id': kt.id,
-            'order_number': kt.order.order_number,
-            'table': kt.order.table.number if kt.order.table else 'Takeaway',
+            'order_number': o.order_number,
+            'table': o.table.number if o.table else 'Takeaway',
             'status': kt.status,
             'sent_at': kt.sent_at.isoformat(),
-            'items': [{'id':i.id,'name':i.product_name,'qty':i.qty,'status':i.kitchen_status} for i in kt.order.items]
+            'started_at': kt.started_at.isoformat() if kt.started_at else None,
+            'total': total_price,
+            'time_in_prep': time_in_preparation,
+            'items': [{
+                'id':i.id,
+                'name':i.product_name,
+                'qty':i.qty,
+                'price':i.price,
+                'status':i.kitchen_status,
+                'started_at': i.started_at.isoformat() if i.started_at else None,
+                'completed_at': i.completed_at.isoformat() if i.completed_at else None
+            } for i in o.items]
         })
     return jsonify(result)
 
 @app.route('/api/kitchen/tickets/<int:kid>/advance', methods=['POST'])
+@staff_required
 def advance_ticket(kid):
     kt = KitchenTicket.query.get_or_404(kid)
+    o = kt.order
     stages = ['to_cook','preparing','completed']
     idx = stages.index(kt.status) if kt.status in stages else 0
     if idx < len(stages)-1:
-        kt.status = stages[idx+1]
+        new_stage = stages[idx+1]
+        kt.status = new_stage
+        
+        # Track timestamps
+        if new_stage == 'preparing':
+            kt.started_at = datetime.utcnow()
+            o.started_at = datetime.utcnow()
+            for item in o.items:
+                if item.kitchen_status == 'to_cook':
+                    item.kitchen_status = 'preparing'
+                    item.started_at = datetime.utcnow()
+        elif new_stage == 'completed':
+            kt.completed_at = datetime.utcnow()
+            o.completed_at = datetime.utcnow()
+            for item in o.items:
+                if item.kitchen_status != 'completed':
+                    item.kitchen_status = 'completed'
+                    item.completed_at = datetime.utcnow()
+        
         db.session.commit()
-        socketio.emit('ticket_update', {'id': kid, 'status': kt.status})
+        socketio.emit('ticket_update', {'id': kid, 'status': kt.status, 'started_at': kt.started_at.isoformat() if kt.started_at else None})
+        socketio.emit('order_update', {'order_number': o.order_number, 'status': new_stage, 'started_at': o.started_at.isoformat() if o.started_at else None, 'completed_at': o.completed_at.isoformat() if o.completed_at else None})
     return jsonify({'ok':True,'status':kt.status})
+
+@app.route('/api/kitchen/items/<int:item_id>/complete', methods=['POST'])
+@staff_required
+def mark_item_complete(item_id):
+    item = OrderItem.query.get_or_404(item_id)
+    if item.kitchen_status != 'completed':
+        item.kitchen_status = 'completed'
+        item.completed_at = datetime.utcnow()
+        db.session.commit()
+        
+        # Check if all items in the order are completed
+        order = item.order
+        all_completed = all(i.kitchen_status == 'completed' for i in order.items)
+        if all_completed:
+            kt = KitchenTicket.query.filter_by(order_id=order.id).first()
+            if kt and kt.status != 'completed':
+                kt.status = 'completed'
+                kt.completed_at = datetime.utcnow()
+                order.completed_at = datetime.utcnow()
+                db.session.commit()
+                socketio.emit('ticket_update', {'id': kt.id, 'status': 'completed'})
+                socketio.emit('order_update', {'order_number': order.order_number, 'status': 'completed', 'completed_at': order.completed_at.isoformat()})
+        
+        socketio.emit('item_update', {'item_id': item_id, 'status': 'completed'})
+    return jsonify({'ok': True, 'item_id': item_id})
 
 # ─── API: Dashboard ────────────────────────────────────────
 @app.route('/api/dashboard/stats', methods=['GET'])
-@login_required
+@staff_required
 def dashboard_stats():
     period = request.args.get('period','today')
     now = datetime.utcnow()
@@ -729,7 +949,7 @@ def dashboard_stats():
 
 # ─── API: Admin / User Management ──────────────────────────
 @app.route('/api/users', methods=['GET'])
-@login_required
+@staff_required
 def get_users():
     user = User.query.get(session['user_id'])
     if not user or user.role != 'restaurant':
@@ -745,7 +965,7 @@ def get_users():
     } for u in users])
 
 @app.route('/api/users/<int:uid>', methods=['DELETE'])
-@login_required
+@staff_required
 def delete_user(uid):
     admin = User.query.get(session['user_id'])
     if not admin or admin.role != 'restaurant':
@@ -758,6 +978,55 @@ def delete_user(uid):
     db.session.delete(user)
     db.session.commit()
     return jsonify({'ok': True})
+
+# ─── API: Reviews and Tips ─────────────────────────────────
+@app.route('/api/orders/<int:oid>/review', methods=['POST'])
+def submit_review(oid):
+    o = Order.query.get_or_404(oid)
+    if o.status != 'paid':
+        return jsonify({'error': 'Can only review paid orders'}), 400
+    
+    d = request.json
+    rating = d.get('rating', 5)
+    comment = (d.get('comment') or '').strip()
+    
+    # Validate rating
+    if not isinstance(rating, int) or rating < 1 or rating > 5:
+        return jsonify({'error': 'Rating must be 1-5'}), 400
+    
+    # Check if review already exists
+    existing = Review.query.filter_by(order_id=oid).first()
+    if existing:
+        existing.rating = rating
+        existing.comment = comment
+        existing.created_at = datetime.utcnow()
+    else:
+        review = Review(order_id=oid, rating=rating, comment=comment)
+        db.session.add(review)
+    
+    db.session.commit()
+    return jsonify({'ok': True, 'message': 'Review submitted successfully'})
+
+@app.route('/api/reviews', methods=['GET'])
+@admin_required
+def get_reviews():
+    reviews = Review.query.order_by(Review.created_at.desc()).all()
+    return jsonify([{
+        'id': r.id,
+        'order_number': r.order.order_number,
+        'table': r.order.table.number if r.order.table else 'Takeaway',
+        'rating': r.rating,
+        'comment': r.comment,
+        'total': r.order.total,
+        'created_at': r.created_at.isoformat()
+    } for r in reviews])
+
+@app.route('/api/orders/<int:oid>/check-review', methods=['GET'])
+def check_review(oid):
+    review = Review.query.filter_by(order_id=oid).first()
+    if review:
+        return jsonify({'has_review': True, 'rating': review.rating, 'comment': review.comment})
+    return jsonify({'has_review': False})
 
 # ─── SocketIO ──────────────────────────────────────────────
 @socketio.on('connect')
@@ -788,9 +1057,26 @@ def seed_data():
         PaymentMethod(name='Cash',type='cash',enabled=True),
         PaymentMethod(name='Card / Bank',type='digital',enabled=True),
         PaymentMethod(name='UPI / QR',type='upi',enabled=True,upi_id='cafe@ybl'),
+        PaymentMethod(name='Razorpay',type='razorpay',enabled=True),
     ]:
         db.session.add(m)
     db.session.commit()
+
+def ensure_payment_methods():
+    defaults = [
+        {'name': 'Cash', 'type': 'cash', 'upi_id': ''},
+        {'name': 'Card / Bank', 'type': 'digital', 'upi_id': ''},
+        {'name': 'UPI / QR', 'type': 'upi', 'upi_id': 'cafe@ybl'},
+        {'name': 'Razorpay', 'type': 'razorpay', 'upi_id': ''},
+    ]
+    changed = False
+    for item in defaults:
+        method = PaymentMethod.query.filter_by(type=item['type']).first()
+        if not method:
+            db.session.add(PaymentMethod(name=item['name'], type=item['type'], enabled=True, upi_id=item['upi_id']))
+            changed = True
+    if changed:
+        db.session.commit()
 
 def ensure_default_accounts():
     admin_email = 'admin@cafe.com'
@@ -805,11 +1091,26 @@ def ensure_default_accounts():
         db.session.add(admin)
     else:
         admin.role = 'restaurant'
+
+    customer_email = 'customer@cafe.com'
+    customer = User.query.filter_by(email=customer_email).first()
+    if not customer:
+        customer = User(
+            name='Customer',
+            email=customer_email,
+            password=generate_password_hash('Customer@1234', method='scrypt'),
+            role='customer',
+        )
+        db.session.add(customer)
+    else:
+        customer.name = 'Customer'
+        customer.role = 'customer'
     db.session.commit()
 
 with app.app_context():
     db.create_all()
     seed_data()
+    ensure_payment_methods()
     ensure_default_accounts()
 
 if __name__ == '__main__':

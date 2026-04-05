@@ -2,83 +2,314 @@
 {% block title %}Customer Display — POS Cafe{% endblock %}
 {% block extra_head %}
 <style>
-  body { background:#050505; }
-  .status-paid { background:rgba(34,197,94,0.08); border-color:rgba(34,197,94,0.3); }
-  .status-unpaid { background:rgba(249,115,22,0.05); border-color:rgba(249,115,22,0.2); }
-  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
-  .float { animation:float 3s ease-in-out infinite; }
-  @keyframes pulse-ring { 0%{transform:scale(.9);opacity:1} 100%{transform:scale(1.3);opacity:0} }
-  .pulse-ring { animation:pulse-ring 1.5s ease-out infinite; }
+  body { background:#050505; padding: 20px; }
+  .orders-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; }
+  @media (max-width: 1024px) {
+    .orders-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+  }
+  @media (max-width: 640px) {
+    .orders-grid { grid-template-columns: 1fr; }
+  }
+  .order-card { border: 2px solid #333; border-radius: 16px; padding: 20px; transition: all 0.3s; position: relative; }
+  .order-card.sent { background: rgba(249,115,22,0.08); border-color: rgba(249,115,22,0.3); }
+  .order-card.preparing { background: rgba(249,115,22,0.12); border-color: rgba(249,115,22,0.5); animation: pulse-prep 2s infinite; }
+  .order-card.ready { background: rgba(34,197,94,0.12); border-color: rgba(34,197,94,0.5); }
+  @keyframes pulse-prep { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
+  .order-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px; }
+  .order-number { font-size: 32px; font-weight: 800; color: #f97316; font-family: monospace; }
+  .order-status-badge { display: inline-block; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; }
+  .status-sent { background: rgba(249,115,22,0.2); color: #f97316; }
+  .status-preparing { background: rgba(249,115,22,0.25); color: #ffa500; }
+  .status-ready { background: rgba(34,197,94,0.2); color: #22c55e; }
+  .order-time { font-size: 12px; color: #999; margin-top: 4px; font-family: monospace; }
+  .progress-bar { width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; margin: 12px 0; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, #f97316 0%, #22c55e 100%); border-radius: 4px; transition: width 0.5s; }
+  .progress-fill.sent { width: 33%; }
+  .progress-fill.preparing { width: 67%; }
+  .progress-fill.ready { width: 100%; }
+  .order-items { margin: 12px 0; }
+  .order-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 13px; }
+  .order-item:last-child { border-bottom: none; }
+  .item-name { flex: 1; color: #ccc; }
+  .item-qty { color: #999; padding: 0 8px; }
+  .item-price { color: #f97316; font-weight: 600; }
+  .order-total { display: flex; justify-content: space-between; padding: 12px 0; border-top: 2px solid rgba(255,255,255,0.1); margin-top: 12px; font-size: 18px; font-weight: 700; }
+  .total-label { color: #999; }
+  .total-amount { color: #22c55e; font-size: 24px; }
+  .idle-message { text-align: center; padding: 60px 20px; }
+  .idle-icon { width: 80px; height: 80px; margin: 0 auto 20px; opacity: 0.3; }
+  .header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid rgba(255,255,255,0.1); }
+  .header h1 { font-size: 28px; font-weight: 800; margin-bottom: 8px; }
+  .header-subtitle { color: #999; font-size: 14px; }
+  .live-indicator { display: inline-block; width: 8px; height: 8px; background: #22c55e; border-radius: 50%; animation: pulse 1.5s infinite; margin-right: 6px; }
+  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } }
+  .order-eta { font-size: 11px; color: #f97316; font-weight: 600; margin-top: 4px; }
+  .review-section { background: rgba(249,115,22,0.05); border: 2px dashed rgba(249,115,22,0.3); border-radius: 12px; padding: 16px; margin-top: 16px; }
+  .review-title { font-size: 14px; font-weight: 600; color: #f97316; margin-bottom: 12px; }
+  .star-rating { display: flex; gap: 8px; margin-bottom: 12px; }
+  .star-btn { width: 32px; height: 32px; border: 2px solid #444; background: transparent; border-radius: 6px; color: #999; font-size: 18px; cursor: pointer; transition: all 0.2s; }
+  .star-btn:hover { border-color: #f97316; color: #f97316; }
+  .star-btn.selected { border-color: #f97316; background: rgba(249,115,22,0.2); color: #f97316; }
+  .review-input { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid #444; border-radius: 8px; color: #ccc; padding: 8px 12px; font-size: 12px; resize: vertical; min-height: 60px; margin-bottom: 8px; }
+  .review-input::placeholder { color: #666; }
+  .review-submit { width: 100%; background: #f97316; color: white; border: none; border-radius: 8px; padding: 8px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+  .review-submit:hover { background: #ea580c; }
+  .review-display { background: rgba(249,115,22,0.08); border-left: 3px solid #f97316; border-radius: 8px; padding: 12px; margin-top: 12px; }
+  .review-stars { color: #f97316; font-size: 14px; margin-bottom: 4px; }
+  .review-comment { color: #ccc; font-size: 12px; font-style: italic; }
+  .paid-badge { display: inline-block; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; background: rgba(34,197,94,0.2); color: #22c55e; }
+
 </style>
 {% endblock %}
 {% block body %}
-<div class="min-h-screen flex flex-col items-center justify-center p-8">
-  <div class="w-full max-w-sm">
-    <!-- Logo -->
-    <div class="text-center mb-10">
-      <div class="inline-flex items-center justify-center w-14 h-14 brand-gradient rounded-2xl mb-4 float">
-        <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-      </div>
-      <div class="font-display text-2xl font-800 text-white">POS Cafe</div>
-      <div class="text-gray-600 text-sm">Customer Display</div>
+<div style="max-width: 1400px; margin: 0 auto;">
+  <!-- Header -->
+  <div class="header">
+    <h1>🍽️ POS Cafe</h1>
+    <div class="header-subtitle">
+      <span class="live-indicator"></span>
+      <span>Real-Time Order Status</span>
+      <span id="clock" style="float: right; font-family: monospace; color: #666;"></span>
     </div>
+  </div>
 
-    <!-- Order Card -->
-    <div id="order-card" class="card p-6 border status-unpaid" style="border-radius:20px;display:none">
-      <div class="flex items-center justify-between mb-5">
-        <div>
-          <div class="text-xs text-gray-500 uppercase tracking-wider">Order</div>
-          <div class="font-display font-800 text-xl" id="c-order-num">—</div>
-        </div>
-        <div id="c-status-badge" class="tag bg-orange-900/30 text-orange-400">Unpaid</div>
-      </div>
-      <div id="c-items" class="space-y-2 mb-5"></div>
-      <div class="border-t border-border pt-4">
-        <div class="flex justify-between items-center">
-          <span class="text-gray-400 text-sm">Total</span>
-          <span class="font-display font-800 text-2xl text-brand-500" id="c-total">₹0</span>
-        </div>
-      </div>
-      <div id="c-payment-method" class="mt-3 text-xs text-gray-600 text-center"></div>
-    </div>
+  <!-- Orders Grid -->
+  <div id="orders-container" class="orders-grid"></div>
 
-    <!-- Idle state -->
-    <div id="idle-state" class="text-center">
-      <div class="relative inline-flex">
-        <div class="w-20 h-20 rounded-full" style="background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.2)"></div>
-        <div class="pulse-ring absolute inset-0 rounded-full" style="border:1px solid rgba(249,115,22,0.3)"></div>
-      </div>
-      <div class="text-gray-600 mt-6 text-sm">Waiting for your order...</div>
-      <div class="text-gray-700 text-xs mt-2">Ask staff to start your order</div>
-    </div>
-
-    <div class="mt-8 text-center">
-      <span id="c-clock" class="text-gray-700 text-xs font-mono"></span>
-    </div>
+  <!-- Idle State -->
+  <div id="idle-state" class="idle-message">
+    <svg class="idle-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
+    </svg>
+    <div style="color: #999; font-size: 18px;">No active orders</div>
+    <div style="color: #666; font-size: 14px; margin-top: 10px;">Waiting for orders to arrive...</div>
   </div>
 </div>
 {% endblock %}
 {% block scripts %}
 <script>
 const socket = io();
-socket.on('order_update', d => { showOrder(d); });
-socket.on('order_paid', d => { markPaid(d); });
+let orders = {};
+let orderTimestamps = {};
 
-function showOrder(d) {
-  document.getElementById('idle-state').style.display='none';
-  document.getElementById('order-card').style.display='block';
-  document.getElementById('c-order-num').textContent = d.order_number;
+socket.on('new_ticket', t => { 
+  if (!orders[t.order_number]) {
+    orders[t.order_number] = {
+      order_number: t.order_number,
+      table: t.table,
+      status: t.status || 'sent',
+      items: t.items || [],
+      total: t.total || 0,
+      sent_at: t.sent_at || new Date().toISOString()
+    };
+    orderTimestamps[t.order_number] = new Date(t.sent_at);
+  }
+  render();
+});
+
+socket.on('ticket_update', d => { 
+  for (let order_num in orders) {
+    if (orders[order_num].table) {
+      orders[order_num].status = d.status;
+      if (d.started_at && !orders[order_num].started_at) {
+        orders[order_num].started_at = d.started_at;
+      }
+    }
+  }
+  render();
+});
+
+socket.on('order_update', d => { 
+  if (orders[d.order_number]) {
+    orders[d.order_number].status = d.status;
+    if (d.started_at) orders[d.order_number].started_at = d.started_at;
+    if (d.completed_at) orders[d.order_number].completed_at = d.completed_at;
+  }
+  render();
+});
+
+socket.on('order_paid', d => { 
+  if (orders[d.order_number]) {
+    orders[d.order_number].status = 'paid';
+  }
+  render();
+});
+
+async function loadOrders() {
+  try {
+    const response = await fetch('/api/kitchen/tickets');
+    const tickets = await response.json();
+    
+    orders = {};
+    tickets.forEach(t => {
+      if (t.status !== 'completed') {
+        orders[t.order_number] = {
+          order_number: t.order_number,
+          table: t.table,
+          status: t.status,
+          items: t.items || [],
+          total: t.total || 0,
+          sent_at: t.sent_at,
+          started_at: t.started_at,
+          time_in_prep: t.time_in_prep || 0
+        };
+        orderTimestamps[t.order_number] = new Date(t.sent_at);
+      }
+    });
+    render();
+  } catch (e) {
+    console.error('Failed to load orders:', e);
+  }
 }
 
-function markPaid(d) {
-  document.getElementById('c-status-badge').className='tag bg-green-900/30 text-green-400';
-  document.getElementById('c-status-badge').textContent='Paid';
-  document.getElementById('order-card').classList.remove('status-unpaid');
-  document.getElementById('order-card').classList.add('status-paid');
-  document.getElementById('c-total').textContent = '₹'+d.total.toFixed(0);
-  document.getElementById('c-payment-method').textContent = 'Paid via '+(d.method==='cash'?'Cash':d.method==='upi'?'UPI':'Card');
+function getOrderAge(order) {
+  const sentTime = new Date(order.sent_at);
+  const now = new Date();
+  const minutes = Math.floor((now - sentTime) / 60000);
+  return minutes;
 }
 
-setInterval(()=>{ document.getElementById('c-clock').textContent = new Date().toLocaleTimeString(); },1000);
+function getPrepTime(order) {
+  if (order.started_at) {
+    const startTime = new Date(order.started_at);
+    const now = new Date();
+    return Math.floor((now - startTime) / 60000);
+  }
+  return 0;
+}
+
+function renderOrder(order) {
+  const age = getOrderAge(order);
+  const prepTime = getPrepTime(order);
+  
+  const isPaid = order.status === 'paid';
+  const statusClass = `status-${order.status}`;
+  const statusText = order.status === 'to_cook' ? 'Awaiting' : 
+                     order.status === 'preparing' ? 'Preparing' : 
+                     order.status === 'ready' ? 'Ready!' : 'Thank You!';
+  const progressClass = order.status === 'to_cook' ? 'sent' : 
+                        order.status === 'preparing' ? 'preparing' : 'ready';
+  
+  const itemsHtml = (order.items || []).map(item => `
+    <div class="order-item">
+      <span class="item-name">${item.name}</span>
+      <span class="item-qty">×${item.qty}</span>
+      <span class="item-price">₹${(item.price * item.qty).toFixed(0)}</span>
+    </div>
+  `).join('');
+  
+  const eta = order.status === 'preparing' ? `~${Math.max(5, 15 - prepTime)}m` : 
+              order.status === 'to_cook' ? '~15m' : 'Ready now!';
+  
+  const reviewSection = isPaid ? `
+    <div class="review-section">
+      <div class="review-title">📝 Share Your Feedback</div>
+      <div class="star-rating" id="star-rating-${order.order_number}">
+        <button class="star-btn" onclick="setRating('${order.order_number}', 1)" data-rating="1">⭐</button>
+        <button class="star-btn" onclick="setRating('${order.order_number}', 2)" data-rating="2">⭐</button>
+        <button class="star-btn" onclick="setRating('${order.order_number}', 3)" data-rating="3">⭐</button>
+        <button class="star-btn" onclick="setRating('${order.order_number}', 4)" data-rating="4">⭐</button>
+        <button class="star-btn" onclick="setRating('${order.order_number}', 5)" data-rating="5">⭐</button>
+      </div>
+      <textarea class="review-input" id="comment-${order.order_number}" placeholder="Share your experience... (optional)" maxlength="500"></textarea>
+      <button class="review-submit" onclick="submitReview('${order.order_number}', ${order.id})">Submit Review</button>
+    </div>
+  ` : '';
+  
+  return `
+    <div class="order-card ${order.status}">
+      <div class="order-header">
+        <div>
+          <div class="order-number">#${order.order_number.split('-')[1]}</div>
+          <div class="order-time">🪑 Table ${order.table}</div>
+          <div class="order-time">${age}m ago</div>
+          ${order.status === 'preparing' ? `<div class="order-time">⏱️ Prep: ${prepTime}m</div>` : ''}
+        </div>
+        <div style="text-align: right;">
+          <div class="order-status-badge ${statusClass}">${statusText}</div>
+          ${isPaid ? '<div class="paid-badge">✓ Paid</div>' : ''}
+          ${!isPaid ? `<div class="order-eta">${eta}</div>` : ''}
+        </div>
+      </div>
+      
+      <div class="progress-bar">
+        <div class="progress-fill ${progressClass}"></div>
+      </div>
+      
+      <div class="order-items">
+        ${itemsHtml}
+      </div>
+      
+      <div class="order-total">
+        <span class="total-label">Total</span>
+        <span class="total-amount">₹${order.total.toFixed(0)}</span>
+      </div>
+      
+      ${reviewSection}
+    </div>
+  `;
+}
+
+function render() {
+  const activeOrders = Object.values(orders).sort((a, b) => new Date(b.sent_at) - new Date(a.sent_at));
+  
+  if (activeOrders.length === 0) {
+    document.getElementById('orders-container').style.display = 'none';
+    document.getElementById('idle-state').style.display = 'block';
+  } else {
+    document.getElementById('orders-container').style.display = 'grid';
+    document.getElementById('idle-state').style.display = 'none';
+    document.getElementById('orders-container').innerHTML = activeOrders.map(o => renderOrder(o)).join('');
+  }
+}
+
+function setRating(orderNumber, rating) {
+  const container = document.getElementById(`star-rating-${orderNumber}`);
+  container.querySelectorAll('.star-btn').forEach((btn, idx) => {
+    btn.classList.toggle('selected', idx < rating);
+  });
+  container.dataset.rating = rating;
+}
+
+async function submitReview(orderNumber, orderId) {
+  const container = document.getElementById(`star-rating-${orderNumber}`);
+  const rating = parseInt(container.dataset.rating) || 5;
+  const comment = document.getElementById(`comment-${orderNumber}`).value;
+  
+  try {
+    const response = await fetch(`/api/orders/${orderId}/review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rating, comment })
+    });
+    
+    if (response.ok) {
+      const reviewSection = document.querySelector(`[id^="star-rating-${orderNumber}"]`).closest('.review-section');
+      if (reviewSection) {
+        reviewSection.innerHTML = `
+          <div class="review-title">✓ Thank You for Your Review!</div>
+          <div class="review-display">
+            <div class="review-stars">${'⭐'.repeat(rating)} (${rating}/5 stars)</div>
+            ${comment ? `<div class="review-comment">"${comment.substring(0, 100)}${comment.length > 100 ? '...' : ''}"</div>` : ''}
+          </div>
+        `;
+      }
+    } else {
+      alert('Error submitting review. Please try again.');
+    }
+  } catch (err) {
+    console.error('Review submission error:', err);
+    alert('Error submitting review');
+  }
+}
+
+// Update times and load orders
+setInterval(() => {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString();
+  render();
+}, 1000);
+
+loadOrders();
+setInterval(loadOrders, 15000);
 </script>
 {% endblock %}
