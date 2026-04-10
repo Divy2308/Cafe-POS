@@ -1,404 +1,604 @@
 {% extends "base.html" %}
-{% block title %}Customer Display — POS Cafe{% endblock %}
+{% block title %}Customer Portal — POS Cafe{% endblock %}
 {% block extra_head %}
 <style>
-  body { background:#050505; padding: 20px; }
-  .orders-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; }
-  @media (max-width: 1024px) {
-    .orders-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
-  }
-  @media (max-width: 640px) {
-    .orders-grid { grid-template-columns: 1fr; }
-  }
-  .order-card { border: 2px solid #333; border-radius: 16px; padding: 20px; transition: all 0.3s; position: relative; }
-  .order-card.sent { background: rgba(249,115,22,0.08); border-color: rgba(249,115,22,0.3); }
-  .order-card.preparing { background: rgba(249,115,22,0.12); border-color: rgba(249,115,22,0.5); animation: pulse-prep 2s infinite; }
-  .order-card.ready { background: rgba(34,197,94,0.12); border-color: rgba(34,197,94,0.5); }
-  @keyframes pulse-prep { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
-  .order-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px; }
-  .order-number { font-size: 32px; font-weight: 800; color: #f97316; font-family: monospace; }
-  .order-status-badge { display: inline-block; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; }
-  .status-sent { background: rgba(249,115,22,0.2); color: #f97316; }
-  .status-preparing { background: rgba(249,115,22,0.25); color: #ffa500; }
-  .status-ready { background: rgba(34,197,94,0.2); color: #22c55e; }
-  .order-time { font-size: 12px; color: #999; margin-top: 4px; font-family: monospace; }
-  .progress-bar { width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; margin: 12px 0; }
-  .progress-fill { height: 100%; background: linear-gradient(90deg, #f97316 0%, #22c55e 100%); border-radius: 4px; transition: width 0.5s; }
-  .progress-fill.sent { width: 33%; }
-  .progress-fill.preparing { width: 67%; }
-  .progress-fill.ready { width: 100%; }
-  .order-items { margin: 12px 0; }
-  .order-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 13px; }
-  .order-item:last-child { border-bottom: none; }
-  .item-name { flex: 1; color: #ccc; }
-  .item-qty { color: #999; padding: 0 8px; }
-  .item-price { color: #f97316; font-weight: 600; }
-  .order-total { display: flex; justify-content: space-between; padding: 12px 0; border-top: 2px solid rgba(255,255,255,0.1); margin-top: 12px; font-size: 18px; font-weight: 700; }
-  .total-label { color: #999; }
-  .total-amount { color: #22c55e; font-size: 24px; }
-  .idle-message { text-align: center; padding: 60px 20px; }
-  .idle-icon { width: 80px; height: 80px; margin: 0 auto 20px; opacity: 0.3; }
-  .header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid rgba(255,255,255,0.1); }
-  .header h1 { font-size: 28px; font-weight: 800; margin-bottom: 8px; }
-  .header-subtitle { color: #999; font-size: 14px; }
-  .live-indicator { display: inline-block; width: 8px; height: 8px; background: #22c55e; border-radius: 50%; animation: pulse 1.5s infinite; margin-right: 6px; }
-  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } }
-  .order-eta { font-size: 11px; color: #f97316; font-weight: 600; margin-top: 4px; }
-  .review-section { background: rgba(249,115,22,0.05); border: 2px dashed rgba(249,115,22,0.3); border-radius: 12px; padding: 16px; margin-top: 16px; }
-  .review-title { font-size: 14px; font-weight: 600; color: #f97316; margin-bottom: 12px; }
-  .review-panel { background: rgba(249,115,22,0.06); border: 1px solid rgba(249,115,22,0.18); border-radius: 16px; padding: 18px; margin-bottom: 20px; }
-  .review-panel-header { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; margin-bottom: 14px; }
-  .review-panel-note { font-size: 12px; color: #9ca3af; }
-  .star-rating { display: flex; gap: 8px; margin-bottom: 12px; }
-  .star-btn { width: 32px; height: 32px; border: 2px solid #444; background: transparent; border-radius: 6px; color: #999; font-size: 18px; cursor: pointer; transition: all 0.2s; }
-  .star-btn:hover { border-color: #f97316; color: #f97316; }
-  .star-btn.selected { border-color: #f97316; background: rgba(249,115,22,0.2); color: #f97316; }
-  .review-input { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid #444; border-radius: 8px; color: #ccc; padding: 8px 12px; font-size: 12px; resize: vertical; min-height: 60px; margin-bottom: 8px; }
-  .review-input::placeholder { color: #666; }
-  .review-submit { width: 100%; background: #f97316; color: white; border: none; border-radius: 8px; padding: 8px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-  .review-submit:hover { background: #ea580c; }
-  .review-display { background: rgba(249,115,22,0.08); border-left: 3px solid #f97316; border-radius: 8px; padding: 12px; margin-top: 12px; }
-  .review-stars { color: #f97316; font-size: 14px; margin-bottom: 4px; }
-  .review-comment { color: #ccc; font-size: 12px; font-style: italic; }
-  .paid-badge { display: inline-block; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; background: rgba(34,197,94,0.2); color: #22c55e; }
-
+  body { background:#050505; }
+  /* Tabs */
+  .tab-bar { display:flex; gap:0; border-bottom:2px solid #1a1a1a; }
+  .tab-btn { flex:1; padding:14px 8px; font-size:13px; font-weight:600; cursor:pointer; border:none; background:transparent; color:#666; border-bottom:2px solid transparent; margin-bottom:-2px; transition:all .2s; }
+  .tab-btn.active { color:#f97316; border-bottom-color:#f97316; }
+  .tab-btn:hover:not(.active) { color:#ccc; }
+  .tab-panel { display:none; padding:20px; }
+  .tab-panel.active { display:block; }
+  /* Cards */
+  .res-card { background:#111; border:1px solid #222; border-radius:14px; padding:16px; margin-bottom:12px; transition:all .2s; }
+  .res-card:hover { border-color:#f97316; }
+  .table-pick { display:grid; grid-template-columns:repeat(auto-fill,minmax(100px,1fr)); gap:10px; margin-top:10px; }
+  .table-pick-btn { padding:12px 8px; border-radius:10px; border:2px solid #333; background:#111; cursor:pointer; text-align:center; transition:all .2s; }
+  .table-pick-btn:hover { border-color:#f97316; }
+  .table-pick-btn.selected { border-color:#f97316; background:rgba(249,115,22,0.1); }
+  .table-pick-btn.unavailable { opacity:.4; cursor:not-allowed; }
+  /* Order cards */
+  .order-card { border:2px solid #333; border-radius:16px; padding:20px; transition:all .3s; }
+  .order-card.to_cook { border-color:rgba(239,68,68,0.4); background:rgba(239,68,68,0.05); }
+  .order-card.preparing { border-color:rgba(249,115,22,0.5); background:rgba(249,115,22,0.08); animation:pulse-prep 2s infinite; }
+  .order-card.completed { border-color:rgba(34,197,94,0.5); background:rgba(34,197,94,0.08); }
+  .order-card.paid { border-color:rgba(100,116,139,0.4); background:rgba(100,116,139,0.05); }
+  @keyframes pulse-prep { 0%,100%{opacity:1} 50%{opacity:.85} }
+  .progress-bar { width:100%; height:8px; background:rgba(255,255,255,0.08); border-radius:4px; overflow:hidden; margin:12px 0; }
+  .progress-fill { height:100%; border-radius:4px; transition:width .5s; }
+  .progress-fill.to_cook  { width:25%; background:linear-gradient(90deg,#ef4444,#f97316); }
+  .progress-fill.preparing { width:65%; background:linear-gradient(90deg,#f97316,#facc15); }
+  .progress-fill.completed { width:100%; background:linear-gradient(90deg,#22c55e,#86efac); }
+  .progress-fill.paid { width:100%; background:#334155; }
+  /* ETA */
+  .eta-badge { font-size:11px; font-weight:700; padding:2px 8px; border-radius:6px; }
+  .eta-good { background:rgba(34,197,94,0.15); color:#22c55e; }
+  .eta-mid  { background:rgba(249,115,22,0.15); color:#f97316; }
+  .eta-late { background:rgba(239,68,68,0.15); color:#ef4444; }
+  /* Pre-order menu */
+  .menu-product { background:#111; border:1px solid #222; border-radius:12px; padding:14px; cursor:pointer; transition:all .2s; }
+  .menu-product:hover { border-color:#f97316; background:rgba(249,115,22,0.05); }
+  .menu-product:active { transform:scale(.97); }
+  /* Form */
+  .form-group { margin-bottom:14px; }
+  .form-group label { display:block; font-size:12px; color:#888; margin-bottom:6px; font-weight:500; }
+  .form-group input, .form-group select, .form-group textarea { width:100%; background:#111; border:1px solid #333; border-radius:8px; color:#fff; padding:10px 12px; font-size:13px; }
+  .form-group input:focus, .form-group select:focus { outline:none; border-color:#f97316; }
+  .btn-orange { background:#f97316; color:#fff; border:none; border-radius:10px; padding:12px 20px; font-size:13px; font-weight:700; cursor:pointer; transition:all .2s; width:100%; }
+  .btn-orange:hover { background:#ea580c; }
+  .btn-orange:disabled { opacity:.5; cursor:not-allowed; }
+  .status-badge { display:inline-block; padding:4px 12px; border-radius:8px; font-size:12px; font-weight:600; }
+  .status-pending { background:rgba(251,191,36,0.15); color:#fbbf24; }
+  .status-confirmed { background:rgba(34,197,94,0.15); color:#22c55e; }
+  .status-seated { background:rgba(99,102,241,0.15); color:#818cf8; }
+  .status-cancelled { background:rgba(239,68,68,0.12); color:#ef4444; }
+  /* Push prompt */
+  .push-prompt { background:rgba(249,115,22,0.07); border:1px solid rgba(249,115,22,0.2); border-radius:12px; padding:14px; display:flex; align-items:center; gap:12px; }
+  .cart-item-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #1a1a1a; }
+  .qty-ctrl { display:flex; align-items:center; gap:6px; }
+  .qty-btn { width:24px; height:24px; border-radius:6px; background:#222; border:none; color:#ccc; cursor:pointer; font-size:14px; }
+  .qty-btn:hover { background:#333; }
+  .live-dot { width:8px; height:8px; border-radius:50%; background:#22c55e; animation:livepulse 1.5s infinite; display:inline-block; }
+  @keyframes livepulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
+  .floor-label { font-size:11px; color:#888; text-transform:uppercase; letter-spacing:.06em; margin:12px 0 6px; font-weight:600; }
 </style>
 {% endblock %}
 {% block body %}
-<div style="max-width: 1400px; margin: 0 auto;">
+<div style="max-width:900px; margin:0 auto; padding:20px;">
   <!-- Header -->
-  <div class="header">
-    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-      <h1 style="margin:0;">🍽️ POS Cafe</h1>
-      <button onclick="logout()" style="background:#f97316; color:white; border:none; border-radius:8px; padding:10px 16px; font-weight:700; cursor:pointer;">
-        Logout
-      </button>
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+    <div>
+      <h1 style="font-size:24px; font-weight:800; margin:0;">🍽️ POS Cafe</h1>
+      <div style="font-size:13px; color:#888; margin-top:4px;">
+        <span class="live-dot"></span>
+        <span id="user-greeting" style="margin-left:6px;">Welcome</span>
+        <span id="clock" style="float:right; font-family:monospace; color:#555;"></span>
+      </div>
     </div>
-    <div class="header-subtitle">
-      <span class="live-indicator"></span>
-      <span>Real-Time Order Status</span>
-      <span id="clock" style="float: right; font-family: monospace; color: #666;"></span>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <button id="push-enable-btn" onclick="requestPushPermission()" style="display:none; background:rgba(249,115,22,0.12); color:#f97316; border:1px solid rgba(249,115,22,0.3); border-radius:8px; padding:8px 14px; font-size:12px; font-weight:600; cursor:pointer;">🔔 Enable Notifications</button>
+      <button onclick="logout()" style="background:#1a1a1a; color:#ccc; border:1px solid #333; border-radius:8px; padding:8px 16px; font-weight:600; cursor:pointer; font-size:13px;">Logout</button>
     </div>
   </div>
 
-  <!-- Orders Grid -->
-  <div id="review-panel" class="review-panel" style="display:none;"></div>
-  <div id="orders-container" class="orders-grid"></div>
+  <!-- Tab Bar -->
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab-btn-orders" onclick="showTab('orders')">📦 My Orders</button>
+    <button class="tab-btn" id="tab-btn-reserve" onclick="showTab('reserve')">📅 Reserve Table</button>
+    <button class="tab-btn" id="tab-btn-preorder" onclick="showTab('preorder')">🛒 Pre-Order</button>
+    <button class="tab-btn" id="tab-btn-myres" onclick="showTab('myres')">🗓️ My Reservations</button>
+  </div>
 
-  <!-- Idle State -->
-  <div id="idle-state" class="idle-message">
-    <svg class="idle-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
-    </svg>
-    <div style="color: #999; font-size: 18px;">No active orders</div>
-    <div style="color: #666; font-size: 14px; margin-top: 10px;">Waiting for orders to arrive...</div>
+  <!-- ═══ TAB: My Orders ═══ -->
+  <div class="tab-panel active" id="tab-orders">
+    <div id="review-panel" style="display:none; margin-bottom:16px;"></div>
+    <div id="orders-grid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:16px;"></div>
+    <div id="orders-empty" style="text-align:center; padding:60px 20px; color:#555;">
+      <div style="font-size:48px; margin-bottom:12px;">🍽️</div>
+      <div style="font-size:16px;">No active orders right now</div>
+      <div style="font-size:13px; margin-top:8px; color:#444;">Reserve a table or scan QR to order</div>
+    </div>
+  </div>
+
+  <!-- ═══ TAB: Reserve Table ═══ -->
+  <div class="tab-panel" id="tab-reserve">
+    <div style="max-width:480px; margin:0 auto;">
+      <h2 style="font-size:18px; font-weight:700; margin-bottom:4px;">Reserve a Table</h2>
+      <p style="font-size:13px; color:#888; margin-bottom:20px;">Pick a date, time, and table. Optionally pre-order your food.</p>
+
+      <div class="form-group">
+        <label>Date & Time</label>
+        <input type="datetime-local" id="res-datetime" />
+      </div>
+      <div class="form-group">
+        <label>Party Size</label>
+        <select id="res-party">
+          <option value="1">1 person</option>
+          <option value="2" selected>2 people</option>
+          <option value="3">3 people</option>
+          <option value="4">4 people</option>
+          <option value="5">5 people</option>
+          <option value="6">6 people</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Special notes (optional)</label>
+        <input type="text" id="res-notes" placeholder="e.g. birthday, window seat preferred" />
+      </div>
+
+      <div class="form-group">
+        <label>Select Table <span id="avail-loading" style="color:#888; font-size:11px; display:none;">Loading availability…</span></label>
+        <button onclick="checkAvailability()" class="btn-orange" style="margin-bottom:10px; padding:8px;">Check Available Tables</button>
+        <div id="table-picker" class="table-pick"></div>
+      </div>
+      <input type="hidden" id="res-table-id" value="" />
+
+      <button onclick="submitReservation()" class="btn-orange" id="res-submit-btn" disabled>Confirm Reservation</button>
+      <p style="font-size:11px; color:#555; margin-top:8px; text-align:center;">You can also add a pre-order on the Pre-Order tab before confirming.</p>
+    </div>
+  </div>
+
+  <!-- ═══ TAB: Pre-Order ═══ -->
+  <div class="tab-panel" id="tab-preorder">
+    <div style="display:grid; grid-template-columns:1fr 280px; gap:20px;" id="preorder-layout">
+      <!-- Menu -->
+      <div>
+        <h2 style="font-size:18px; font-weight:700; margin-bottom:4px;">Browse Menu</h2>
+        <p style="font-size:13px; color:#888; margin-bottom:14px;">Items will be pre-ordered for your reservation. Link a reservation first or they'll be added on arrival.</p>
+        <div id="preorder-cat-pills" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;"></div>
+        <div id="preorder-menu-grid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:10px; align-content:start;"></div>
+      </div>
+      <!-- Cart -->
+      <div style="position:sticky; top:20px; align-self:start;">
+        <div class="res-card">
+          <div style="font-size:15px; font-weight:700; margin-bottom:12px;">🛒 Pre-Order Cart</div>
+          <div id="preorder-cart-items" style="min-height:60px;">
+            <div style="color:#555; font-size:13px; text-align:center; padding:20px 0;">Cart is empty</div>
+          </div>
+          <div id="preorder-cart-total" style="display:none; border-top:1px solid #222; padding-top:10px; margin-top:10px;">
+            <div style="display:flex; justify-content:space-between; font-weight:700; font-size:15px;">
+              <span>Total</span>
+              <span style="color:#f97316;" id="preorder-total-amount">₹0</span>
+            </div>
+          </div>
+          <div style="margin-top:12px;">
+            <div id="preorder-linked-res" style="font-size:12px; color:#888; margin-bottom:8px;">
+              <span id="preorder-res-label">No reservation linked</span>
+            </div>
+            <button onclick="attachPreorderToReservation()" class="btn-orange" id="preorder-attach-btn" disabled style="margin-bottom:8px;">Save Pre-Order to Reservation</button>
+            <button onclick="clearPreorderCart()" style="width:100%; padding:8px; background:transparent; border:1px solid #333; border-radius:8px; color:#888; cursor:pointer; font-size:12px;">Clear Cart</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ TAB: My Reservations ═══ -->
+  <div class="tab-panel" id="tab-myres">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <h2 style="font-size:18px; font-weight:700; margin:0;">My Reservations</h2>
+      <button onclick="loadReservations()" style="background:transparent; border:1px solid #333; border-radius:8px; padding:8px 14px; color:#888; cursor:pointer; font-size:12px;">↻ Refresh</button>
+    </div>
+    <div id="reservations-list"></div>
+    <div id="reservations-empty" style="display:none; text-align:center; padding:40px 0; color:#555;">No reservations yet. Book your first table! 📅</div>
   </div>
 </div>
 {% endblock %}
 {% block scripts %}
 <script>
 const socket = io();
-let orders = {};
-let orderTimestamps = {};
-let latestReviewRating = 5;
-let latestReviewOrderId = null;
+let orders = {}, orderTimestamps = {}, latestReviewRating = 5, latestReviewOrderId = null;
 const reviewedOrderIds = new Set();
+let menuData = [], preorderCart = [], activeReservationId = null;
 
-socket.on('new_ticket', t => { 
+// ─── Socket events ─────────────────────────────────────────
+socket.on('new_ticket', t => {
   if (!orders[t.order_number]) {
     orders[t.order_number] = {
-      id: t.order_id,
-      order_number: t.order_number,
-      table: t.table,
-      status: t.status || 'sent',
-      items: t.items || [],
-      total: t.total || 0,
-      sent_at: t.sent_at || new Date().toISOString()
+      id: t.order_id, order_number: t.order_number, table: t.table,
+      status: t.status || 'to_cook', items: t.items || [], total: t.total || 0,
+      sent_at: t.sent_at || new Date().toISOString(), eta_minutes: t.eta_minutes || 15
     };
-    orderTimestamps[t.order_number] = new Date(t.sent_at);
   }
-  render();
+  renderOrders();
 });
 
-socket.on('ticket_update', d => { 
-  for (let order_num in orders) {
-    if (orders[order_num].table) {
-      orders[order_num].status = d.status;
-      if (d.started_at && !orders[order_num].started_at) {
-        orders[order_num].started_at = d.started_at;
-      }
+socket.on('ticket_update', d => {
+  for (let on in orders) {
+    // Match by ticket id or order id
+    if (orders[on]) {
+      orders[on].status = d.status || orders[on].status;
+      if (d.started_at) orders[on].started_at = d.started_at;
+      if (d.eta_minutes !== undefined) orders[on].eta_minutes = d.eta_minutes;
     }
   }
-  render();
+  renderOrders();
 });
 
-socket.on('order_update', d => { 
+socket.on('order_update', d => {
   if (orders[d.order_number]) {
     orders[d.order_number].status = d.status;
     if (d.started_at) orders[d.order_number].started_at = d.started_at;
     if (d.completed_at) orders[d.order_number].completed_at = d.completed_at;
+    // Send push notification if completed
+    if (d.status === 'completed') {
+      showInPageAlert('🍽️ Your order is ready! Head to the counter to pick it up.');
+    }
   }
-  render();
+  renderOrders();
 });
 
-socket.on('order_paid', d => { 
-  if (orders[d.order_number]) {
-    orders[d.order_number].status = 'paid';
-  }
-  render();
+socket.on('order_paid', d => {
+  if (orders[d.order_number]) orders[d.order_number].status = 'paid';
+  renderOrders();
 });
+
+// ─── Init ──────────────────────────────────────────────────
+async function init() {
+  document.getElementById('user-greeting').textContent = '{{ user_name or "Customer" }}';
+  await loadOrders();
+  await loadMenu();
+  setupPushNotifications();
+  // Set min datetime to now
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  document.getElementById('res-datetime').min = now.toISOString().slice(0,16);
+  document.getElementById('res-datetime').value = new Date(Date.now() + 3600000).toISOString().slice(0,16).replace('T00:','T').replace('T01:','T').replace(/T(\d{2}):/,  (_, h) => `T${String(parseInt(h)+1).padStart(2,'0')}:`);
+}
 
 async function loadOrders() {
   try {
-    const response = await fetch('/api/kitchen/tickets');
-    const tickets = await response.json();
-    
+    const res = await fetch('/api/kitchen/tickets');
+    const tickets = await res.json();
     orders = {};
     tickets.forEach(t => {
-      if (t.status !== 'completed') {
-        orders[t.order_number] = {
-          id: t.order_id,
-          order_number: t.order_number,
-          table: t.table,
-          status: t.status,
-          items: t.items || [],
-          total: t.total || 0,
-          sent_at: t.sent_at,
-          started_at: t.started_at,
-          time_in_prep: t.time_in_prep || 0
-        };
-        orderTimestamps[t.order_number] = new Date(t.sent_at);
-      }
+      orders[t.order_number] = {
+        id: t.order_id, order_number: t.order_number, table: t.table,
+        is_takeaway: t.is_takeaway, customer_name: t.customer_name,
+        status: t.status, items: t.items || [], total: t.total || 0,
+        sent_at: t.sent_at, started_at: t.started_at,
+        eta_minutes: t.eta_minutes || 15, avg_prep: t.avg_prep_minutes || 15
+      };
     });
-    render();
-  } catch (e) {
-    console.error('Failed to load orders:', e);
-  }
+    renderOrders();
+  } catch(e) { console.error(e); }
 }
 
-function getOrderAge(order) {
-  const sentTime = new Date(order.sent_at);
-  const now = new Date();
-  const minutes = Math.floor((now - sentTime) / 60000);
-  return minutes;
+// ─── Orders Tab ────────────────────────────────────────────
+function getEtaLabel(o) {
+  const eta = o.eta_minutes || 15;
+  if (o.status === 'completed') return 'Ready!';
+  if (o.status === 'paid') return '';
+  const cls = eta < 8 ? 'eta-good' : eta < 18 ? 'eta-mid' : 'eta-late';
+  return `<span class="eta-badge ${cls}">⏱ ~${eta}m</span>`;
 }
 
-function getPrepTime(order) {
-  if (order.started_at) {
-    const startTime = new Date(order.started_at);
-    const now = new Date();
-    return Math.floor((now - startTime) / 60000);
-  }
-  return 0;
-}
-
-function renderOrder(order) {
-  const age = getOrderAge(order);
-  const prepTime = getPrepTime(order);
-  
-  const isPaid = order.status === 'paid';
-  const statusClass = `status-${order.status}`;
-  const statusText = order.status === 'to_cook' ? 'Awaiting' : 
-                     order.status === 'preparing' ? 'Preparing' : 
-                     order.status === 'ready' ? 'Ready!' : 'Thank You!';
-  const progressClass = order.status === 'to_cook' ? 'sent' : 
-                        order.status === 'preparing' ? 'preparing' : 'ready';
-  
-  const itemsHtml = (order.items || []).map(item => `
-    <div class="order-item">
-      <span class="item-name">${item.name}</span>
-      <span class="item-qty">×${item.qty}</span>
-      <span class="item-price">₹${(item.price * item.qty).toFixed(0)}</span>
-    </div>
-  `).join('');
-  
-  const eta = order.status === 'preparing' ? `~${Math.max(5, 15 - prepTime)}m` : 
-              order.status === 'to_cook' ? '~15m' : 'Ready now!';
-  
-  return `
-    <div class="order-card ${order.status}">
-      <div class="order-header">
-        <div>
-          <div class="order-number">#${order.order_number.split('-')[1]}</div>
-          <div class="order-time">🪑 Table ${order.table}</div>
-          <div class="order-time">${age}m ago</div>
-          ${order.status === 'preparing' ? `<div class="order-time">⏱️ Prep: ${prepTime}m</div>` : ''}
-        </div>
-        <div style="text-align: right;">
-          <div class="order-status-badge ${statusClass}">${statusText}</div>
-          ${isPaid ? '<div class="paid-badge">✓ Paid</div>' : ''}
-          ${!isPaid ? `<div class="order-eta">${eta}</div>` : ''}
-        </div>
-      </div>
-      
-      <div class="progress-bar">
-        <div class="progress-fill ${progressClass}"></div>
-      </div>
-      
-      <div class="order-items">
-        ${itemsHtml}
-      </div>
-      
-      <div class="order-total">
-        <span class="total-label">Total</span>
-        <span class="total-amount">₹${order.total.toFixed(0)}</span>
-      </div>
-    </div>
-  `;
-}
-
-function render() {
-  const activeOrders = Object.values(orders).sort((a, b) => new Date(b.sent_at) - new Date(a.sent_at));
-  
-  if (activeOrders.length === 0) {
-    document.getElementById('orders-container').style.display = 'none';
-    document.getElementById('idle-state').style.display = 'block';
+function renderOrders() {
+  const list = Object.values(orders);
+  const grid = document.getElementById('orders-grid');
+  const empty = document.getElementById('orders-empty');
+  if (!list.length) {
+    grid.innerHTML = ''; empty.style.display = 'block';
   } else {
-    document.getElementById('orders-container').style.display = 'grid';
-    document.getElementById('idle-state').style.display = 'none';
-    document.getElementById('orders-container').innerHTML = activeOrders.map(o => renderOrder(o)).join('');
-  }
-  renderReviewPanel(activeOrders);
-}
-
-function renderReviewPanel(activeOrders) {
-  const panel = document.getElementById('review-panel');
-  const paidOrders = activeOrders.filter(o => o.status === 'paid').sort((a, b) => new Date(b.sent_at || 0) - new Date(a.sent_at || 0));
-  if (!paidOrders.length) {
-    panel.style.display = 'none';
-    panel.innerHTML = '';
-    latestReviewOrderId = null;
-    return;
-  }
-
-  const latest = paidOrders[0];
-  if (latestReviewOrderId !== latest.id) {
-    latestReviewOrderId = latest.id;
-    if (!reviewedOrderIds.has(latest.id)) {
-      latestReviewRating = 5;
-    }
-  }
-  panel.style.display = 'block';
-  if (reviewedOrderIds.has(latest.id)) {
-    panel.innerHTML = `
-      <div class="review-panel-header">
-        <div>
-          <div class="review-title">✓ Review Sent</div>
-          <div class="review-panel-note">Thanks for your feedback on order #${latest.order_number.split('-')[1]}. It is already visible in the dashboard.</div>
-        </div>
-        <div class="paid-badge">Submitted</div>
-      </div>
-    `;
-    return;
-  }
-  panel.innerHTML = `
-    <div class="review-panel-header">
-      <div>
-        <div class="review-title">📝 Share Your Feedback</div>
-        <div class="review-panel-note">Your review will appear in the staff dashboard for order #${latest.order_number.split('-')[1]}.</div>
-      </div>
-      <div class="paid-badge">Paid Order</div>
-    </div>
-    <div class="review-panel-note" style="margin-bottom:10px;">Table ${latest.table}</div>
-    <div class="star-rating" id="latest-star-rating">
-      <button class="star-btn" onclick="setLatestRating(1)" data-rating="1">⭐</button>
-      <button class="star-btn" onclick="setLatestRating(2)" data-rating="2">⭐</button>
-      <button class="star-btn" onclick="setLatestRating(3)" data-rating="3">⭐</button>
-      <button class="star-btn" onclick="setLatestRating(4)" data-rating="4">⭐</button>
-      <button class="star-btn selected" onclick="setLatestRating(5)" data-rating="5">⭐</button>
-    </div>
-    <textarea class="review-input" id="latest-review-comment" placeholder="Share your experience... (optional)" maxlength="500"></textarea>
-    <button class="review-submit" onclick="submitLatestReview(${latest.id})">Submit Review</button>
-  `;
-  latestReviewRating = 5;
-}
-
-function setLatestRating(rating) {
-  latestReviewRating = rating;
-  const container = document.getElementById('latest-star-rating');
-  if (!container) return;
-  container.querySelectorAll('.star-btn').forEach((btn, idx) => {
-    btn.classList.toggle('selected', idx < rating);
-  });
-}
-
-async function submitLatestReview(orderId) {
-  const commentEl = document.getElementById('latest-review-comment');
-  const comment = commentEl ? commentEl.value.trim() : '';
-  try {
-    const response = await fetch(`/api/orders/${orderId}/review`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rating: latestReviewRating, comment })
-    });
-    if (response.ok) {
-      reviewedOrderIds.add(orderId);
-      const panel = document.getElementById('review-panel');
-      panel.innerHTML = `
-        <div class="review-title">✓ Thank You for Your Review!</div>
-        <div class="review-display">
-          <div class="review-stars">${'⭐'.repeat(latestReviewRating)} (${latestReviewRating}/5 stars)</div>
-          ${comment ? `<div class="review-comment">"${comment.substring(0, 100)}${comment.length > 100 ? '...' : ''}"</div>` : ''}
-        </div>
-      `;
-      setTimeout(loadOrders, 1000);
-    } else {
-      alert('Error submitting review. Please try again.');
-    }
-  } catch (err) {
-    console.error('Review submission error:', err);
-    alert('Error submitting review');
-  }
-}
-
-function setRating(orderNumber, rating) {
-  const container = document.getElementById(`star-rating-${orderNumber}`);
-  container.querySelectorAll('.star-btn').forEach((btn, idx) => {
-    btn.classList.toggle('selected', idx < rating);
-  });
-  container.dataset.rating = rating;
-}
-
-async function submitReview(orderNumber, orderId) {
-  const container = document.getElementById(`star-rating-${orderNumber}`);
-  const rating = parseInt(container.dataset.rating) || 5;
-  const comment = document.getElementById(`comment-${orderNumber}`).value;
-  
-  try {
-    const response = await fetch(`/api/orders/${orderId}/review`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rating, comment })
-    });
-    
-    if (response.ok) {
-      const reviewSection = document.querySelector(`[id^="star-rating-${orderNumber}"]`).closest('.review-section');
-      if (reviewSection) {
-        reviewSection.innerHTML = `
-          <div class="review-title">✓ Thank You for Your Review!</div>
-          <div class="review-display">
-            <div class="review-stars">${'⭐'.repeat(rating)} (${rating}/5 stars)</div>
-            ${comment ? `<div class="review-comment">"${comment.substring(0, 100)}${comment.length > 100 ? '...' : ''}"</div>` : ''}
+    empty.style.display = 'none';
+    grid.innerHTML = list.map(o => {
+      const statusLabel = {to_cook:'Awaiting',preparing:'Preparing…',completed:'Ready! 🎉',paid:'Paid ✓'}[o.status] || o.status;
+      const itemsHtml = (o.items||[]).map(i => `
+        <div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #1a1a1a; font-size:13px;">
+          <span style="color:#ccc;">${i.name}${i.notes ? ` <em style="color:#888;font-size:11px;">(${i.notes})</em>` : ''}</span>
+          <span style="color:#f97316; font-weight:600;">×${i.qty}</span>
+        </div>`).join('');
+      return `
+        <div class="order-card ${o.status}">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.07); padding-bottom:10px;">
+            <div>
+              <div style="font-size:28px; font-weight:800; color:#f97316; font-family:monospace;">#${o.order_number.split('-')[1]}</div>
+              <div style="font-size:12px; color:#888; margin-top:2px;">${o.is_takeaway ? '🛵 Takeaway' : '🪑 Table '+o.table}</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:13px; font-weight:700; color:#ccc;">${statusLabel}</div>
+              ${getEtaLabel(o)}
+            </div>
           </div>
-        `;
-      }
-    } else {
-      alert('Error submitting review. Please try again.');
-    }
-  } catch (err) {
-    console.error('Review submission error:', err);
-    alert('Error submitting review');
+          <div class="progress-bar"><div class="progress-fill ${o.status}"></div></div>
+          <div>${itemsHtml}</div>
+          <div style="display:flex; justify-content:space-between; border-top:1px solid rgba(255,255,255,0.07); margin-top:10px; padding-top:10px; font-weight:700; font-size:15px;">
+            <span style="color:#888;">Total</span>
+            <span style="color:#22c55e;">₹${(o.total||0).toFixed(0)}</span>
+          </div>
+        </div>`;
+    }).join('');
+  }
+  renderReviewPanel(list);
+}
+
+function renderReviewPanel(list) {
+  const panel = document.getElementById('review-panel');
+  const paid = list.filter(o => o.status === 'paid').sort((a,b) => new Date(b.sent_at||0) - new Date(a.sent_at||0));
+  if (!paid.length) { panel.style.display = 'none'; return; }
+  const latest = paid[0];
+  if (reviewedOrderIds.has(latest.id)) { panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+  panel.innerHTML = `
+    <div style="background:rgba(249,115,22,0.07); border:1px solid rgba(249,115,22,0.2); border-radius:14px; padding:16px;">
+      <div style="font-size:14px; font-weight:700; color:#f97316; margin-bottom:10px;">📝 Rate Your Experience — Order #${latest.order_number.split('-')[1]}</div>
+      <div style="display:flex; gap:6px; margin-bottom:10px;">
+        ${[1,2,3,4,5].map(n=>`<button onclick="setReview(${latest.id},${n})" id="star-${latest.id}-${n}" style="width:32px;height:32px;border:2px solid #444;background:transparent;border-radius:6px;font-size:18px;cursor:pointer;transition:all .2s;" data-rating="${n}">⭐</button>`).join('')}
+      </div>
+      <textarea id="review-comment-${latest.id}" placeholder="Share your experience… (optional)" style="width:100%; background:#111; border:1px solid #333; border-radius:8px; color:#ccc; padding:8px; font-size:12px; resize:vertical; min-height:60px; margin-bottom:8px;"></textarea>
+      <button onclick="submitReview(${latest.id})" class="btn-orange">Submit Review</button>
+    </div>`;
+}
+
+let pendingReviewRating = {};
+function setReview(orderId, rating) {
+  pendingReviewRating[orderId] = rating;
+  [1,2,3,4,5].forEach(n => {
+    const btn = document.getElementById(`star-${orderId}-${n}`);
+    if (btn) btn.style.borderColor = n <= rating ? '#f97316' : '#444';
+  });
+}
+
+async function submitReview(orderId) {
+  const rating = pendingReviewRating[orderId] || 5;
+  const comment = document.getElementById(`review-comment-${orderId}`)?.value?.trim() || '';
+  const res = await fetch(`/api/orders/${orderId}/review`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ rating, comment })
+  });
+  if (res.ok) {
+    reviewedOrderIds.add(orderId);
+    document.getElementById('review-panel').style.display = 'none';
+    showInPageAlert('✓ Thank you for your review!');
   }
 }
 
-// Update times and load orders
+// ─── Reserve Tab ───────────────────────────────────────────
+async function checkAvailability() {
+  const dt = document.getElementById('res-datetime').value;
+  if (!dt) { showInPageAlert('Please pick a date and time first.'); return; }
+  document.getElementById('avail-loading').style.display = 'inline';
+  const res = await fetch(`/api/tables/availability?datetime=${encodeURIComponent(dt)}`);
+  const floors = await res.json();
+  document.getElementById('avail-loading').style.display = 'none';
+  const picker = document.getElementById('table-picker');
+  const party = parseInt(document.getElementById('res-party').value) || 2;
+  picker.innerHTML = floors.map(f => {
+    const tbHtml = f.tables.map(t => {
+      const fits = t.seats >= party;
+      const avail = t.available_for_reservation && t.status !== 'occupied';
+      const cls = !avail ? 'unavailable' : fits ? '' : '';
+      return `<div class="table-pick-btn ${cls}" ${avail ? `onclick="selectResTable(${t.id},'${t.number}',${t.seats}, this)"` : ''} title="${!avail ? 'Not available' : `Table ${t.number}, ${t.seats} seats`}">
+        <div style="font-size:18px; font-weight:800; color:${avail ? (fits?'#f97316':'#888') : '#444'};">T${t.number}</div>
+        <div style="font-size:10px; color:#666;">${t.seats} seats</div>
+        ${!avail ? '<div style="font-size:9px;color:#ef4444;">Booked</div>' : !fits ? '<div style="font-size:9px;color:#888;">Too small</div>' : '<div style="font-size:9px;color:#22c55e;">Available</div>'}
+      </div>`;
+    }).join('');
+    return `<div><div class="floor-label">${f.name}</div><div class="table-pick">${tbHtml}</div></div>`;
+  }).join('');
+}
+
+function selectResTable(id, number, seats, el) {
+  document.querySelectorAll('.table-pick-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('res-table-id').value = id;
+  document.getElementById('res-submit-btn').disabled = false;
+}
+
+async function submitReservation() {
+  const dt = document.getElementById('res-datetime').value;
+  const party = document.getElementById('res-party').value;
+  const notes = document.getElementById('res-notes').value;
+  const tableId = document.getElementById('res-table-id').value;
+  if (!dt) { showInPageAlert('Please pick a date and time.'); return; }
+  const btn = document.getElementById('res-submit-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  // Convert local datetime to ISO (treat as local)
+  const localDt = new Date(dt);
+  const payload = {
+    reserved_at: localDt.toISOString(),
+    party_size: parseInt(party),
+    notes,
+    table_id: tableId ? parseInt(tableId) : null,
+    items: preorderCart.map(i => ({product_id:i.product_id,name:i.name,qty:i.qty,price:i.price,notes:i.notes||''}))
+  };
+  const res = await fetch('/api/reservations', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  btn.disabled = false; btn.textContent = 'Confirm Reservation';
+  if (data.ok) {
+    activeReservationId = data.id;
+    showInPageAlert('✅ Reservation confirmed! We\'ll see you then.');
+    document.getElementById('preorder-res-label').textContent = `Linked to Reservation #${data.id}`;
+    document.getElementById('preorder-attach-btn').disabled = false;
+    showTab('myres');
+    loadReservations();
+  } else {
+    showInPageAlert('❌ ' + (data.error || 'Error creating reservation'));
+  }
+}
+
+// ─── Pre-order Tab ─────────────────────────────────────────
+async function loadMenu() {
+  const res = await fetch('/api/products');
+  menuData = await res.json();
+  renderMenu(menuData);
+  renderMenuPills(menuData);
+}
+
+function renderMenuPills(cats) {
+  const el = document.getElementById('preorder-cat-pills');
+  el.innerHTML = `<button onclick="renderMenu(menuData)" class="cat-pill px-3 py-1 rounded-full text-xs border border-border active">All</button>` +
+    cats.map(c => `<button onclick="filterMenuCat(${c.id})" class="cat-pill px-3 py-1 rounded-full text-xs border border-border">${c.name}</button>`).join('');
+}
+
+function filterMenuCat(catId) {
+  renderMenu(menuData.filter(c => c.id === catId));
+}
+
+function renderMenu(cats) {
+  const grid = document.getElementById('preorder-menu-grid');
+  const emojiMap = {Food:'🍽️',Beverages:'☕',Desserts:'🍰',Snacks:'🥨'};
+  grid.innerHTML = cats.flatMap(c => c.products.map(p => `
+    <div class="menu-product" onclick="addToPreorder(${p.id},'${p.name.replace(/'/g,"\\'")}',${p.price})">
+      <div style="font-size:22px; margin-bottom:6px;">${emojiMap[c.name]||'🛒'}</div>
+      <div style="font-size:13px; font-weight:600; line-height:1.3;">${p.name}</div>
+      <div style="font-size:13px; color:#f97316; font-weight:700; margin-top:4px;">₹${p.price}</div>
+    </div>`)).join('');
+}
+
+function addToPreorder(id, name, price) {
+  const ex = preorderCart.find(i => i.product_id === id);
+  if (ex) { ex.qty++; } else { preorderCart.push({product_id:id, name, price, qty:1, notes:''}); }
+  renderPreorderCart();
+}
+
+function updatePreorderQty(idx, delta) {
+  preorderCart[idx].qty += delta;
+  if (preorderCart[idx].qty <= 0) preorderCart.splice(idx, 1);
+  renderPreorderCart();
+}
+
+function clearPreorderCart() { preorderCart = []; renderPreorderCart(); }
+
+function renderPreorderCart() {
+  const el = document.getElementById('preorder-cart-items');
+  const totalEl = document.getElementById('preorder-cart-total');
+  if (!preorderCart.length) {
+    el.innerHTML = '<div style="color:#555;font-size:13px;text-align:center;padding:20px 0;">Cart is empty</div>';
+    totalEl.style.display = 'none';
+    return;
+  }
+  el.innerHTML = preorderCart.map((i, idx) => `
+    <div class="cart-item-row">
+      <div style="flex:1; font-size:13px;">${i.name}</div>
+      <div class="qty-ctrl">
+        <button class="qty-btn" onclick="updatePreorderQty(${idx},-1)">−</button>
+        <span style="font-size:13px; font-weight:600;">${i.qty}</span>
+        <button class="qty-btn" onclick="updatePreorderQty(${idx},1)">+</button>
+      </div>
+      <div style="font-size:13px; font-weight:700; color:#f97316; margin-left:10px;">₹${(i.price*i.qty).toFixed(0)}</div>
+    </div>`).join('');
+  const total = preorderCart.reduce((s,i) => s + i.price*i.qty, 0);
+  document.getElementById('preorder-total-amount').textContent = '₹'+total.toFixed(0);
+  totalEl.style.display = 'block';
+}
+
+async function attachPreorderToReservation() {
+  if (!activeReservationId || !preorderCart.length) {
+    showInPageAlert('Create a reservation first in the Reserve tab.'); return;
+  }
+  const res = await fetch(`/api/reservations/${activeReservationId}`, {
+    method:'PUT', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ items: preorderCart.map(i=>({product_id:i.product_id,name:i.name,qty:i.qty,price:i.price,notes:i.notes||''})) })
+  });
+  if (res.ok) {
+    showInPageAlert('✅ Pre-order saved to your reservation!');
+    loadReservations();
+    showTab('myres');
+  }
+}
+
+// ─── My Reservations Tab ───────────────────────────────────
+async function loadReservations() {
+  const res = await fetch('/api/reservations');
+  const reservations = await res.json();
+  const el = document.getElementById('reservations-list');
+  const empty = document.getElementById('reservations-empty');
+  const active = reservations.filter(r => r.status !== 'cancelled');
+  if (!active.length) {
+    el.innerHTML = ''; empty.style.display = 'block'; return;
+  }
+  empty.style.display = 'none';
+  el.innerHTML = active.map(r => {
+    const dt = new Date(r.reserved_at);
+    const dtLabel = dt.toLocaleString('en-IN', {dateStyle:'medium', timeStyle:'short'});
+    const itemsHtml = r.items.length ? `<div style="margin-top:10px; font-size:12px; color:#888;">Pre-order: ${r.items.map(i=>`${i.product_name} ×${i.qty}`).join(', ')}</div>` : '';
+    return `
+      <div class="res-card">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div>
+            <div style="font-size:16px; font-weight:700;">📅 ${dtLabel}</div>
+            <div style="font-size:12px; color:#888; margin-top:4px;">
+              ${r.table ? '🪑 Table ' + r.table : 'No table assigned'} · ${r.party_size} people
+              ${r.notes ? ` · <em>${r.notes}</em>` : ''}
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+            <span class="status-badge status-${r.status}">${r.status.charAt(0).toUpperCase()+r.status.slice(1)}</span>
+            ${r.status !== 'seated' && r.status !== 'confirmed' ?
+              `<button onclick="cancelReservation(${r.id})" style="font-size:11px; color:#888; background:transparent; border:1px solid #333; border-radius:6px; padding:4px 10px; cursor:pointer;">Cancel</button>` : ''}
+          </div>
+        </div>
+        ${itemsHtml}
+        ${r.items.length ? `<div style="margin-top:8px; color:#888; font-size:11px;">Pre-order total: ₹${r.items.reduce((s,i)=>s+i.qty*i.price,0).toFixed(0)}</div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+async function cancelReservation(id) {
+  if (!confirm('Cancel this reservation?')) return;
+  await fetch(`/api/reservations/${id}`, { method:'DELETE' });
+  loadReservations();
+  showInPageAlert('Reservation cancelled.');
+}
+
+// ─── Push Notifications ────────────────────────────────────
+async function setupPushNotifications() {
+  if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
+  if (Notification.permission === 'default') {
+    document.getElementById('push-enable-btn').style.display = 'block';
+  } else if (Notification.permission === 'granted') {
+    registerPush();
+  }
+}
+
+async function requestPushPermission() {
+  const result = await Notification.requestPermission();
+  if (result === 'granted') {
+    document.getElementById('push-enable-btn').style.display = 'none';
+    await registerPush();
+    showInPageAlert('🔔 Notifications enabled! You\'ll be notified when your order is ready.');
+  }
+}
+
+async function registerPush() {
+  // Simple in-page notification (no VAPID required for in-page)
+  // Store that the user wants push
+  if (Notification.permission === 'granted') {
+    window._pushEnabled = true;
+  }
+}
+
+function showInPageAlert(msg) {
+  // Show browser notification if permission granted
+  if (window._pushEnabled || Notification.permission === 'granted') {
+    try { new Notification('POS Cafe', { body: msg, icon: '/favicon.ico' }); } catch(e) {}
+  }
+  // Also show in-page toast
+  toast(msg, 'success');
+}
+
+// ─── Tabs ──────────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.getElementById('tab-btn-'+name).classList.add('active');
+  if (name === 'myres') loadReservations();
+}
+
+// ─── Clock & Poll ──────────────────────────────────────────
 setInterval(() => {
   document.getElementById('clock').textContent = new Date().toLocaleTimeString();
-  render();
 }, 1000);
 
 loadOrders();
 setInterval(loadOrders, 15000);
+init();
 
 async function logout() {
   await fetch('/api/logout', { method: 'POST' });

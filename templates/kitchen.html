@@ -8,9 +8,15 @@
   .ticket.to_cook { border-top:3px solid #ef4444; }
   .ticket.preparing { border-top:3px solid #f97316; }
   .ticket.completed { border-top:3px solid #22c55e; opacity:0.7; }
+  .ticket.overdue { border-top:3px solid #dc2626 !important; animation:flash-overdue 1.2s infinite; }
+  @keyframes flash-overdue {
+    0%,100%{ box-shadow:0 0 0 0 rgba(220,38,38,0); }
+    50%{ box-shadow:0 0 0 6px rgba(220,38,38,0.25); }
+  }
   .item-line { cursor:pointer; transition:all .15s; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.06); }
   .item-line:hover { background:rgba(255,255,255,0.04); }
   .item-line.done { text-decoration:line-through; color:#4a4a4a; }
+  .item-notes { font-size:11px; color:#f97316; font-style:italic; margin-top:2px; }
   .items-container { max-height:600px; overflow-y:auto; overflow-x:hidden; padding-right:6px; }
   .items-container::-webkit-scrollbar { width:6px; }
   .items-container::-webkit-scrollbar-track { background:rgba(255,255,255,0.03); border-radius:3px; }
@@ -27,6 +33,12 @@
   .to-cook-header { background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.2); }
   .preparing-header { background:rgba(249,115,22,0.08); border:1px solid rgba(249,115,22,0.2); }
   .completed-header { background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.2); }
+  .overdue-badge { background:rgba(220,38,38,0.2); color:#ef4444; border:1px solid rgba(220,38,38,0.4); border-radius:6px; padding:2px 8px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:4px; }
+  .eta-badge { border-radius:6px; padding:2px 8px; font-size:11px; font-weight:600; }
+  .eta-good { background:rgba(34,197,94,0.15); color:#22c55e; }
+  .eta-mid  { background:rgba(249,115,22,0.15); color:#f97316; }
+  .eta-late { background:rgba(239,68,68,0.15); color:#ef4444; }
+  .takeaway-tag { background:rgba(139,92,246,0.18); color:#a78bfa; border:1px solid rgba(139,92,246,0.3); border-radius:4px; padding:1px 7px; font-size:10px; font-weight:700; }
 </style>
 {% endblock %}
 {% block body %}
@@ -39,10 +51,16 @@
       </div>
       <span class="font-display font-700 text-lg">Kitchen Display</span>
     </div>
-    <div class="flex items-center gap-3">
-      <div class="ping-dot"></div>
-      <span class="text-xs text-gray-500">Live</span>
-      <span id="clock" class="text-sm text-gray-400 font-mono"></span>
+    <div class="flex items-center gap-4">
+      <div class="flex items-center gap-2 text-xs text-gray-500">
+        <span>Avg prep:</span>
+        <span id="avg-prep-badge" class="eta-badge eta-mid">~15m</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="ping-dot"></div>
+        <span class="text-xs text-gray-500">Live</span>
+        <span id="clock" class="text-sm text-gray-400 font-mono"></span>
+      </div>
     </div>
   </div>
 
@@ -55,7 +73,7 @@
           <span class="font-display font-700 text-red-400">To Cook</span>
           <span id="count-to_cook" class="tag badge-cook">0</span>
         </div>
-        <div class="text-xs text-gray-600 mt-1">Click ticket to start preparing</div>
+        <div class="text-xs text-gray-600 mt-1">Oldest order on top · Tap to start</div>
       </div>
       <div id="col-to_cook" class="space-y-3 px-1"></div>
     </div>
@@ -66,7 +84,7 @@
           <span class="font-display font-700 text-orange-400">Preparing</span>
           <span id="count-preparing" class="tag badge-prep">0</span>
         </div>
-        <div class="text-xs text-gray-600 mt-1">Click item to mark done</div>
+        <div class="text-xs text-gray-600 mt-1">Click item to mark done · ⚠️ Red = overdue</div>
       </div>
       <div id="col-preparing" class="space-y-3 px-1"></div>
     </div>
@@ -88,66 +106,131 @@
 <script>
 let tickets = [];
 const socket = io();
+const OVERDUE_MINUTES = 15;
 
-socket.on('new_ticket', t => { tickets.push(t); render(); toast('New order: '+t.order_number); });
+socket.on('new_ticket', t => {
+  // Insert so oldest stays at top: append to end (render will sort)
+  tickets.push(t);
+  render();
+  toast('🍳 New order: '+t.order_number);
+  // Play a subtle beep sound
+  try { new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAA...').play(); } catch(e) {}
+});
+
 socket.on('ticket_update', d => {
   const t = tickets.find(t=>t.id===d.id);
-  if (t) { t.status=d.status; render(); }
+  if (t) {
+    t.status = d.status;
+    if (d.started_at) t.started_at = d.started_at;
+    if (Array.isArray(d.items)) {
+      const itemsById = new Map((t.items || []).map(i => [i.id, i]));
+      d.items.forEach(i => itemsById.set(i.id, { ...(itemsById.get(i.id) || {}), ...i }));
+      t.items = Array.from(itemsById.values());
+      if (typeof d.total === 'number') t.total = d.total;
+    }
+    render();
+  }
 });
 
 async function loadTickets() {
-  tickets = await api('/api/kitchen/tickets');
+  const data = await api('/api/kitchen/tickets');
+  tickets = data;
+  // Update avg prep badge from first ticket (all have same avg)
+  if (tickets.length > 0 && tickets[0].avg_prep_minutes) {
+    updateAvgBadge(tickets[0].avg_prep_minutes);
+  }
   render();
+}
+
+function updateAvgBadge(mins) {
+  const el = document.getElementById('avg-prep-badge');
+  if (!el) return;
+  el.textContent = `~${mins}m`;
+  el.className = 'eta-badge ' + (mins < 10 ? 'eta-good' : mins < 20 ? 'eta-mid' : 'eta-late');
+  document.getElementById('avg-prep-badge').textContent = `~${mins}m`;
 }
 
 function render() {
   ['to_cook','preparing','completed'].forEach(stage=>{
     const col = document.getElementById('col-'+stage);
-    const stageTix = tickets.filter(t=>t.status===stage);
+    // Sort oldest first (ascending sent_at) within each stage
+    const stageTix = tickets
+      .filter(t=>t.status===stage)
+      .sort((a,b)=> new Date(a.sent_at) - new Date(b.sent_at));
     document.getElementById('count-'+stage).textContent = stageTix.length;
     col.innerHTML = stageTix.map(t=>renderTicket(t)).join('');
   });
 }
 
 function renderTicket(t) {
-  const age = Math.floor((Date.now() - new Date(t.sent_at+'Z').getTime()) / 60000);
-  const prepTime = t.started_at ? Math.floor((Date.now() - new Date(t.started_at+'Z').getTime()) / 60000) : 0;
-  
-  // Build items HTML with full details
-  const itemsHtml = t.items.map(i=>`
-    <div class="item-line flex items-center justify-between ${i.status==='completed'?'done':''}" onclick="event.stopPropagation();markItem(${t.id},${i.id})">
-      <div class="flex-1">
-        <span class="text-sm font-500">${i.name}</span>
-        <span class="text-xs text-gray-600 ml-2">₹${(i.price || 0).toFixed(0)} × ${i.qty}</span>
+  const now = Date.now();
+  const age = Math.floor((now - new Date(t.sent_at+'Z').getTime()) / 60000);
+  const prepTime = t.started_at ? Math.floor((now - new Date(t.started_at+'Z').getTime()) / 60000) : 0;
+  const isOverdue = t.status === 'preparing' && prepTime > OVERDUE_MINUTES;
+  const eta = t.eta_minutes || 15;
+
+  // ETA badge
+  let etaBadgeHtml = '';
+  if (t.status === 'to_cook') {
+    const cls = eta < 10 ? 'eta-good' : eta < 20 ? 'eta-mid' : 'eta-late';
+    etaBadgeHtml = `<span class="eta-badge ${cls}">⏱ ~${eta}m</span>`;
+  } else if (t.status === 'preparing') {
+    if (isOverdue) {
+      etaBadgeHtml = `<span class="overdue-badge">⚠️ OVERDUE: ${prepTime}m</span>`;
+    } else {
+      const rem = Math.max(0, eta - prepTime);
+      const cls = rem > 5 ? 'eta-good' : rem > 0 ? 'eta-mid' : 'eta-late';
+      etaBadgeHtml = `<span class="eta-badge ${cls}">~${rem}m left</span>`;
+    }
+  }
+
+  // Items HTML
+  const itemsHtml = (t.items || []).map(i=>`
+    <div class="item-line flex flex-col ${i.status==='completed'?'done':''}" onclick="event.stopPropagation();markItem(${t.id},${i.id})">
+      <div class="flex items-center justify-between">
+        <div class="flex-1">
+          <span class="text-sm font-500">${i.name}</span>
+          <span class="text-xs text-gray-600 ml-2">₹${(i.price||0).toFixed(0)} × ${i.qty}</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-700 text-gray-400 px-2 py-0.5 rounded bg-gray-900">${i.qty}</span>
+          <span class="text-xs">${i.status==='to_cook'?'📋':i.status==='preparing'?'👨‍🍳':'✓'}</span>
+        </div>
       </div>
-      <div class="flex items-center gap-2">
-        <span class="text-xs font-700 text-gray-400 px-2 py-0.5 rounded bg-gray-900">${i.qty}</span>
-        <span class="text-xs">${i.status==='to_cook'?'📋':i.status==='preparing'?'👨‍🍳':'✓'}</span>
-      </div>
+      ${i.notes ? `<div class="item-notes">📝 ${i.notes}</div>` : ''}
     </div>`).join('');
-  
+
+  // Takeaway / table label
+  const tableLabel = t.is_takeaway
+    ? `<span class="takeaway-tag">🛵 Takeaway</span>${t.customer_name ? ` <span class="text-xs text-gray-400">${t.customer_name}</span>` : ''}`
+    : `🪑 Table ${t.table}`;
+
   return `
-    <div class="ticket card p-4 ${t.status}" onclick="advanceTicket(${t.id})" style="border-radius:14px;cursor:pointer">
+    <div class="ticket card p-4 ${t.status}${isOverdue?' overdue':''}" onclick="advanceTicket(${t.id})" style="border-radius:14px;cursor:pointer">
       <div class="flex items-start justify-between mb-2">
         <div>
           <div class="font-display font-800 text-lg text-brand-500">${t.order_number}</div>
-          <div class="text-xs text-gray-500">🪑 Table ${t.table}</div>
+          <div class="text-xs text-gray-500 mt-0.5">${tableLabel}</div>
         </div>
-        <div class="text-right">
-          <div class="text-xs font-700 text-gray-500">${t.status==='to_cook'?'📊':t.status==='preparing'?'⏱️':'✅'}</div>
+        <div class="text-right space-y-1">
           <div class="text-xs text-gray-600">${age}m ago</div>
           ${t.status==='preparing'?`<div class="text-xs text-orange-400 font-700">${prepTime}m prep</div>`:''}
+          ${etaBadgeHtml}
         </div>
       </div>
-      
+
       <div class="bg-gray-900 rounded px-2 py-1 text-xs mb-2 inline-block">
-        <span class="font-700">₹${(t.total || 0).toFixed(0)}</span>
+        <span class="font-700">₹${(t.total||0).toFixed(0)}</span>
       </div>
-      
+
       <div class="items-container space-y-1.5 my-2 border-t border-b border-gray-800 py-1">${itemsHtml}</div>
-      
+
       <div class="mt-3 pt-2 border-t border-border">
-        <div class="text-xs text-gray-400 font-500">${t.status==='to_cook'?'🔴 Awaiting → Tap to start preparing':t.status==='preparing'?'🟠 In preparation → Tap to mark ready':'✅ Ready to serve'}</div>
+        <div class="text-xs text-gray-400 font-500">${
+          t.status==='to_cook'?'🔴 Awaiting → Tap to start preparing':
+          t.status==='preparing'?'🟠 In preparation → Tap to mark ready':
+          '✅ Ready to serve'
+        }</div>
       </div>
     </div>`;
 }
@@ -155,7 +238,11 @@ function renderTicket(t) {
 async function advanceTicket(id) {
   const r = await api('/api/kitchen/tickets/'+id+'/advance','POST');
   const t = tickets.find(t=>t.id===id);
-  if (t&&r.status) { t.status=r.status; render(); }
+  if (t && r.status) {
+    t.status = r.status;
+    if (r.started_at) t.started_at = r.started_at;
+    render();
+  }
 }
 
 async function markItem(ticketId, itemId) {
@@ -165,8 +252,13 @@ async function markItem(ticketId, itemId) {
   if (item) { item.status = item.status==='completed'?'to_cook':'completed'; render(); }
 }
 
-// Clock
-setInterval(()=>{ document.getElementById('clock').textContent = new Date().toLocaleTimeString(); },1000);
+// Clock & reload
+setInterval(()=>{
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString();
+  // Re-render every second to update overdue status and timers
+  render();
+}, 1000);
+
 loadTickets();
 setInterval(loadTickets, 30000);
 </script>

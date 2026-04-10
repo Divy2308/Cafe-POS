@@ -606,10 +606,11 @@ body::after {
             <div class="field">
               <label>Account role</label>
               <select id="signup-role">
-                <option value="cashier">Staff / POS Operator</option>
-                <option value="customer">Customer</option>
+                <option value="cashier" selected>Staff / POS Operator</option>
+                <option value="customer">User / Customer</option>
                 <option value="restaurant">Restaurant Admin</option>
               </select>
+              <small style="color: var(--muted); font-size: 11px; margin-top: 6px; display: block;">Select "Staff" for POS terminal access or "User / Customer" for the customer view.</small>
             </div>
             <button class="btn-primary" id="signup-btn" onclick="doSignup()" style="margin-top:4px">
               Create Account →

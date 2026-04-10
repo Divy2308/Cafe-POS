@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+{% block title %}Table {{ table_number }} — Order Now | POS Cafe{% endblock %}
+{% block extra_head %}
+<style>
+  body { background:#050505; }
+  .menu-product { background:#111; border:2px solid #1a1a1a; border-radius:14px; padding:14px 12px; cursor:pointer; transition:all .2s; text-align:center; }
+  .menu-product:hover { border-color:#f97316; background:rgba(249,115,22,0.06); transform:translateY(-2px); }
+  .menu-product:active { transform:scale(.96); }
+  .cat-pill { cursor:pointer; transition:all .2s; }
+  .cat-pill.active { background:#f97316; color:white; border-color:#f97316; }
+  .cart-row { display:flex; align-items:center; gap:8px; padding:10px 0; border-bottom:1px solid #1a1a1a; }
+  .qty-btn { width:28px; height:28px; border-radius:8px; background:#222; border:none; color:#ccc; cursor:pointer; font-size:16px; flex-shrink:0; transition:background .15s; }
+  .qty-btn:hover { background:#333; }
+  .item-note-input { width:100%; margin-top:5px; padding:4px 8px; font-size:11px; background:#1a1a1a; border:1px solid #2a2a2a; border-radius:6px; color:#ccc; }
+  .item-note-input::placeholder { color:#555; }
+  .status-card { border-radius:16px; padding:24px; text-align:center; margin-top:20px; }
+  .status-to_cook { background:rgba(239,68,68,0.08); border:2px solid rgba(239,68,68,0.3); }
+  .status-preparing { background:rgba(249,115,22,0.1); border:2px solid rgba(249,115,22,0.4); animation:pulse-prep 2s infinite; }
+  .status-completed { background:rgba(34,197,94,0.1); border:2px solid rgba(34,197,94,0.4); }
+  @keyframes pulse-prep { 0%,100%{opacity:1} 50%{opacity:.85} }
+  .progress-bar { width:100%; height:10px; background:rgba(255,255,255,0.08); border-radius:5px; overflow:hidden; margin:16px 0; }
+  .progress-fill.to_cook  { width:25%; background:linear-gradient(90deg,#ef4444,#f97316); }
+  .progress-fill.preparing { width:65%; background:linear-gradient(90deg,#f97316,#facc15); animation:slide-prep 2s ease-in-out infinite; }
+  .progress-fill.completed { width:100%; background:linear-gradient(90deg,#22c55e,#86efac); }
+  @keyframes slide-prep { 0%,100%{opacity:1} 50%{opacity:.7} }
+  .progress-fill { height:100%; border-radius:5px; transition:width .5s; }
+  .sticky-cart { position:sticky; top:20px; }
+  .login-prompt { background:rgba(249,115,22,0.08); border:1px solid rgba(249,115,22,0.25); border-radius:14px; padding:20px; text-align:center; }
+  @media (max-width:640px) {
+    .split-layout { display:block !important; }
+    .sticky-cart { position:static; }
+    #order-status-section { margin-top:20px; }
+  }
+</style>
+{% endblock %}
+{% block body %}
+<div style="max-width:900px; margin:0 auto; padding:20px;">
+  <!-- Header -->
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+    <div>
+      <div style="font-size:13px; color:#f97316; font-weight:600; margin-bottom:4px;">🍽️ POS Cafe</div>
+      <h1 style="font-size:22px; font-weight:800; margin:0;">Table {{ table_number }}</h1>
+      <div style="font-size:13px; color:#666; margin-top:2px;">Order directly from your table</div>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      {% if is_logged_in %}
+      <span style="font-size:12px; color:#22c55e; background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.3); border-radius:8px; padding:6px 12px;">✓ {{ user_name }}</span>
+      <button onclick="logout()" style="background:transparent; border:1px solid #333; border-radius:8px; padding:6px 12px; color:#888; cursor:pointer; font-size:12px;">Logout</button>
+      {% else %}
+      <a href="/auth?next=/table/{{ table_id }}/order" style="background:#f97316; color:#fff; border:none; border-radius:8px; padding:8px 16px; font-size:13px; font-weight:600; text-decoration:none;">Login to Order</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Placed Order Status (shown after order) -->
+  <div id="order-status-section" style="display:none;">
+    <div id="order-status-card" class="status-card status-to_cook">
+      <div id="order-status-icon" style="font-size:48px; margin-bottom:12px;">⏳</div>
+      <div id="order-status-num" style="font-size:28px; font-weight:800; color:#f97316; font-family:monospace;"></div>
+      <div id="order-status-label" style="font-size:15px; color:#ccc; margin-top:4px;"></div>
+      <div class="progress-bar"><div id="order-progress-fill" class="progress-fill to_cook"></div></div>
+      <div id="order-status-items" style="text-align:left; margin-top:12px; font-size:13px; color:#888;"></div>
+      <div id="order-status-total" style="margin-top:12px; font-size:18px; font-weight:700; color:#22c55e;"></div>
+      <button onclick="resetToMenu()" style="margin-top:16px; background:transparent; border:1px solid #333; border-radius:8px; padding:8px 20px; color:#888; cursor:pointer; font-size:12px;">Order More / Back to Menu</button>
+    </div>
+  </div>
+
+  <!-- Menu + Cart -->
+  <div id="menu-section">
+    {% if not is_logged_in %}
+    <div class="login-prompt">
+      <div style="font-size:36px; margin-bottom:12px;">🔑</div>
+      <div style="font-size:16px; font-weight:700; margin-bottom:8px;">Login Required</div>
+      <div style="font-size:13px; color:#888; margin-bottom:16px;">Please log in to browse the menu and place your order at Table {{ table_number }}.</div>
+      <a href="/auth?next=/table/{{ table_id }}/order" style="display:inline-block; background:#f97316; color:#fff; border-radius:10px; padding:12px 28px; font-size:14px; font-weight:700; text-decoration:none;">Login / Sign Up</a>
+    </div>
+    {% else %}
+    <div class="split-layout" style="display:grid; grid-template-columns:1fr 300px; gap:20px;">
+      <!-- Menu panel -->
+      <div>
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px; flex-wrap:wrap;">
+          <input type="text" id="menu-search" placeholder="Search dishes…" oninput="filterMenuSearch()" style="flex:1; max-width:280px; background:#111; border:1px solid #333; border-radius:8px; color:#fff; padding:8px 12px; font-size:13px;" />
+        </div>
+        <div id="cat-pills" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;"></div>
+        <div id="menu-grid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:10px; align-content:start;"></div>
+      </div>
+
+      <!-- Cart panel -->
+      <div class="sticky-cart">
+        <div style="background:#111; border:1px solid #1a1a1a; border-radius:16px; padding:16px;">
+          <div style="font-size:15px; font-weight:700; margin-bottom:12px;">🛒 Your Order</div>
+          <div id="cart-items-el">
+            <div style="color:#555; font-size:13px; text-align:center; padding:20px 0;">Add items from the menu</div>
+          </div>
+          <div id="cart-footer" style="display:none; border-top:1px solid #1a1a1a; padding-top:12px; margin-top:10px;">
+            <div style="display:flex; justify-content:space-between; font-weight:700; font-size:15px; margin-bottom:14px;">
+              <span>Total</span>
+              <span style="color:#f97316;" id="cart-total-el">₹0</span>
+            </div>
+            <button onclick="placeOrder()" id="place-order-btn" class="btn-orange" style="width:100%; background:#f97316; color:#fff; border:none; border-radius:10px; padding:14px; font-size:14px; font-weight:700; cursor:pointer; transition:all .2s;">
+              🚀 Send to Kitchen
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const TABLE_ID = {{ table_id }};
+let menuData = [], cart = [];
+const socket = io();
+let activeOrderId = null;
+
+{% if is_logged_in %}
+// ─── Menu ─────────────────────────────────────────────────
+async function loadMenu() {
+  const res = await fetch('/api/products');
+  menuData = await res.json();
+  renderCatPills(menuData);
+  renderMenuGrid(menuData);
+}
+
+const emojiMap = {Food:'🍽️',Beverages:'☕',Desserts:'🍰',Snacks:'🥨'};
+
+function renderCatPills(cats) {
+  const el = document.getElementById('cat-pills');
+  el.innerHTML = `<button onclick="renderMenuGrid(menuData)" class="cat-pill px-3 py-1.5 rounded-full text-xs border border-border active">All</button>` +
+    cats.map(c => `<button onclick="filterCat(${c.id})" class="cat-pill px-3 py-1.5 rounded-full text-xs border border-border">${c.name}</button>`).join('');
+}
+
+function filterCat(catId) {
+  document.querySelectorAll('.cat-pill').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  renderMenuGrid(menuData.filter(c => c.id === catId));
+}
+
+function filterMenuSearch() {
+  const q = document.getElementById('menu-search').value.toLowerCase();
+  const filtered = menuData.map(c => ({...c, products: c.products.filter(p => p.name.toLowerCase().includes(q))})).filter(c => c.products.length);
+  renderMenuGrid(filtered);
+}
+
+function renderMenuGrid(cats) {
+  const grid = document.getElementById('menu-grid');
+  grid.innerHTML = cats.flatMap(c => c.products.map(p => `
+    <div class="menu-product" onclick="addToCart(${p.id},'${p.name.replace(/'/g,"\\'")}',${p.price})">
+      <div style="font-size:26px; margin-bottom:6px;">${emojiMap[c.name]||'🛒'}</div>
+      <div style="font-size:12px; font-weight:600; line-height:1.3;">${p.name}</div>
+      <div style="color:#f97316; font-weight:700; margin-top:4px;">₹${p.price}</div>
+    </div>`)).join('');
+}
+
+function addToCart(id, name, price) {
+  const ex = cart.find(i => i.product_id === id);
+  if (ex) { ex.qty++; } else { cart.push({product_id:id, name, price, qty:1, notes:''}); }
+  renderCart();
+}
+
+function updateQty(idx, delta) {
+  cart[idx].qty += delta;
+  if (cart[idx].qty <= 0) cart.splice(idx, 1);
+  renderCart();
+}
+
+function updateNote(idx, val) { if (cart[idx]) cart[idx].notes = val; }
+
+function escapeAttr(s) { return (s||'').replace(/"/g,'&quot;'); }
+
+function renderCart() {
+  const el = document.getElementById('cart-items-el');
+  const footer = document.getElementById('cart-footer');
+  if (!cart.length) {
+    el.innerHTML = '<div style="color:#555; font-size:13px; text-align:center; padding:20px 0;">Add items from the menu</div>';
+    footer.style.display = 'none'; return;
+  }
+  el.innerHTML = cart.map((i, idx) => `
+    <div class="cart-row" style="flex-wrap:wrap;">
+      <div style="flex:1; min-width:0;">
+        <div style="font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${i.name}</div>
+        <div style="font-size:11px; color:#888;">₹${i.price} each</div>
+        <input type="text" class="item-note-input" placeholder="📝 Special request (e.g. no onion)" value="${escapeAttr(i.notes)}" oninput="updateNote(${idx}, this.value)" />
+      </div>
+      <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+        <button class="qty-btn" onclick="updateQty(${idx},-1)">−</button>
+        <span style="font-size:13px; font-weight:700; min-width:16px; text-align:center;">${i.qty}</span>
+        <button class="qty-btn" onclick="updateQty(${idx},1)">+</button>
+        <span style="color:#f97316; font-weight:700; min-width:40px; text-align:right;">₹${(i.price*i.qty).toFixed(0)}</span>
+      </div>
+    </div>`).join('');
+  const total = cart.reduce((s,i) => s + i.price*i.qty, 0);
+  document.getElementById('cart-total-el').textContent = '₹'+total.toFixed(0);
+  footer.style.display = 'block';
+}
+
+async function placeOrder() {
+  if (!cart.length) { toast('Add items first!', 'error'); return; }
+  const btn = document.getElementById('place-order-btn');
+  btn.disabled = true; btn.textContent = '⏳ Sending to kitchen…';
+  const res = await fetch('/api/self-order', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      table_id: TABLE_ID,
+      items: cart.map(i => ({product_id:i.product_id,name:i.name,price:i.price,qty:i.qty,notes:i.notes||''}))
+    })
+  });
+  const data = await res.json();
+  btn.disabled = false; btn.textContent = '🚀 Send to Kitchen';
+  if (data.ok) {
+    activeOrderId = data.order_id;
+    cart = [];
+    renderCart();
+    showOrderStatus(data.order_id, data.order_number, 'to_cook');
+    // Request notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().then(p => {
+        if (p === 'granted') toast('🔔 You\'ll be notified when ready!', 'success');
+      });
+    }
+  } else {
+    if (data.error === 'Please log in to place your order') {
+      window.location.href = '/auth?next=/table/'+TABLE_ID+'/order';
+    } else {
+      toast(data.error || 'Error placing order', 'error');
+    }
+  }
+}
+
+function showOrderStatus(orderId, orderNum, status) {
+  document.getElementById('menu-section').style.marginTop = '0';
+  document.getElementById('order-status-section').style.display = 'block';
+  updateOrderStatusUI(orderId, orderNum, status);
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function updateOrderStatusUI(orderId, orderNum, status) {
+  const card = document.getElementById('order-status-card');
+  const icon = {to_cook:'⏳', preparing:'👨‍🍳', completed:'✅'};
+  const label = {to_cook:'Your order is in the queue', preparing:'Kitchen is preparing your food!', completed:'Your order is ready! 🎉'};
+  card.className = 'status-card status-' + status;
+  document.getElementById('order-status-icon').textContent = icon[status] || '⏳';
+  document.getElementById('order-status-num').textContent = '#' + orderNum;
+  document.getElementById('order-status-label').textContent = label[status] || status;
+  document.getElementById('order-progress-fill').className = 'progress-fill ' + status;
+  // Trigger browser notification on completed
+  if (status === 'completed') {
+    try { new Notification('POS Cafe 🍽️', { body: `Your order #${orderNum} at Table {{ table_number }} is ready!` }); } catch(e) {}
+    toast('🎉 Your order is ready! Please pick it up.', 'success');
+  }
+}
+
+function resetToMenu() {
+  document.getElementById('order-status-section').style.display = 'none';
+  activeOrderId = null;
+}
+
+// ─── Socket: listen for status updates ────────────────────
+socket.on('order_update', d => {
+  if (activeOrderId) {
+    const numEl = document.getElementById('order-status-num');
+    if (numEl && numEl.textContent.includes(d.order_number?.split('-')[1]||'')) {
+      updateOrderStatusUI(activeOrderId, d.order_number, d.status);
+    }
+  }
+});
+
+socket.on('ticket_update', d => {
+  // Update status if this is our order's ticket
+  if (activeOrderId) {
+    const statusEl = document.getElementById('order-status-label');
+    if (statusEl) updateOrderStatusUI(activeOrderId, '', d.status);
+  }
+});
+
+loadMenu();
+{% endif %}
+
+async function logout() {
+  await fetch('/api/logout', { method: 'POST' });
+  window.location.href = '/auth';
+}
+</script>
+{% endblock %}

@@ -151,6 +151,7 @@ class Order(db.Model):
     table_id = db.Column(db.Integer, db.ForeignKey('table.id'), nullable=True)
     session_id = db.Column(db.Integer, db.ForeignKey('session.id'))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    customer_name = db.Column(db.String(100), default='')  # For takeaway orders
     status = db.Column(db.String(30), default='draft')  # draft, sent, paid
     payment_method = db.Column(db.String(30), default='')
     total = db.Column(db.Float, default=0)
@@ -171,6 +172,7 @@ class OrderItem(db.Model):
     product_name = db.Column(db.String(100))
     qty = db.Column(db.Integer, default=1)
     price = db.Column(db.Float, default=0)
+    notes = db.Column(db.Text, default='')  # Item modifier notes (e.g. 'no onion')
     kitchen_status = db.Column(db.String(20), default='pending')  # pending, to_cook, preparing, completed
     started_at = db.Column(db.DateTime, nullable=True)  # When item preparation starts
     completed_at = db.Column(db.DateTime, nullable=True)  # When item is ready
@@ -190,6 +192,36 @@ class Review(db.Model):
     order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
     rating = db.Column(db.Integer, default=5)  # 1-5 stars
     comment = db.Column(db.Text, default='')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class Reservation(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    table_id = db.Column(db.Integer, db.ForeignKey('table.id'), nullable=True)
+    reserved_at = db.Column(db.DateTime, nullable=False)  # date+time of booking
+    party_size = db.Column(db.Integer, default=2)
+    status = db.Column(db.String(20), default='pending')  # pending, confirmed, seated, cancelled
+    notes = db.Column(db.Text, default='')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    items = db.relationship('ReservationItem', backref='reservation', cascade='all, delete-orphan', lazy=True)
+    customer = db.relationship('User', backref='reservations')
+    table = db.relationship('Table', backref='reservations')
+
+class ReservationItem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    reservation_id = db.Column(db.Integer, db.ForeignKey('reservation.id'))
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'))
+    product_name = db.Column(db.String(100))
+    qty = db.Column(db.Integer, default=1)
+    price = db.Column(db.Float)
+    notes = db.Column(db.Text, default='')
+    product = db.relationship('Product')
+
+class PushSubscription(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    table_id = db.Column(db.Integer, nullable=True)  # For guest self-orders via QR
+    subscription_json = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 # ─── Auth Helpers ──────────────────────────────────────────
@@ -807,9 +839,11 @@ def create_order():
     if not s:
         return jsonify({'error':'No open session'}), 400
     total = sum(item['price'] * item['qty'] for item in d['items'])
-    table_id = d.get('table_id')
+    table_id = d.get('table_id')  # None for takeaway
+    is_takeaway = d.get('takeaway', False) or not table_id
+    customer_name = d.get('customer_name', '')
     o = None
-    if table_id:
+    if table_id and not is_takeaway:
         o = (
             Order.query
             .filter_by(session_id=s.id, table_id=table_id)
@@ -826,6 +860,7 @@ def create_order():
                 product_name=item['name'],
                 qty=item['qty'],
                 price=item['price'],
+                notes=item.get('notes', ''),
             )
             db.session.add(oi)
         o.total = (o.total or 0) + total
@@ -839,11 +874,13 @@ def create_order():
         order_num = f"ORD-{count:04d}"
         o = Order(
             order_number=order_num,
-            table_id=table_id,
+            table_id=table_id if not is_takeaway else None,
             session_id=s.id,
             user_id=session['user_id'],
             total=total,
         )
+        if customer_name:
+            o.customer_name = customer_name
         db.session.add(o)
         db.session.flush()
         for item in d['items']:
@@ -853,9 +890,10 @@ def create_order():
                 product_name=item['name'],
                 qty=item['qty'],
                 price=item['price'],
+                notes=item.get('notes', ''),
             )
             db.session.add(oi)
-        if table_id:
+        if table_id and not is_takeaway:
             t = Table.query.get(table_id)
             if t:
                 t.status = 'occupied'
@@ -869,6 +907,8 @@ def serialize_bill(order):
         'order_number': order.order_number,
         'table_id': order.table_id,
         'table': order.table.number if order.table else 'Takeaway',
+        'customer_name': order.customer_name if hasattr(order, 'customer_name') else None,
+        'is_takeaway': order.table_id is None,
         'status': order.status,
         'total': payable_total,
         'tip': order.tip,
@@ -880,6 +920,7 @@ def serialize_bill(order):
             'name': i.product_name,
             'qty': i.qty,
             'price': i.price,
+            'notes': i.notes or '',
         } for i in order.items],
     }
 
@@ -1011,36 +1052,62 @@ def get_table_order(tid):
     }})
 
 # ─── API: Kitchen ──────────────────────────────────────────
+def get_avg_prep_minutes():
+    """Rolling average prep time from last 10 completed tickets."""
+    completed = (
+        KitchenTicket.query
+        .filter(KitchenTicket.status == 'completed',
+                KitchenTicket.started_at.isnot(None),
+                KitchenTicket.completed_at.isnot(None))
+        .order_by(KitchenTicket.completed_at.desc())
+        .limit(10)
+        .all()
+    )
+    if not completed:
+        return 15  # default estimate
+    total = sum((kt.completed_at - kt.started_at).total_seconds() for kt in completed)
+    return max(1, int(total / len(completed) / 60))
+
 @app.route('/api/kitchen/tickets', methods=['GET'])
 def get_tickets():
-    tickets = KitchenTicket.query.filter(KitchenTicket.status != 'completed').order_by(KitchenTicket.sent_at).all()
+    tickets = KitchenTicket.query.filter(KitchenTicket.status != 'completed').order_by(KitchenTicket.sent_at.asc()).all()
     result = []
+    avg_prep = get_avg_prep_minutes()
+    now = datetime.utcnow()
     for kt in tickets:
         o = kt.order
         total_price = sum(i.qty * i.price for i in o.items)
-        
-        # Calculate time elapsed in each stage
-        now = datetime.utcnow()
         time_in_preparation = 0
         if kt.started_at:
             time_in_preparation = int((now - kt.started_at).total_seconds() / 60)
-        
+        # Estimated time remaining
+        if kt.status == 'to_cook':
+            eta_minutes = avg_prep
+        elif kt.status == 'preparing':
+            eta_minutes = max(0, avg_prep - time_in_preparation)
+        else:
+            eta_minutes = 0
         result.append({
             'id': kt.id,
             'order_id': o.id,
             'order_number': o.order_number,
             'table': o.table.number if o.table else 'Takeaway',
+            'is_takeaway': o.table_id is None,
+            'customer_name': getattr(o, 'customer_name', None) or '',
             'status': kt.status,
             'sent_at': kt.sent_at.isoformat(),
             'started_at': kt.started_at.isoformat() if kt.started_at else None,
             'total': total_price,
             'time_in_prep': time_in_preparation,
+            'eta_minutes': eta_minutes,
+            'avg_prep_minutes': avg_prep,
             'items': [{
-                'id':i.id,
-                'name':i.product_name,
-                'qty':i.qty,
-                'price':i.price,
-                'status':i.kitchen_status,
+                'id': i.id,
+                'name': i.product_name,
+                'qty': i.qty,
+                'price': i.price,
+                'notes': i.notes or '',
+                'status': i.kitchen_status,
                 'started_at': i.started_at.isoformat() if i.started_at else None,
                 'completed_at': i.completed_at.isoformat() if i.completed_at else None
             } for i in o.items]
@@ -1103,6 +1170,391 @@ def mark_item_complete(item_id):
         
         socketio.emit('item_update', {'item_id': item_id, 'status': 'completed'})
     return jsonify({'ok': True, 'item_id': item_id})
+
+# ─── API: Reservations ────────────────────────────────────
+@app.route('/api/reservations', methods=['GET'])
+@login_required
+def get_my_reservations():
+    uid = session['user_id']
+    role = normalize_role(session.get('user_role'))
+    if role == 'customer':
+        reservations = Reservation.query.filter_by(customer_id=uid).order_by(Reservation.reserved_at.asc()).all()
+    else:
+        # Staff/admin see all upcoming reservations
+        reservations = Reservation.query.filter(
+            Reservation.reserved_at >= datetime.utcnow() - timedelta(hours=2)
+        ).order_by(Reservation.reserved_at.asc()).all()
+    return jsonify([_serialize_reservation(r) for r in reservations])
+
+def _serialize_reservation(r):
+    return {
+        'id': r.id,
+        'customer_id': r.customer_id,
+        'customer_name': r.customer.name if r.customer else 'Guest',
+        'table_id': r.table_id,
+        'table': r.table.number if r.table else None,
+        'reserved_at': r.reserved_at.isoformat(),
+        'party_size': r.party_size,
+        'status': r.status,
+        'notes': r.notes,
+        'created_at': r.created_at.isoformat(),
+        'items': [{
+            'product_id': i.product_id,
+            'product_name': i.product_name,
+            'qty': i.qty,
+            'price': i.price,
+            'notes': i.notes or '',
+        } for i in r.items]
+    }
+
+@app.route('/api/reservations', methods=['POST'])
+@login_required
+def create_reservation():
+    d = request.json or {}
+    try:
+        reserved_at = datetime.fromisoformat(d.get('reserved_at', ''))
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid date/time'}), 400
+    if reserved_at < datetime.utcnow():
+        return jsonify({'error': 'Cannot reserve in the past'}), 400
+    table_id = d.get('table_id')
+    if table_id:
+        # Check for conflicting reservation (±90 min window)
+        window_start = reserved_at - timedelta(minutes=90)
+        window_end = reserved_at + timedelta(minutes=90)
+        conflict = Reservation.query.filter(
+            Reservation.table_id == table_id,
+            Reservation.status.in_(['pending', 'confirmed']),
+            Reservation.reserved_at >= window_start,
+            Reservation.reserved_at <= window_end,
+        ).first()
+        if conflict:
+            return jsonify({'error': 'Table already reserved in this time window'}), 409
+    r = Reservation(
+        customer_id=session['user_id'],
+        table_id=table_id,
+        reserved_at=reserved_at,
+        party_size=int(d.get('party_size', 2)),
+        notes=d.get('notes', ''),
+    )
+    db.session.add(r)
+    db.session.flush()
+    for item in d.get('items', []):
+        ri = ReservationItem(
+            reservation_id=r.id,
+            product_id=item.get('product_id'),
+            product_name=item.get('name', ''),
+            qty=int(item.get('qty', 1)),
+            price=float(item.get('price', 0)),
+            notes=item.get('notes', ''),
+        )
+        db.session.add(ri)
+    db.session.commit()
+    return jsonify({'ok': True, 'id': r.id, 'reservation': _serialize_reservation(r)})
+
+@app.route('/api/reservations/<int:rid>', methods=['PUT'])
+@login_required
+def update_reservation(rid):
+    r = Reservation.query.get_or_404(rid)
+    uid = session['user_id']
+    role = normalize_role(session.get('user_role'))
+    if role == 'customer' and r.customer_id != uid:
+        return jsonify({'error': 'forbidden'}), 403
+    d = request.json or {}
+    if 'reserved_at' in d:
+        try:
+            r.reserved_at = datetime.fromisoformat(d['reserved_at'])
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid date/time'}), 400
+    if 'table_id' in d:
+        r.table_id = d['table_id']
+    if 'party_size' in d:
+        r.party_size = int(d['party_size'])
+    if 'notes' in d:
+        r.notes = d['notes']
+    if 'items' in d:
+        ReservationItem.query.filter_by(reservation_id=r.id).delete()
+        for item in d['items']:
+            ri = ReservationItem(
+                reservation_id=r.id,
+                product_id=item.get('product_id'),
+                product_name=item.get('name', ''),
+                qty=int(item.get('qty', 1)),
+                price=float(item.get('price', 0)),
+                notes=item.get('notes', ''),
+            )
+            db.session.add(ri)
+    db.session.commit()
+    return jsonify({'ok': True, 'reservation': _serialize_reservation(r)})
+
+@app.route('/api/reservations/<int:rid>', methods=['DELETE'])
+@login_required
+def cancel_reservation(rid):
+    r = Reservation.query.get_or_404(rid)
+    uid = session['user_id']
+    role = normalize_role(session.get('user_role'))
+    if role == 'customer' and r.customer_id != uid:
+        return jsonify({'error': 'forbidden'}), 403
+    r.status = 'cancelled'
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/api/reservations/<int:rid>/seat', methods=['POST'])
+@staff_required
+def seat_reservation(rid):
+    """Staff action: seat the party and auto-convert pre-order to kitchen ticket."""
+    r = Reservation.query.get_or_404(rid)
+    r.status = 'seated'
+    # Mark table occupied
+    if r.table:
+        r.table.status = 'occupied'
+    # Convert pre-order items to a live Order
+    if r.items:
+        s = Session.query.filter_by(user_id=session['user_id'], status='open').first()
+        if not s:
+            s = Session(user_id=session['user_id'])
+            db.session.add(s)
+            db.session.flush()
+        count = Order.query.count() + 1
+        order_num = f'ORD-{count:04d}'
+        total = sum(i.qty * i.price for i in r.items)
+        o = Order(
+            order_number=order_num,
+            table_id=r.table_id,
+            session_id=s.id,
+            user_id=session['user_id'],
+            total=total,
+            status='sent',
+            sent_to_kitchen_at=datetime.utcnow(),
+        )
+        db.session.add(o)
+        db.session.flush()
+        for ri in r.items:
+            oi = OrderItem(
+                order_id=o.id,
+                product_id=ri.product_id,
+                product_name=ri.product_name,
+                qty=ri.qty,
+                price=ri.price,
+                notes=ri.notes or '',
+                kitchen_status='to_cook',
+            )
+            db.session.add(oi)
+        kt = KitchenTicket(order_id=o.id)
+        db.session.add(kt)
+        db.session.commit()
+        ticket_data = {
+            'id': kt.id,
+            'order_id': o.id,
+            'order_number': o.order_number,
+            'table': r.table.number if r.table else 'Takeaway',
+            'status': 'to_cook',
+            'total': total,
+            'sent_at': kt.sent_at.isoformat(),
+            'items': [{'id': i.id, 'name': i.product_name, 'qty': i.qty, 'price': i.price, 'notes': i.notes or '', 'status': i.kitchen_status} for i in o.items]
+        }
+        socketio.emit('new_ticket', ticket_data)
+    else:
+        db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/api/reservations/<int:rid>/confirm', methods=['POST'])
+@staff_required
+def confirm_reservation(rid):
+    r = Reservation.query.get_or_404(rid)
+    r.status = 'confirmed'
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/api/tables/availability', methods=['GET'])
+def table_availability():
+    """Return tables available for a given ISO datetime slot."""
+    dt_str = request.args.get('datetime', '')
+    try:
+        dt = datetime.fromisoformat(dt_str)
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid datetime'}), 400
+    window_start = dt - timedelta(minutes=90)
+    window_end = dt + timedelta(minutes=90)
+    busy_table_ids = set(
+        r.table_id for r in Reservation.query.filter(
+            Reservation.status.in_(['pending', 'confirmed']),
+            Reservation.reserved_at >= window_start,
+            Reservation.reserved_at <= window_end,
+            Reservation.table_id.isnot(None),
+        ).all()
+    )
+    floors = Floor.query.all()
+    result = []
+    for f in floors:
+        tables = []
+        for t in f.tables:
+            if t.active:
+                tables.append({
+                    'id': t.id,
+                    'number': t.number,
+                    'seats': t.seats,
+                    'status': t.status,
+                    'available_for_reservation': t.id not in busy_table_ids,
+                })
+        result.append({'id': f.id, 'name': f.name, 'tables': tables})
+    return jsonify(result)
+
+# ─── API: Self-Order (Customer QR) ────────────────────────
+@app.route('/table/<int:table_id>/order')
+def self_order_page(table_id):
+    t = Table.query.get_or_404(table_id)
+    return render_template('self_order.html',
+        table_id=table_id,
+        table_number=t.number,
+        user_name=session.get('user_name'),
+        user_role=session.get('user_role'),
+        is_logged_in='user_id' in session,
+    )
+
+@app.route('/api/self-order', methods=['POST'])
+def create_self_order():
+    """Customer QR self-order: creates an order and sends directly to kitchen.
+    Requires login (customer or any role)."""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Please log in to place your order'}), 401
+    d = request.json or {}
+    table_id = d.get('table_id')
+    items = d.get('items', [])
+    if not items:
+        return jsonify({'error': 'No items in order'}), 400
+    if not table_id:
+        return jsonify({'error': 'Table ID required'}), 400
+    t = Table.query.get_or_404(table_id)
+    total = sum(item['price'] * item['qty'] for item in items)
+    # Use or create a session for this user
+    s = Session.query.filter_by(user_id=session['user_id'], status='open').first()
+    if not s:
+        # Find or create a staff/admin session to attach to
+        from sqlalchemy import or_
+        staff = User.query.filter(
+            User.role.in_(['restaurant', 'cashier', 'manager'])
+        ).first()
+        if staff:
+            s = Session.query.filter_by(user_id=staff.id, status='open').first()
+        if not s:
+            s = Session(user_id=session['user_id'])
+            db.session.add(s)
+            db.session.flush()
+    count = Order.query.count() + 1
+    order_num = f'ORD-{count:04d}'
+    o = Order(
+        order_number=order_num,
+        table_id=table_id,
+        session_id=s.id,
+        user_id=session['user_id'],
+        total=total,
+        status='sent',
+        sent_to_kitchen_at=datetime.utcnow(),
+    )
+    db.session.add(o)
+    db.session.flush()
+    for item in items:
+        oi = OrderItem(
+            order_id=o.id,
+            product_id=item.get('product_id'),
+            product_name=item['name'],
+            qty=item['qty'],
+            price=item['price'],
+            notes=item.get('notes', ''),
+            kitchen_status='to_cook',
+        )
+        db.session.add(oi)
+    t.status = 'occupied'
+    kt = KitchenTicket(order_id=o.id)
+    db.session.add(kt)
+    db.session.commit()
+    ticket_data = {
+        'id': kt.id,
+        'order_id': o.id,
+        'order_number': o.order_number,
+        'table': t.number,
+        'is_takeaway': False,
+        'status': 'to_cook',
+        'total': total,
+        'sent_at': kt.sent_at.isoformat(),
+        'items': [{
+            'id': i.id, 'name': i.product_name, 'qty': i.qty,
+            'price': i.price, 'notes': i.notes or '', 'status': i.kitchen_status
+        } for i in o.items]
+    }
+    socketio.emit('new_ticket', ticket_data)
+    socketio.emit('order_update', {'order_number': o.order_number, 'status': 'to_cook'})
+    return jsonify({'ok': True, 'order_id': o.id, 'order_number': o.order_number})
+
+@app.route('/api/self-order/<int:oid>/status', methods=['GET'])
+def self_order_status(oid):
+    o = Order.query.get_or_404(oid)
+    kt = KitchenTicket.query.filter_by(order_id=oid).order_by(KitchenTicket.sent_at.desc()).first()
+    return jsonify({
+        'order_id': o.id,
+        'order_number': o.order_number,
+        'status': kt.status if kt else o.status,
+        'table': o.table.number if o.table else 'Takeaway',
+        'items': [{'name': i.product_name, 'qty': i.qty, 'notes': i.notes or ''} for i in o.items],
+        'total': o.total,
+    })
+
+@app.route('/api/qr/table/<int:table_id>')
+def table_qr_code(table_id):
+    """Generate a QR code for the table's self-order URL."""
+    t = Table.query.get_or_404(table_id)
+    url = request.host_url.rstrip('/') + f'/table/{table_id}/order'
+    qr = qrcode.QRCode(box_size=8, border=2)
+    qr.add_data(url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color='black', back_color='white')
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    b64 = base64.b64encode(buf.getvalue()).decode()
+    return jsonify({'qr': f'data:image/png;base64,{b64}', 'url': url, 'table': t.number})
+
+# ─── API: Push Notifications ──────────────────────────────
+@app.route('/api/push/subscribe', methods=['POST'])
+@login_required
+def push_subscribe():
+    d = request.json or {}
+    sub = d.get('subscription')
+    if not sub:
+        return jsonify({'error': 'No subscription data'}), 400
+    sub_json = json.dumps(sub)
+    # Upsert: replace existing subscription for this user
+    existing = PushSubscription.query.filter_by(user_id=session['user_id']).first()
+    if existing:
+        existing.subscription_json = sub_json
+    else:
+        ps = PushSubscription(user_id=session['user_id'], subscription_json=sub_json)
+        db.session.add(ps)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/api/push/subscribe/table', methods=['POST'])
+def push_subscribe_table():
+    """Guest push subscription for a specific table (QR self-order)."""
+    d = request.json or {}
+    sub = d.get('subscription')
+    table_id = d.get('table_id')
+    if not sub or not table_id:
+        return jsonify({'error': 'Missing data'}), 400
+    sub_json = json.dumps(sub)
+    existing = PushSubscription.query.filter_by(table_id=table_id, user_id=None).first()
+    if existing:
+        existing.subscription_json = sub_json
+    else:
+        ps = PushSubscription(table_id=table_id, subscription_json=sub_json)
+        db.session.add(ps)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/api/push/vapid-public-key', methods=['GET'])
+def get_vapid_public_key():
+    key = os.getenv('VAPID_PUBLIC_KEY', '')
+    return jsonify({'key': key})
 
 # ─── API: Dashboard ────────────────────────────────────────
 @app.route('/api/dashboard/stats', methods=['GET'])
@@ -1271,10 +1723,20 @@ def ensure_order_table_schema():
     # Older SQLite databases may not have the newer order columns added in code.
     # Add them in-place so existing data stays intact.
     with db.engine.connect() as conn:
+        # Order table additions
         rows = conn.exec_driver_sql('PRAGMA table_info("order")').fetchall()
         columns = {row[1] for row in rows}
         if 'tip' not in columns:
             conn.exec_driver_sql('ALTER TABLE "order" ADD COLUMN tip FLOAT DEFAULT 0')
+            conn.commit()
+        if 'customer_name' not in columns:
+            conn.exec_driver_sql('ALTER TABLE "order" ADD COLUMN customer_name VARCHAR(100) DEFAULT NULL')
+            conn.commit()
+        # OrderItem notes
+        rows2 = conn.exec_driver_sql('PRAGMA table_info("order_item")').fetchall()
+        cols2 = {row[1] for row in rows2}
+        if 'notes' not in cols2:
+            conn.exec_driver_sql('ALTER TABLE "order_item" ADD COLUMN notes TEXT DEFAULT ""')
             conn.commit()
 
 def ensure_demo_catalog():

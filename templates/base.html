@@ -57,6 +57,9 @@ tailwind.config = {
   .btn-primary:hover { transform:translateY(-1px); box-shadow:0 8px 24px rgba(249,115,22,0.4); }
   .btn-ghost { background:var(--ghost-bg); border:1px solid var(--ghost-border); transition:all .2s; }
   .btn-ghost:hover { background:rgba(255,255,255,0.1); }
+  .btn-orange { background:#f97316; color:#fff; border:none; border-radius:10px; padding:12px 20px; font-size:13px; font-weight:700; cursor:pointer; transition:all .2s; }
+  .btn-orange:hover { background:#ea580c; transform:translateY(-1px); }
+  .btn-orange:disabled { opacity:.5; cursor:not-allowed; transform:none; }
   input, select, textarea { background:var(--input-bg); border:1px solid var(--input-border); color:var(--text); border-radius:8px; padding:10px 14px; width:100%; transition:border .2s, background .2s ease, color .2s ease; outline:none; }
   input:focus, select:focus, textarea:focus { border-color:#f97316; }
   .card { background:var(--card); border:1px solid var(--border); border-radius:12px; transition:background .2s ease,border-color .2s ease,color .2s ease; }
