@@ -89,7 +89,12 @@ RAZORPAY_MERCHANT_NAME = os.getenv('RAZORPAY_MERCHANT_NAME', 'POS Cafe').strip()
 PASSWORD_RESET_CODES = {}
 
 db = SQLAlchemy(app)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+try:
+    import eventlet  # noqa: F401
+    _async_mode = 'eventlet'
+except ImportError:
+    _async_mode = None
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode=_async_mode)
 CORS(app)
 
 # ─── Models ───────────────────────────────────────────────
