@@ -6,3 +6,5 @@ qrcode[pil]
 pillow
 werkzeug
 resend
+eventlet
+gunicorn
