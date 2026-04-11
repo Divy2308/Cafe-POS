@@ -9,31 +9,23 @@
         <div class="p-6 border-b border-border">
             <div class="flex items-center space-x-3">
                 <div class="w-10 h-10 brand-gradient text-white rounded-lg flex items-center justify-center">
-                    <span class="text-gray-900 font-bold">☕</span>
+                    <span class=" font-bold">☕</span>
                 </div>
                 <div>
-                    <div class="font-bold text-gray-900">POS Cafe</div>
-                    <div class="text-xs text-gray-500">Admin Panel</div>
+                    <div class="font-bold ">POS Cafe</div>
+                    <div class="text-xs ">Admin Panel</div>
                 </div>
             </div>
         </div>
 
         <nav class="p-4 space-y-2">
-            <button onclick="switchTab('overview')" class="nav-link w-full text-left px-4 py-3 rounded-lg transition-all flex items-center space-x-3 active">
-                <span class="text-xl">📊</span>
-                <span>Dashboard</span>
-            </button>
-            <button onclick="switchTab('reviews')" class="nav-link w-full text-left px-4 py-3 rounded-lg transition-all flex items-center space-x-3">
-                <span class="text-xl">⭐</span>
-                <span>Reviews</span>
-            </button>
-            <button onclick="switchTab('users')" class="nav-link w-full text-left px-4 py-3 rounded-lg transition-all flex items-center space-x-3">
+            <button onclick="switchTab('users')" class="nav-link w-full text-left px-4 py-3 rounded-lg transition-all flex items-center space-x-3 active">
                 <span class="text-xl">👥</span>
                 <span>Staff Management</span>
             </button>
             <button onclick="switchTab('settings')" class="nav-link w-full text-left px-4 py-3 rounded-lg transition-all flex items-center space-x-3">
                 <span class="text-xl">⚙️</span>
-                <span>Settings</span>
+                <span>Cafe Settings</span>
             </button>
         </nav>
 
@@ -52,7 +44,7 @@
     <div class="flex-1 overflow-auto">
         <!-- Top Bar -->
         <div class="border-b border-border p-6 flex justify-between items-center">
-            <h1 class="text-3xl font-bold" id="pageTitle">Dashboard</h1>
+            <h1 class="text-3xl font-bold" id="pageTitle">Staff Management</h1>
             <div class="flex items-center space-x-4">
                 <button onclick="goToPOS()" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg font-semibold transition">
                     Go to POS
@@ -62,8 +54,8 @@
 
         <!-- Content Area -->
         <div class="p-6">
-            <!-- Dashboard Tab -->
-            <div id="overview-tab" class="tab-content">
+            <!-- Dashboard Tab - HIDDEN -->
+            <div id="overview-tab" class="tab-content hidden">
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
                     <div class="card">
                         <div class="text-gray-500 text-sm mb-2">Total Staff</div>
@@ -196,7 +188,7 @@
 
             <!-- Settings Tab -->
             <div id="settings-tab" class="tab-content hidden">
-                <h2 class="text-2xl font-bold mb-6">System Settings</h2>
+                <h2 class="text-2xl font-bold mb-6">Cafe Settings</h2>
 
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <!-- Cafe Settings -->
@@ -206,25 +198,25 @@
                             <div class="space-y-4">
                                 <div>
                                     <label class="block text-sm text-gray-500 mb-2">Cafe Name</label>
-                                    <input type="text" id="cafeName" placeholder="Enter cafe name" class="w-full bg-card border border-border text-gray-900 px-4 py-2 rounded-lg">
+                                    <input type="text" id="cafeName" placeholder="Enter cafe name" class="w-full bg-card border border-border  px-4 py-2 rounded-lg">
                                 </div>
                                 <div>
                                     <label class="block text-sm text-gray-500 mb-2">Phone Number</label>
-                                    <input type="tel" id="cafePhone" placeholder="+91-XXXX-XXX-XXX" class="w-full bg-card border border-border text-gray-900 px-4 py-2 rounded-lg">
+                                    <input type="tel" id="cafePhone" placeholder="+91-XXXX-XXX-XXX" class="w-full bg-card border border-border  px-4 py-2 rounded-lg">
                                 </div>
                                 <div>
                                     <label class="block text-sm text-gray-500 mb-2">Email</label>
-                                    <input type="email" id="cafeEmail" placeholder="contact@cafe.com" class="w-full bg-card border border-border text-gray-900 px-4 py-2 rounded-lg">
+                                    <input type="email" id="cafeEmail" placeholder="contact@cafe.com" class="w-full bg-card border border-border  px-4 py-2 rounded-lg">
                                 </div>
                                 <div>
                                     <label class="block text-sm text-gray-500 mb-2">Address</label>
-                                    <textarea id="cafeAddress" placeholder="Enter full address" rows="3" class="w-full bg-card border border-border text-gray-900 px-4 py-2 rounded-lg"></textarea>
+                                    <textarea id="cafeAddress" placeholder="Enter full address" rows="3" class="w-full bg-card border border-border  px-4 py-2 rounded-lg"></textarea>
                                 </div>
                                 <div>
                                     <label class="block text-sm text-gray-500 mb-2">Operating Hours</label>
                                     <div class="grid grid-cols-2 gap-4">
-                                        <input type="time" id="openTime" class="bg-card border border-border text-gray-900 px-4 py-2 rounded-lg">
-                                        <input type="time" id="closeTime" class="bg-card border border-border text-gray-900 px-4 py-2 rounded-lg">
+                                        <input type="time" id="openTime" class="bg-card border border-border  px-4 py-2 rounded-lg">
+                                        <input type="time" id="closeTime" class="bg-card border border-border  px-4 py-2 rounded-lg">
                                     </div>
                                 </div>
                             </div>
@@ -234,8 +226,8 @@
                             <h3 class="text-xl font-bold mb-4">Tax Settings</h3>
                             <div class="space-y-4">
                                 <div>
-                                    <label class="block text-sm text-gray-500 mb-2">Default Tax Rate (%)</label>
-                                    <input type="number" id="taxRate" placeholder="5" min="0" max="100" class="w-full bg-card border border-border text-gray-900 px-4 py-2 rounded-lg">
+                                    <label class="block text-sm  mb-2">Default Tax Rate (%)</label>
+                                    <input type="number" id="taxRate" placeholder="5" min="0" max="100" class="w-full bg-card border border-border  px-4 py-2 rounded-lg">
                                 </div>
                             </div>
                         </div>
@@ -248,7 +240,7 @@
                             <button onclick="saveCafeSettings()" class="w-full bg-brand-600 hover:bg-brand-700 text-white py-2 rounded-lg font-semibold transition">
                                 Save Changes
                             </button>
-                            <button onclick="resetSettings()" class="w-full bg-card hover:bg-[#2a2a2a] text-gray-900 py-2 rounded-lg font-semibold transition border border-border">
+                            <button onclick="resetSettings()" class="w-full bg-card hover:bg-[#2a2a2a]  py-2 rounded-lg font-semibold transition border border-border">
                                 Reset
                             </button>
                             <div class="border border-border rounded-lg p-4 mt-6">
@@ -272,19 +264,19 @@
         <div class="space-y-4">
             <div>
                 <label class="block text-sm text-gray-500 mb-2">Full Name</label>
-                <input type="text" id="newUserName" placeholder="John Doe" class="w-full bg-card border border-border text-gray-900 px-4 py-2 rounded-lg">
+                <input type="text" id="newUserName" placeholder="John Doe" class="w-full bg-card border border-border  px-4 py-2 rounded-lg">
             </div>
             <div>
                 <label class="block text-sm text-gray-500 mb-2">Email</label>
-                <input type="email" id="newUserEmail" placeholder="john@cafe.com" class="w-full bg-card border border-border text-gray-900 px-4 py-2 rounded-lg">
+                <input type="email" id="newUserEmail" placeholder="john@cafe.com" class="w-full bg-card border border-border  px-4 py-2 rounded-lg">
             </div>
             <div>
                 <label class="block text-sm text-gray-500 mb-2">Password</label>
-                <input type="password" id="newUserPassword" placeholder="••••••" class="w-full bg-card border border-border text-gray-900 px-4 py-2 rounded-lg">
+                <input type="password" id="newUserPassword" placeholder="••••••" class="w-full bg-card border border-border  px-4 py-2 rounded-lg">
             </div>
             <div>
                 <label class="block text-sm text-gray-500 mb-2">Role</label>
-                <select id="newUserRole" class="w-full bg-card border border-border text-gray-900 px-4 py-2 rounded-lg">
+                <select id="newUserRole" class="w-full bg-card border border-border  px-4 py-2 rounded-lg">
                     <option value="cashier">Cashier</option>
                     <option value="kitchen">Kitchen Staff</option>
                     <option value="manager">Manager</option>
@@ -292,7 +284,7 @@
             </div>
         </div>
         <div class="flex gap-3 mt-6">
-            <button onclick="closeAddUserModal()" class="flex-1 bg-card hover:bg-[#2a2a2a] text-gray-900 py-2 rounded-lg font-semibold transition border border-border">
+            <button onclick="closeAddUserModal()" class="flex-1 bg-card hover:bg-[#2a2a2a]  py-2 rounded-lg font-semibold transition border border-border">
                 Cancel
             </button>
             <button onclick="addStaffMember()" class="flex-1 bg-brand-600 hover:bg-brand-700 text-white py-2 rounded-lg font-semibold transition">
@@ -303,7 +295,7 @@
 </div>
 
 <script>
-let currentTab = 'overview';
+let currentTab = 'users';
 
 function switchTab(tab) {
     // Hide all tabs
@@ -318,18 +310,14 @@ function switchTab(tab) {
     
     // Update page title
     const titles = {
-        'overview': 'Dashboard',
-        'reviews': 'Customer Reviews',
         'users': 'Staff Management',
-        'settings': 'System Settings'
+        'settings': 'Cafe Settings'
     };
     document.getElementById('pageTitle').textContent = titles[tab];
     
     // Load data for specific tab
     if (tab === 'users') {
         loadStaff();
-    } else if (tab === 'reviews') {
-        loadReviews();
     }
 }
 
@@ -489,7 +477,32 @@ async function loadReviews() {
 }
 
 function saveCafeSettings() {
-    toast('Settings saved successfully', 'success');
+    const settings = {
+        name: document.getElementById('cafeName').value,
+        phone: document.getElementById('cafePhone').value,
+        email: document.getElementById('cafeEmail').value,
+        address: document.getElementById('cafeAddress').value,
+        open_time: document.getElementById('openTime').value,
+        close_time: document.getElementById('closeTime').value,
+        tax_rate: parseFloat(document.getElementById('taxRate').value) || 0
+    };
+
+    fetch('/api/cafe-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings)
+    })
+    .then(r => {
+        if (r.ok) {
+            toast('Cafe settings saved successfully', 'success');
+        } else {
+            toast('Error saving settings', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        toast('Error saving settings', 'error');
+    });
 }
 
 function resetSettings() {
@@ -512,10 +525,29 @@ function goToPOS() {
 
 // Load initial data
 document.addEventListener('DOMContentLoaded', () => {
-    fetch('/api/products/all').then(r => r.ok && r.json().then(d => {
-        document.getElementById('totalProducts').textContent = d.products.length;
-    })).catch(console.error);
+    // Load staff data on page load
+    loadStaff();
+    loadCafeSettings();
 });
+
+async function loadCafeSettings() {
+    try {
+        const response = await fetch('/api/cafe-settings');
+        if (response.ok) {
+            const settings = await response.json();
+            document.getElementById('cafeName').value = settings.name || '';
+            document.getElementById('cafePhone').value = settings.phone || '';
+            document.getElementById('cafeEmail').value = settings.email || '';
+            document.getElementById('cafeAddress').value = settings.address || '';
+            document.getElementById('openTime').value = settings.open_time || '';
+            document.getElementById('closeTime').value = settings.close_time || '';
+            document.getElementById('taxRate').value = settings.tax_rate || '';
+        }
+    } catch (error) {
+        console.log('Cafe settings not yet configured');
+    }
+}
+
 </script>
 </body>
 {% endblock %}

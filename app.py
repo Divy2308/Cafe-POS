@@ -146,6 +146,18 @@ class PaymentMethod(db.Model):
     enabled = db.Column(db.Boolean, default=True)
     upi_id = db.Column(db.String(100), default='')
 
+class CafeSettings(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), default='POS Cafe')
+    phone = db.Column(db.String(20), default='')
+    email = db.Column(db.String(120), default='')
+    address = db.Column(db.Text, default='')
+    open_time = db.Column(db.String(5), default='09:00')  # HH:MM format
+    close_time = db.Column(db.String(5), default='22:00')  # HH:MM format
+    tax_rate = db.Column(db.Float, default=5.0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 class Session(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
@@ -1638,6 +1650,46 @@ def delete_user(uid):
     db.session.delete(user)
     db.session.commit()
     return jsonify({'ok': True})
+
+# ─── API: Cafe Settings ─────────────────────────────────
+@app.route('/api/cafe-settings', methods=['GET'])
+def get_cafe_settings():
+    settings = CafeSettings.query.first()
+    if not settings:
+        settings = CafeSettings()
+        db.session.add(settings)
+        db.session.commit()
+    
+    return jsonify({
+        'name': settings.name,
+        'phone': settings.phone,
+        'email': settings.email,
+        'address': settings.address,
+        'open_time': settings.open_time,
+        'close_time': settings.close_time,
+        'tax_rate': settings.tax_rate
+    })
+
+@app.route('/api/cafe-settings', methods=['POST'])
+@admin_required
+def save_cafe_settings():
+    settings = CafeSettings.query.first()
+    if not settings:
+        settings = CafeSettings()
+    
+    d = request.json or {}
+    settings.name = (d.get('name') or '').strip() or settings.name
+    settings.phone = (d.get('phone') or '').strip()
+    settings.email = (d.get('email') or '').strip()
+    settings.address = (d.get('address') or '').strip()
+    settings.open_time = (d.get('open_time') or '').strip()
+    settings.close_time = (d.get('close_time') or '').strip()
+    settings.tax_rate = float(d.get('tax_rate', 5.0))
+    
+    db.session.add(settings)
+    db.session.commit()
+    
+    return jsonify({'ok': True, 'message': 'Cafe settings saved successfully'})
 
 # ─── API: Reviews and Tips ─────────────────────────────────
 @app.route('/api/orders/<int:oid>/review', methods=['POST'])
