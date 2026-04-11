@@ -5,6 +5,11 @@
   .table-card {
     transition: all .2s;
     cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 140px;
+    padding: 16px !important;
   }
 
   .table-card:hover {
@@ -19,6 +24,48 @@
 
   .table-card.free {
     border-color: #2a2a2a;
+  }
+
+  .table-card .table-header {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .table-card .table-number {
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .table-card .table-seats {
+    font-size: 12px;
+    color: #9ca3af;
+  }
+
+  .table-card .table-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: auto;
+  }
+
+  .table-card .table-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .table-card .table-status .tag {
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 6px;
+  }
+
+  .table-card .table-hint {
+    font-size: 11px;
+    color: #6b7280;
   }
 
   .product-btn {
@@ -659,12 +706,16 @@
     if (activeTab) activeTab.classList.add('active');
     const grid = document.getElementById('tables-grid');
     grid.innerHTML = floor.tables.map(t => `
-    <div class="table-card card p-5 ${t.status === 'occupied' ? 'occupied' : 'free'}" onclick="selectTable(${t.id},'${t.number}','${t.status}')" oncontextmenu="toggleTableStatus(event,${t.id},'${t.status}')">
-      <div class="font-display text-2xl font-800 mb-1">T${t.number}</div>
-      <div class="text-xs text-gray-500">${t.seats} seats</div>
-      <div class="mt-3">
-        <span class="tag text-xs ${t.status === 'occupied' ? 'bg-orange-900/40 text-orange-400' : 'bg-gray-800 text-gray-500'}">${t.status === 'occupied' ? 'Occupied' : 'Free'}</span>
-        <span class="text-xs text-gray-600 ml-2">(right-click to toggle)</span>
+    <div class="table-card card ${t.status === 'occupied' ? 'occupied' : 'free'}" onclick="selectTable(${t.id},'${t.number}','${t.status}')" oncontextmenu="toggleTableStatus(event,${t.id},'${t.status}')">
+      <div class="table-header">
+        <div class="table-number">T${t.number}</div>
+        <div class="table-seats">${t.seats} seats</div>
+      </div>
+      <div class="table-footer">
+        <div class="table-status">
+          <span class="tag ${t.status === 'occupied' ? 'bg-orange-900/40 text-orange-400' : 'bg-gray-800 text-gray-500'}">${t.status === 'occupied' ? 'Occupied' : 'Free'}</span>
+        </div>
+        <div class="table-hint">(right-click to toggle)</div>
       </div>
     </div>`).join('');
   }
@@ -1312,7 +1363,7 @@
     const grid = document.getElementById('pos-res-grid');
     const empty = document.getElementById('pos-res-empty');
     const list = filter === 'all'
-      ? posReservations.filter(r => r.status !== 'cancelled')
+      ? posReservations.filter(r => r.status !== 'cancelled' && r.status !== 'completed')
       : posReservations.filter(r => r.status === filter);
     if (!list.length) { grid.innerHTML = ''; empty.classList.remove('hidden'); return; }
     empty.classList.add('hidden');
@@ -1320,6 +1371,7 @@
       pending:   { bg:'rgba(251,191,36,0.08)',   col:'#fbbf24', border:'rgba(251,191,36,0.3)' },
       confirmed: { bg:'rgba(34,197,94,0.08)',    col:'#22c55e', border:'rgba(34,197,94,0.3)' },
       seated:    { bg:'rgba(99,102,241,0.08)',   col:'#818cf8', border:'rgba(99,102,241,0.3)' },
+      completed: { bg:'rgba(100,116,139,0.08)',  col:'#64748b', border:'rgba(100,116,139,0.3)' },
       cancelled: { bg:'rgba(239,68,68,0.06)',    col:'#ef4444', border:'rgba(239,68,68,0.2)' },
     };
     grid.innerHTML = list.map(r => {
@@ -1347,11 +1399,12 @@
           <span style="flex-shrink:0;padding:4px 12px;border-radius:8px;font-size:11px;font-weight:700;background:${c.bg};color:${c.col};border:1px solid ${c.border};">${r.status.charAt(0).toUpperCase()+r.status.slice(1)}</span>
         </div>
         ${preHtml}
-        ${r.status !== 'seated' && r.status !== 'cancelled' ? `
+        ${r.status !== 'cancelled' ? `
         <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
-          ${r.status === 'pending' ? `<button onclick="posConfirmRes(${r.id})" style="flex:1;min-width:100px;padding:9px 10px;background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.4);border-radius:9px;color:#22c55e;font-size:12px;font-weight:700;cursor:pointer;">\u2705 Confirm</button>` : ''}
-          ${r.status === 'confirmed' ? `<button onclick="posSeatRes(${r.id})" style="flex:1;min-width:100px;padding:9px 10px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.4);border-radius:9px;color:#818cf8;font-size:12px;font-weight:700;cursor:pointer;">\uD83E\uDE91 Seat Party</button>` : ''}
-          <button onclick="posCancelRes(${r.id})" style="flex:1;min-width:80px;padding:9px 10px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:9px;color:#ef4444;font-size:12px;font-weight:600;cursor:pointer;">\u2715 Cancel</button>
+          ${r.status === 'pending' ? `<button onclick="posConfirmRes(${r.id})" style="flex:1;min-width:100px;padding:9px 10px;background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.4);border-radius:9px;color:#22c55e;font-size:12px;font-weight:700;cursor:pointer;">✅ Confirm</button>` : ''}
+          ${r.status === 'confirmed' ? `<button onclick="posSeatRes(${r.id})" style="flex:1;min-width:100px;padding:9px 10px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.4);border-radius:9px;color:#818cf8;font-size:12px;font-weight:700;cursor:pointer;">🪑 Seat Party</button>` : ''}
+          ${r.status === 'seated' ? `<button onclick="posFinishRes(${r.id})" style="flex:1;min-width:100px;padding:9px 10px;background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.4);border-radius:9px;color:#22c55e;font-size:12px;font-weight:700;cursor:pointer;">✓ Done</button>` : ''}
+          <button onclick="posCancelRes(${r.id})" style="flex:1;min-width:80px;padding:9px 10px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:9px;color:#ef4444;font-size:12px;font-weight:600;cursor:pointer;">✕ Cancel</button>
         </div>` : ''}
       </div>`;
     }).join('');
@@ -1366,7 +1419,14 @@
   async function posSeatRes(id) {
     if (!confirm('Seat this party? Pre-order items will be sent to kitchen.')) return;
     const r = await api('/api/reservations/' + id + '/seat', 'POST');
-    if (r.ok) { toast('\uD83E\uDE91 Party seated! Kitchen ticket sent.', 'success'); loadPosReservations(); reloadData(); }
+    if (r.ok) { toast('🪑 Party seated! Kitchen ticket sent.', 'success'); loadPosReservations(); reloadData(); }
+    else toast(r.error || 'Error', 'error');
+  }
+
+  async function posFinishRes(id) {
+    if (!confirm('Mark this reservation as done? Table will be cleared.')) return;
+    const r = await api('/api/reservations/' + id + '/done', 'POST');
+    if (r.ok) { toast('✓ Reservation completed! Table cleared.', 'success'); loadPosReservations(); reloadData(); }
     else toast(r.error || 'Error', 'error');
   }
 

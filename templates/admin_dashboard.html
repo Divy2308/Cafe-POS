@@ -110,9 +110,14 @@
             <div id="users-tab" class="tab-content hidden">
                 <div class="mb-6 flex justify-between items-center">
                     <h2 class="text-2xl font-bold">Staff Management</h2>
-                    <button onclick="openAddUserModal()" class="bg-brand-600 hover:bg-brand-700  px-4 py-2 rounded-lg font-semibold transition">
-                        + Add Staff
-                    </button>
+                    <div class="flex gap-2">
+                        <button onclick="openAddUserModal()" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg font-semibold transition">
+                            + Add Staff
+                        </button>
+                        <button onclick="deleteAllStaff()" class="bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-600/40 px-4 py-2 rounded-lg font-semibold transition">
+                            🗑️ Delete All
+                        </button>
+                    </div>
                 </div>
 
                 <div class="card p-6">
@@ -424,12 +429,32 @@ async function deleteUser(userId) {
                 toast('Staff member deleted successfully', 'success');
                 loadStaff();
             } else {
-                toast('Error: ' + (data.error || 'Failed to delete staff member'), 'error');
+                toast('Error (HTTP ' + response.status + '): ' + (data.error || 'Failed to delete staff member'), 'error');
             }
         } catch (error) {
             console.error('Error:', error);
-            toast('Network error deleting staff member', 'error');
+            toast('Network error: ' + error.message, 'error');
         }
+    }
+}
+
+async function deleteAllStaff() {
+    if (!confirm('⚠️ Delete ALL staff members? This cannot be undone!')) return;
+    if (!confirm('⚠️⚠️ Final confirmation: Delete ALL staff members?')) return;
+    
+    try {
+        const response = await fetch('/api/users/delete-all', { method: 'POST' });
+        const data = await response.json();
+        
+        if (response.ok) {
+            toast('All staff members deleted', 'success');
+            loadStaff();
+        } else {
+            toast('Error: ' + (data.error || 'Failed to delete all'), 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        toast('Network error deleting staff', 'error');
     }
 }
 

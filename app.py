@@ -222,7 +222,7 @@ class Reservation(db.Model):
     table_id = db.Column(db.Integer, db.ForeignKey('table.id'), nullable=True)
     reserved_at = db.Column(db.DateTime, nullable=False)  # date+time of booking
     party_size = db.Column(db.Integer, default=2)
-    status = db.Column(db.String(20), default='pending')  # pending, confirmed, seated, cancelled
+    status = db.Column(db.String(20), default='pending')  # pending, confirmed, seated, completed, cancelled
     notes = db.Column(db.Text, default='')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     items = db.relationship('ReservationItem', backref='reservation', cascade='all, delete-orphan', lazy=True)
@@ -1397,6 +1397,20 @@ def confirm_reservation(rid):
     db.session.commit()
     return jsonify({'ok': True})
 
+@app.route('/api/reservations/<int:rid>/done', methods=['POST'])
+@staff_required
+def finish_reservation(rid):
+    """Staff action: mark reservation as done and free up the table."""
+    r = Reservation.query.get_or_404(rid)
+    r.status = 'completed'
+    
+    # Mark table as free
+    if r.table:
+        r.table.status = 'free'
+    
+    db.session.commit()
+    return jsonify({'ok': True})
+
 @app.route('/api/tables/availability', methods=['GET'])
 def table_availability():
     """Return tables available for a given ISO datetime slot."""
@@ -1651,6 +1665,21 @@ def delete_user(uid):
     db.session.delete(user)
     db.session.commit()
     return jsonify({'ok': True})
+
+@app.route('/api/users/delete-all', methods=['POST'])
+@admin_required
+def delete_all_users():
+    """Delete all staff except the current admin"""
+    admin = User.query.get(session['user_id'])
+    if not admin or normalize_role(admin.role) != 'restaurant':
+        return jsonify({'error': 'unauthorized'}), 403
+    
+    # Delete all users except admin
+    User.query.filter(User.id != admin.id).delete()
+    db.session.commit()
+    
+    return jsonify({'ok': True, 'message': 'All staff members deleted'})
+
 
 # ─── API: Cafe Settings ─────────────────────────────────
 @app.route('/api/cafe-settings', methods=['GET'])
