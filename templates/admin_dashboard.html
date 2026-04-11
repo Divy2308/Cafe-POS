@@ -370,39 +370,45 @@ async function addStaffMember() {
 async function loadStaff() {
     try {
         const response = await fetch('/api/users');
-        if (response.ok) {
-            const users = await response.json();
-            const tbody = document.getElementById('staffTable');
-            tbody.innerHTML = '';
-            
-            if (users.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-gray-500">No staff members yet</td></tr>';
-                return;
-            }
-
-            users.forEach(user => {
-                const row = document.createElement('tr');
-                row.className = 'border-b border-border hover:bg-gray-50 transition';
-                row.innerHTML = `
-                    <td class="py-4 px-4">${user.name}</td>
-                    <td class="py-4 px-4 text-gray-500">${user.email}</td>
-                    <td class="py-4 px-4">
-                        <span class="tag bg-brand-600/20 text-brand-600">${user.role || 'cashier'}</span>
-                    </td>
-                    <td class="py-4 px-4 text-gray-500">${new Date(user.created_at).toLocaleDateString()}</td>
-                    <td class="py-4 px-4">
-                        <button onclick="editUser(${user.id})" class="text-brand-600 hover:text-[#ea580c] text-sm mr-4">Edit</button>
-                        <button onclick="deleteUser(${user.id})" class="text-red-500 hover:text-red-600 text-sm">Delete</button>
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
-            
-            document.getElementById('totalStaff').textContent = users.length;
+        const tbody = document.getElementById('staffTable');
+        
+        if (!response.ok) {
+            const data = await response.json();
+            tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-red-400">Error: ${data.error || 'Failed to load staff'}</td></tr>`;
+            return;
         }
+        
+        const users = await response.json();
+        tbody.innerHTML = '';
+        
+        if (users.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-gray-500">No staff members yet. Click "+ Add Staff" to add your first team member.</td></tr>';
+            document.getElementById('totalStaff').textContent = '0';
+            return;
+        }
+
+        users.forEach(user => {
+            const row = document.createElement('tr');
+            row.className = 'border-b border-border hover:bg-gray-50 transition';
+            row.innerHTML = `
+                <td class="py-4 px-4">${user.name}</td>
+                <td class="py-4 px-4 text-gray-500">${user.email}</td>
+                <td class="py-4 px-4">
+                    <span class="tag bg-brand-600/20 text-brand-600">${user.role || 'cashier'}</span>
+                </td>
+                <td class="py-4 px-4 text-gray-500">${new Date(user.created_at).toLocaleDateString()}</td>
+                <td class="py-4 px-4">
+                    <button onclick="editUser(${user.id})" class="text-brand-600 hover:text-[#ea580c] text-sm mr-4">Edit</button>
+                    <button onclick="deleteUser(${user.id})" class="text-red-500 hover:text-red-600 text-sm">Delete</button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+        
+        document.getElementById('totalStaff').textContent = users.length;
     } catch (error) {
         console.error('Error loading staff:', error);
-        document.getElementById('staffTable').innerHTML = '<tr><td colspan="5" class="py-8 text-center text-red-400">Error loading staff</td></tr>';
+        document.getElementById('staffTable').innerHTML = `<tr><td colspan="5" class="py-8 text-center text-red-400">Network error loading staff. Check console for details.</td></tr>`;
     }
 }
 

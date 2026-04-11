@@ -1624,10 +1624,11 @@ def dashboard_stats():
 @staff_required
 def get_users():
     user = User.query.get(session['user_id'])
-    if not user or user.role != 'restaurant':
+    if not user or normalize_role(user.role) != 'restaurant':
         return jsonify({'error': 'unauthorized'}), 403
     
-    users = User.query.exclude(User.id == session['user_id']).all()
+    # Get all users except the current admin
+    users = User.query.filter(User.id != session['user_id']).all()
     return jsonify([{
         'id': u.id,
         'name': u.name,
@@ -1640,7 +1641,7 @@ def get_users():
 @staff_required
 def delete_user(uid):
     admin = User.query.get(session['user_id'])
-    if not admin or admin.role != 'restaurant':
+    if not admin or normalize_role(admin.role) != 'restaurant':
         return jsonify({'error': 'unauthorized'}), 403
     
     if uid == admin.id:
