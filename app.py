@@ -90,10 +90,14 @@ PASSWORD_RESET_CODES = {}
 
 db = SQLAlchemy(app)
 try:
-    import eventlet  # noqa: F401
-    _async_mode = 'eventlet'
+    import gevent  # noqa: F401
+    _async_mode = 'gevent'
 except ImportError:
-    _async_mode = None
+    try:
+        import eventlet  # noqa: F401
+        _async_mode = 'eventlet'
+    except ImportError:
+        _async_mode = None
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode=_async_mode)
 CORS(app)
 
@@ -120,6 +124,7 @@ class Product(db.Model):
     tax = db.Column(db.Float, default=0)
     unit = db.Column(db.String(20), default='pcs')
     active = db.Column(db.Boolean, default=True)
+    image_b64 = db.Column(db.Text, default='')  # base64 data URL for product photo
 
 class Floor(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -609,7 +614,7 @@ def get_products():
     cats = Category.query.all()
     result = []
     for c in cats:
-        prods = [{'id':p.id,'name':p.name,'price':p.price,'description':p.description,'tax':p.tax,'unit':p.unit} for p in c.products if p.active]
+        prods = [{'id':p.id,'name':p.name,'price':p.price,'description':p.description,'tax':p.tax,'unit':p.unit,'image_b64':p.image_b64 or ''} for p in c.products if p.active]
         if prods:
             result.append({'id':c.id,'name':c.name,'products':prods})
     return jsonify(result)
@@ -620,7 +625,7 @@ def get_all_products():
     products = Product.query.all()
     cats = Category.query.all()
     return jsonify({
-        'products': [{'id':p.id,'name':p.name,'price':p.price,'category_id':p.category_id,'description':p.description,'tax':p.tax,'unit':p.unit,'active':p.active} for p in products],
+        'products': [{'id':p.id,'name':p.name,'price':p.price,'category_id':p.category_id,'description':p.description,'tax':p.tax,'unit':p.unit,'active':p.active,'image_b64':p.image_b64 or ''} for p in products],
         'categories': [{'id':c.id,'name':c.name} for c in cats]
     })
 
@@ -650,6 +655,8 @@ def update_product(pid):
     p.tax = float(d.get('tax', p.tax))
     p.unit = d.get('unit', p.unit)
     p.active = d.get('active', p.active)
+    if 'image_b64' in d:
+        p.image_b64 = d['image_b64'] or ''
     if 'category' in d and d['category']:
         cat = Category.query.filter_by(name=d['category']).first()
         if not cat:
@@ -1217,9 +1224,16 @@ def _serialize_reservation(r):
 def create_reservation():
     d = request.json or {}
     try:
-        reserved_at = datetime.fromisoformat(d.get('reserved_at', ''))
-    except (ValueError, TypeError):
-        return jsonify({'error': 'Invalid date/time'}), 400
+        dt_str = (d.get('reserved_at') or '').replace('Z', '+00:00')
+        reserved_at = datetime.fromisoformat(dt_str)
+        # Strip timezone info so we compare as naive UTC
+        if reserved_at.tzinfo is not None:
+            # Convert to UTC, then make naive
+            import datetime as dt_mod
+            reserved_at = reserved_at.utctimetuple()
+            reserved_at = datetime(*reserved_at[:6])
+    except (ValueError, TypeError, AttributeError):
+        return jsonify({'error': 'Invalid date/time format'}), 400
     if reserved_at < datetime.utcnow():
         return jsonify({'error': 'Cannot reserve in the past'}), 400
     table_id = d.get('table_id')
@@ -1674,10 +1688,62 @@ def check_review(oid):
         return jsonify({'has_review': True, 'rating': review.rating, 'comment': review.comment})
     return jsonify({'has_review': False})
 
+# ─── Receipt Page ─────────────────────────────────────────
+@app.route('/receipt/<int:order_id>')
+def receipt_page(order_id):
+    o = Order.query.get_or_404(order_id)
+    return render_template('receipt.html', order=o)
+
+# ─── CSV Export ────────────────────────────────────────────
+import csv
+from io import StringIO
+from flask import Response
+
+@app.route('/api/export/orders')
+@staff_required
+def export_orders_csv():
+    period = request.args.get('period', 'today')
+    now = datetime.utcnow()
+    if period == 'week':
+        start = now - timedelta(days=7)
+    elif period == 'month':
+        start = now - timedelta(days=30)
+    else:
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    orders = Order.query.filter(Order.status == 'paid', Order.created_at >= start).order_by(Order.created_at.desc()).all()
+    si = StringIO()
+    writer = csv.writer(si)
+    writer.writerow(['Date', 'Order #', 'Table', 'Customer', 'Items', 'Subtotal', 'Tip', 'Total', 'Payment Method'])
+    for o in orders:
+        items_str = '; '.join(f'{i.product_name} x{i.qty}' for i in o.items)
+        subtotal = sum(i.qty * i.price for i in o.items)
+        writer.writerow([
+            o.created_at.strftime('%Y-%m-%d %H:%M'),
+            o.order_number,
+            o.table.number if o.table else 'Takeaway',
+            o.customer_name or '',
+            items_str,
+            round(subtotal, 2),
+            round(o.tip or 0, 2),
+            round((o.tip or 0) + subtotal, 2),
+            o.payment_method or '',
+        ])
+    output = si.getvalue()
+    return Response(
+        output,
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment;filename=orders_{period}_{now.strftime("%Y%m%d")}.csv'}
+    )
+
 # ─── SocketIO ──────────────────────────────────────────────
 @socketio.on('connect')
 def on_connect():
     emit('connected', {'status':'ok'})
+
+@socketio.on('call_waiter')
+def on_call_waiter(data):
+    """Relay call-waiter event to all connected staff."""
+    emit('call_waiter', data, broadcast=True)
 
 # ─── Seed Data ─────────────────────────────────────────────
 def seed_data():
@@ -1742,6 +1808,12 @@ def ensure_order_table_schema():
         cols2 = {row[1] for row in rows2}
         if 'notes' not in cols2:
             conn.exec_driver_sql('ALTER TABLE "order_item" ADD COLUMN notes TEXT DEFAULT ""')
+            conn.commit()
+        # Product image_b64
+        rows3 = conn.exec_driver_sql('PRAGMA table_info("product")').fetchall()
+        cols3 = {row[1] for row in rows3}
+        if 'image_b64' not in cols3:
+            conn.exec_driver_sql('ALTER TABLE "product" ADD COLUMN image_b64 TEXT DEFAULT ""')
             conn.commit()
 
 def ensure_demo_catalog():
@@ -2047,4 +2119,7 @@ with app.app_context():
     ensure_demo_paid_orders_and_reviews()
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, port=5000)
+    import os
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('FLASK_ENV') != 'production'
+    socketio.run(app, host='0.0.0.0', port=port, debug=debug, allow_unsafe_werkzeug=True)

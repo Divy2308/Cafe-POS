@@ -127,6 +127,14 @@
         <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Unit</label><input id="p-unit" placeholder="pcs"></div>
       </div>
       <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Description</label><textarea id="p-desc" rows="2" placeholder="Short description"></textarea></div>
+      <div>
+        <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Item Photo</label>
+        <input type="file" id="p-image-file" accept="image/*" onchange="previewProductImage()" class="text-xs text-gray-400" style="width:100%;">
+        <div id="p-image-preview" style="margin-top:8px; display:none;">
+          <img id="p-image-preview-img" src="" alt="Preview" style="width:100%; max-height:120px; object-fit:cover; border-radius:8px; border:1px solid #333;">
+          <button type="button" onclick="clearProductImage()" style="font-size:11px; color:#888; background:none; border:none; cursor:pointer; margin-top:4px;">✕ Remove image</button>
+        </div>
+      </div>
       <div class="flex items-center gap-3">
         <label class="toggle">
           <input type="checkbox" id="p-active" checked>
@@ -221,7 +229,12 @@ function renderProductsTable() {
   const tbody = document.getElementById('products-table');
   tbody.innerHTML = allProducts.map(p => `
     <tr class="product-row border-b border-border/50">
-      <td class="px-4 py-3 text-sm font-medium">${escHtml(p.name)}</td>
+      <td class="px-4 py-3">
+        <div style="display:flex; align-items:center; gap:10px;">
+          ${p.image_b64 ? `<img src="${p.image_b64}" alt="" style="width:36px;height:36px;object-fit:cover;border-radius:6px;flex-shrink:0;">` : '<div style="width:36px;height:36px;border-radius:6px;background:#1a1a1a;flex-shrink:0;"></div>'}
+          <span class="text-sm font-medium">${escHtml(p.name)}</span>
+        </div>
+      </td>
       <td class="px-4 py-3 text-sm text-gray-400">${escHtml(getCatName(p.category_id))}</td>
       <td class="px-4 py-3 text-sm text-brand-500 font-700">\u20b9${p.price}</td>
       <td class="px-4 py-3 text-sm text-gray-400">${p.tax}%</td>
@@ -255,11 +268,33 @@ function openProductModal() {
   document.getElementById('p-unit').value = '';
   document.getElementById('p-desc').value = '';
   document.getElementById('p-active').checked = true;
+  clearProductImage();
   document.getElementById('product-modal-title').textContent = 'Add Product';
   document.getElementById('product-save-btn').textContent = 'Save Product';
   updateCatSuggestions();
   document.getElementById('product-modal').classList.remove('hidden');
   setTimeout(() => document.getElementById('p-name').focus(), 100);
+}
+
+let currentImageB64 = '';
+
+function previewProductImage() {
+  const file = document.getElementById('p-image-file').files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    currentImageB64 = e.target.result;
+    document.getElementById('p-image-preview-img').src = currentImageB64;
+    document.getElementById('p-image-preview').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearProductImage() {
+  currentImageB64 = '';
+  document.getElementById('p-image-file').value = '';
+  document.getElementById('p-image-preview').style.display = 'none';
+  document.getElementById('p-image-preview-img').src = '';
 }
 
 /* Open modal for EDIT */
@@ -274,6 +309,13 @@ function editProduct(id) {
   document.getElementById('p-unit').value = p.unit || 'pcs';
   document.getElementById('p-desc').value = p.description || '';
   document.getElementById('p-active').checked = p.active;
+  // Load existing image
+  clearProductImage();
+  if (p.image_b64) {
+    currentImageB64 = p.image_b64;
+    document.getElementById('p-image-preview-img').src = p.image_b64;
+    document.getElementById('p-image-preview').style.display = 'block';
+  }
   document.getElementById('product-modal-title').textContent = 'Edit Product';
   document.getElementById('product-save-btn').textContent = 'Update Product';
   updateCatSuggestions();
@@ -294,7 +336,8 @@ async function saveProduct() {
     category: document.getElementById('p-category').value.trim(),
     unit: document.getElementById('p-unit').value.trim() || 'pcs',
     description: document.getElementById('p-desc').value.trim(),
-    active: document.getElementById('p-active').checked
+    active: document.getElementById('p-active').checked,
+    image_b64: currentImageB64 || ''
   };
   if (!d.name || !d.price) return toast('Name and price are required', 'error');
 

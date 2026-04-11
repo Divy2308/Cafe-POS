@@ -6,5 +6,6 @@ qrcode[pil]
 pillow
 werkzeug
 resend
-eventlet
+gevent
+gevent-websocket
 gunicorn

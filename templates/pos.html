@@ -186,6 +186,14 @@
             d="M9 14l6-6m0 0l-6-6m6 6H3m18 9v-6a2 2 0 00-2-2h-5" />
         </svg> Bills
       </a>
+      <a onclick="showView('reservations')"
+        class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer text-sm" id="nav-reservations">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+        Reservations
+        <span id="pos-pending-badge" class="hidden ml-auto text-xs font-800 bg-orange-500 text-white rounded-full px-1.5 py-0.5" style="min-width:18px;text-align:center;"></span>
+      </a>
       <hr class="border-border my-2">
       {% if user_role == 'restaurant' %}
       <a href="/dashboard" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm">
@@ -322,6 +330,29 @@
       <div id="bills-empty" class="hidden text-center py-20 text-gray-500">
         No bills waiting for payment.
       </div>
+    </div>
+
+    <!-- ═══ RESERVATIONS VIEW ═══ -->
+    <div id="view-reservations" class="hidden flex-1 overflow-auto p-6">
+      <div class="flex items-center justify-between mb-5">
+        <div>
+          <h2 class="font-display text-xl font-700">📅 Reservations</h2>
+          <p class="text-sm text-gray-500">Manage booking requests &amp; seat parties</p>
+        </div>
+        <button onclick="loadPosReservations()" class="btn-ghost px-3 py-1.5 rounded-lg text-xs flex items-center gap-2">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          Refresh
+        </button>
+      </div>
+      <!-- Filter pills -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+        <button class="pos-res-filter active" data-f="all" onclick="filterPosRes('all',this)" style="padding:6px 16px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #333;background:#f97316;color:#fff;transition:all .2s;">All</button>
+        <button class="pos-res-filter" data-f="pending" onclick="filterPosRes('pending',this)" style="padding:6px 16px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #333;background:transparent;color:#888;transition:all .2s;">🟡 Pending</button>
+        <button class="pos-res-filter" data-f="confirmed" onclick="filterPosRes('confirmed',this)" style="padding:6px 16px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #333;background:transparent;color:#888;transition:all .2s;">🟢 Confirmed</button>
+        <button class="pos-res-filter" data-f="seated" onclick="filterPosRes('seated',this)" style="padding:6px 16px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #333;background:transparent;color:#888;transition:all .2s;">🟣 Seated</button>
+      </div>
+      <div id="pos-res-grid" class="grid gap-4" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr));align-content:start;"></div>
+      <div id="pos-res-empty" class="hidden text-center py-20 text-gray-500">No reservations found.</div>
     </div>
 
     <!-- ═══ PAYMENT VIEW ═══ -->
@@ -557,8 +588,11 @@
     let html = '';
     cats.forEach(c => {
       c.products.forEach(p => {
-        html += `<div class="product-btn card p-4 rounded-xl" onclick="addToCart(${p.id},'${p.name.replace(/'/g, "\\'")}',${p.price})">
-        <div class="text-2xl mb-2">${getCatEmoji(c.name)}</div>
+        const imgHtml = p.image_b64
+          ? `<img src="${p.image_b64}" alt="${p.name}" style="width:100%;height:64px;object-fit:cover;border-radius:8px;margin-bottom:6px;">`
+          : `<div class="text-2xl mb-2">${getCatEmoji(c.name)}</div>`;
+        html += `<div class="product-btn card p-3 rounded-xl" onclick="addToCart(${p.id},'${p.name.replace(/'/g, "\\'")}',${p.price})">
+        ${imgHtml}
         <div class="text-sm font-medium leading-tight">${p.name}</div>
         <div class="text-brand-500 font-700 text-sm mt-1">₹${p.price}</div>
       </div>`;
@@ -898,20 +932,22 @@
 
   // ─── Views ────────────────────────────────────────────────
   function showView(v) {
-    ['floor', 'order', 'bills', 'payment', 'qr', 'confirm'].forEach(n => {
+    ['floor', 'order', 'bills', 'reservations', 'payment', 'qr', 'confirm'].forEach(n => {
       document.getElementById('view-' + n).classList.toggle('hidden', n !== v);
-      if (n !== 'floor' && n !== 'order' && n !== 'bills') document.getElementById('view-' + n).classList.toggle('flex', n === v);
+      if (n !== 'floor' && n !== 'order' && n !== 'bills' && n !== 'reservations') document.getElementById('view-' + n).classList.toggle('flex', n === v);
     });
     document.getElementById('view-floor').style.display = v === 'floor' ? 'block' : 'none';
     document.getElementById('view-order').style.display = v === 'order' ? 'flex' : 'none';
     document.getElementById('view-bills').style.display = v === 'bills' ? 'block' : 'none';
-    const labels = { floor: 'Floor View', order: 'Order Screen', bills: 'Bills', payment: 'Payment', qr: 'UPI QR', confirm: 'Confirmed' };
+    document.getElementById('view-reservations').style.display = v === 'reservations' ? 'block' : 'none';
+    const labels = { floor: 'Floor View', order: 'Order Screen', bills: 'Bills', reservations: 'Reservations', payment: 'Payment', qr: 'UPI QR', confirm: 'Confirmed' };
     document.getElementById('breadcrumb').textContent = labels[v] || v;
-    ['floor', 'order', 'bills'].forEach(n => {
+    ['floor', 'order', 'bills', 'reservations'].forEach(n => {
       const el = document.getElementById('nav-' + n);
       if (el) el.classList.toggle('active', n === v);
     });
     if (v === 'confirm') renderConfirmReview();
+    if (v === 'reservations') loadPosReservations();
   }
 
   function renderConfirmReview() {
@@ -995,6 +1031,10 @@
       const isCurrent = currentBill && b.id === currentBill.id;
       const sentToKitchen = Boolean(b.sent_to_kitchen_at || b.status === 'sent');
       const preview = (b.items || []).slice(0, 3).map(i => `<div class="text-xs text-gray-400">${i.name} × ${i.qty}</div>`).join('');
+      // Build WhatsApp message
+      const waItems = (b.items||[]).map(i => `${i.name} \u00d7${i.qty} \u2014 \u20b9${(i.price*i.qty).toFixed(0)}`).join('%0A');
+      const waTotal = b.total ? b.total.toFixed(0) : '0';
+      const waMsg = encodeURIComponent(`\uD83E\uDDFE POS Cafe \u2014 Bill\nOrder: ${b.order_number} | Table ${b.table}\n\u2014\u2014\u2014\u2014\u2014\n`) + waItems + encodeURIComponent(`\n\u2014\u2014\u2014\u2014\u2014\nTotal: \u20b9${waTotal}\nThank you! \uD83D\uDE0A`);
       return `
       <div class="card p-4 rounded-2xl ${isCurrent ? 'ring-2 ring-brand-500/70 bg-brand-500/5' : ''}">
         <div class="flex items-start justify-between gap-3 mb-3">
@@ -1005,15 +1045,19 @@
           </div>
           <div class="text-right">
             <div class="text-xs text-orange-400 uppercase tracking-wider">${b.status}</div>
-            <div class="text-lg font-700 text-brand-500">₹${b.total.toFixed(0)}</div>
+            <div class="text-lg font-700 text-brand-500">\u20b9${b.total.toFixed(0)}</div>
           </div>
         </div>
-        <div class="space-y-1 mb-4">${preview}</div>
-        <div class="flex gap-2">
+        <div class="space-y-1 mb-3">${preview}</div>
+        <div class="flex gap-2 mb-2">
           <button class="btn-ghost flex-1 py-2 rounded-lg text-xs" onclick="openBillForPayment(${b.id})">Open Bill</button>
           ${sentToKitchen ? `<button class="btn-primary flex-1 py-2 rounded-lg text-xs" onclick="payBill(${b.id})">Pay Now</button>` : `<button class="btn-primary flex-1 py-2 rounded-lg text-xs opacity-50 cursor-not-allowed" disabled>Send to Kitchen First</button>`}
         </div>
-        <button class="mt-2 w-full rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-300 hover:bg-red-500/20 transition" onclick="deleteBill(${b.id})">Delete Bill</button>
+        <div class="flex gap-2 mb-2">
+          <a href="/receipt/${b.id}" target="_blank" class="btn-ghost flex-1 py-1.5 rounded-lg text-xs text-center" style="color:#f97316;">\uD83E\uDDFE Receipt</a>
+          <a href="https://wa.me/?text=${waMsg}" target="_blank" rel="noopener" class="btn-ghost flex-1 py-1.5 rounded-lg text-xs text-center" style="color:#25D366;">\uD83D\uDCF2 Share</a>
+        </div>
+        <button class="mt-1 w-full rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-300 hover:bg-red-500/20 transition" onclick="deleteBill(${b.id})">Delete Bill</button>
       </div>
     `;
     }).join('');
@@ -1072,7 +1116,120 @@
 
   // Socket
   const socket = io();
-  socket.on('order_paid', d => { toast('✓ Order ' + d.order_number + ' paid!'); reloadData(); });
+  socket.on('order_paid', d => { toast('\u2713 Order ' + d.order_number + ' paid!'); reloadData(); });
+
+  // Call Waiter alert
+  socket.on('call_waiter', d => {
+    const msg = `\uD83D\uDD14 Table ${d.table_number || d.table_id} needs assistance!`;
+    // Show a persistent loud toast
+    const el = document.createElement('div');
+    el.style.cssText = 'position:fixed;top:24px;right:24px;z-index:9999;background:#1a1a1a;border:2px solid #f97316;border-radius:14px;padding:16px 22px;box-shadow:0 8px 32px rgba(249,115,22,0.35);display:flex;align-items:center;gap:12px;cursor:pointer;transition:all .3s;max-width:320px;';
+    el.innerHTML = `<span style="font-size:26px;">\uD83D\uDD14</span><div><div style="font-weight:700;color:#fff;font-size:15px;">Waiter Requested</div><div style="font-size:12px;color:#f97316;margin-top:2px;">${msg}</div></div><button onclick="this.parentElement.remove()" style="margin-left:auto;background:transparent;border:none;color:#888;font-size:18px;cursor:pointer;padding:0 4px;">&times;</button>`;
+    el.onclick = (e) => { if (e.target !== el.querySelector('button')) el.remove(); };
+    document.body.appendChild(el);
+    setTimeout(() => { if (el.parentNode) el.style.opacity='0'; setTimeout(() => el.remove(), 300); }, 10000);
+    toast(msg, 'error');
+  });
+
+  // ─── Reservations (Staff) ─────────────────────────────────
+  let posReservations = [];
+  let posResFilter = 'all';
+
+  async function loadPosReservations() {
+    const data = await api('/api/reservations');
+    if (data.error) return;
+    posReservations = data;
+    // Update badge
+    const pendingCount = posReservations.filter(r => r.status === 'pending').length;
+    const badge = document.getElementById('pos-pending-badge');
+    if (badge) {
+      if (pendingCount > 0) { badge.textContent = pendingCount; badge.classList.remove('hidden'); }
+      else badge.classList.add('hidden');
+    }
+    renderPosReservations(posResFilter);
+  }
+
+  function filterPosRes(f, btn) {
+    posResFilter = f;
+    document.querySelectorAll('.pos-res-filter').forEach(b => {
+      b.style.background = 'transparent'; b.style.color = '#888';
+    });
+    btn.style.background = '#f97316'; btn.style.color = '#fff';
+    renderPosReservations(f);
+  }
+
+  function renderPosReservations(filter) {
+    const grid = document.getElementById('pos-res-grid');
+    const empty = document.getElementById('pos-res-empty');
+    const list = filter === 'all'
+      ? posReservations.filter(r => r.status !== 'cancelled')
+      : posReservations.filter(r => r.status === filter);
+    if (!list.length) { grid.innerHTML = ''; empty.classList.remove('hidden'); return; }
+    empty.classList.add('hidden');
+    const sc = {
+      pending:   { bg:'rgba(251,191,36,0.08)',   col:'#fbbf24', border:'rgba(251,191,36,0.3)' },
+      confirmed: { bg:'rgba(34,197,94,0.08)',    col:'#22c55e', border:'rgba(34,197,94,0.3)' },
+      seated:    { bg:'rgba(99,102,241,0.08)',   col:'#818cf8', border:'rgba(99,102,241,0.3)' },
+      cancelled: { bg:'rgba(239,68,68,0.06)',    col:'#ef4444', border:'rgba(239,68,68,0.2)' },
+    };
+    grid.innerHTML = list.map(r => {
+      const c = sc[r.status] || sc.pending;
+      const dt = new Date(r.reserved_at);
+      const dtLabel = dt.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+      const preHtml = r.items && r.items.length
+        ? `<div style="margin-top:10px;padding:10px;background:#0d0d0d;border-radius:8px;font-size:12px;">
+            <div style="color:#f97316;font-weight:600;margin-bottom:6px;">\uD83D\uDED2 Pre-Order</div>
+            ${r.items.map(i => `<div style="display:flex;justify-content:space-between;color:#999;">${i.product_name} <span>\u00d7${i.qty} \u2014 \u20b9${(i.qty*i.price).toFixed(0)}</span></div>`).join('')}
+            <div style="border-top:1px solid #222;margin-top:6px;padding-top:6px;font-weight:700;color:#f97316;display:flex;justify-content:space-between;"><span>Total</span><span>\u20b9${r.items.reduce((s,i)=>s+i.qty*i.price,0).toFixed(0)}</span></div>
+          </div>` : '';
+      return `
+      <div class="card" style="border:1px solid ${c.border};background:${c.bg};border-radius:16px;padding:18px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+          <div>
+            <div style="font-size:15px;font-weight:700;color:#fff;">\uD83D\uDCC5 ${dtLabel}</div>
+            <div style="font-size:12px;color:#888;margin-top:5px;">
+              \uD83D\uDC64 ${r.customer_name || 'Guest'}
+              ${r.table ? ` &middot; \uD83E\uDE91 Table ${r.table}` : ' &middot; <span style="color:#f97316;">No table</span>'}
+              &middot; \uD83D\uDC65 ${r.party_size} pax
+              ${r.notes ? `&middot; <em style="color:#777;">${r.notes}</em>` : ''}
+            </div>
+          </div>
+          <span style="flex-shrink:0;padding:4px 12px;border-radius:8px;font-size:11px;font-weight:700;background:${c.bg};color:${c.col};border:1px solid ${c.border};">${r.status.charAt(0).toUpperCase()+r.status.slice(1)}</span>
+        </div>
+        ${preHtml}
+        ${r.status !== 'seated' && r.status !== 'cancelled' ? `
+        <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+          ${r.status === 'pending' ? `<button onclick="posConfirmRes(${r.id})" style="flex:1;min-width:100px;padding:9px 10px;background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.4);border-radius:9px;color:#22c55e;font-size:12px;font-weight:700;cursor:pointer;">\u2705 Confirm</button>` : ''}
+          ${r.status === 'confirmed' ? `<button onclick="posSeatRes(${r.id})" style="flex:1;min-width:100px;padding:9px 10px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.4);border-radius:9px;color:#818cf8;font-size:12px;font-weight:700;cursor:pointer;">\uD83E\uDE91 Seat Party</button>` : ''}
+          <button onclick="posCancelRes(${r.id})" style="flex:1;min-width:80px;padding:9px 10px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:9px;color:#ef4444;font-size:12px;font-weight:600;cursor:pointer;">\u2715 Cancel</button>
+        </div>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  async function posConfirmRes(id) {
+    const r = await api('/api/reservations/' + id + '/confirm', 'POST');
+    if (r.ok) { toast('\u2705 Reservation confirmed!', 'success'); loadPosReservations(); }
+    else toast(r.error || 'Error', 'error');
+  }
+
+  async function posSeatRes(id) {
+    if (!confirm('Seat this party? Pre-order items will be sent to kitchen.')) return;
+    const r = await api('/api/reservations/' + id + '/seat', 'POST');
+    if (r.ok) { toast('\uD83E\uDE91 Party seated! Kitchen ticket sent.', 'success'); loadPosReservations(); reloadData(); }
+    else toast(r.error || 'Error', 'error');
+  }
+
+  async function posCancelRes(id) {
+    if (!confirm('Cancel this reservation?')) return;
+    const r = await api('/api/reservations/' + id, 'DELETE');
+    if (r.ok) { toast('Reservation cancelled', 'success'); loadPosReservations(); }
+    else toast(r.error || 'Error', 'error');
+  }
+
+  // Auto-refresh pending badge every 30s
+  loadPosReservations();
+  setInterval(loadPosReservations, 30000);
 
   init();
 </script>

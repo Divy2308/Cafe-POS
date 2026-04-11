@@ -395,9 +395,8 @@ async function submitReservation() {
   const btn = document.getElementById('res-submit-btn');
   btn.disabled = true; btn.textContent = 'Saving…';
   // Convert local datetime to ISO (treat as local)
-  const localDt = new Date(dt);
   const payload = {
-    reserved_at: localDt.toISOString(),
+    reserved_at: dt,  // Send datetime-local value as-is (no UTC conversion to avoid tz mismatch)
     party_size: parseInt(party),
     notes,
     table_id: tableId ? parseInt(tableId) : null,

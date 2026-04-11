@@ -38,8 +38,8 @@
         <button class="period-btn active border border-border px-4 py-1.5 rounded-lg text-sm" onclick="setPeriod('today',this)">Today</button>
         <button class="period-btn border border-border px-4 py-1.5 rounded-lg text-sm text-gray-500" onclick="setPeriod('week',this)">Week</button>
         <button class="period-btn border border-border px-4 py-1.5 rounded-lg text-sm text-gray-500" onclick="setPeriod('month',this)">Month</button>
-        <button onclick="printReport()" class="btn-ghost px-4 py-1.5 rounded-lg text-sm flex items-center gap-1.5">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg> Export
+        <button onclick="exportCSV()" class="btn-ghost px-4 py-1.5 rounded-lg text-sm flex items-center gap-1.5" title="Download orders as CSV">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg> Export CSV
         </button>
       </div>
     </div>
@@ -96,6 +96,28 @@
         <div id="review-stats" class="grid grid-cols-3 gap-3 mb-4"></div>
         <div id="review-list" class="space-y-3"></div>
         <div id="review-empty" class="hidden text-center py-10 text-gray-500">No reviews yet.</div>
+      </div>
+      <!-- Reservations Management -->
+      <div class="card p-5" style="border-radius:16px">
+        <div class="flex items-center justify-between gap-4 mb-4">
+          <div>
+            <div class="font-display font-700">📅 Reservation Requests</div>
+            <div class="text-xs text-gray-500 mt-1">Upcoming reservations that need your approval</div>
+          </div>
+          <div class="flex gap-2 items-center">
+            <span id="pending-badge" class="hidden text-xs font-700 bg-orange-500 text-white rounded-full px-2 py-0.5"></span>
+            <button onclick="loadReservations()" class="btn-ghost px-3 py-1.5 rounded-lg text-xs">↻ Refresh</button>
+          </div>
+        </div>
+        <!-- Filter tabs -->
+        <div id="res-filter-tabs" style="display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap;">
+          <button class="res-filter-btn" data-status="all" onclick="filterReservations('all',this)" style="padding:5px 14px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; border:1px solid #333; background:#f97316; color:#fff;">All</button>
+          <button class="res-filter-btn" data-status="pending" onclick="filterReservations('pending',this)" style="padding:5px 14px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; border:1px solid #333; background:transparent; color:#888;">Pending</button>
+          <button class="res-filter-btn" data-status="confirmed" onclick="filterReservations('confirmed',this)" style="padding:5px 14px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; border:1px solid #333; background:transparent; color:#888;">Confirmed</button>
+          <button class="res-filter-btn" data-status="seated" onclick="filterReservations('seated',this)" style="padding:5px 14px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; border:1px solid #333; background:transparent; color:#888;">Seated</button>
+        </div>
+        <div id="reservations-mgmt-list" class="space-y-3"></div>
+        <div id="reservations-mgmt-empty" class="hidden text-center py-10 text-gray-500">No upcoming reservations.</div>
       </div>
     </div>
   </div>
@@ -236,14 +258,140 @@ function setPeriod(p, btn) {
   loadStats(p);
 }
 
-function printReport() { window.print(); }
+function exportCSV() { window.open('/api/export/orders?period=' + currentPeriod); }
 
 async function logout() {
   await fetch('/api/logout', { method: 'POST' });
   window.location.href = '/';
 }
 
+
+// ─── Reservations Management ───────────────────────────────
+let allReservations = [];
+let currentResFilter = 'all';
+
+async function loadReservations() {
+  try {
+    const data = await api('/api/reservations');
+    if (data.error) return;
+    allReservations = data;
+    // Update pending badge
+    const pendingCount = allReservations.filter(r => r.status === 'pending').length;
+    const badge = document.getElementById('pending-badge');
+    if (pendingCount > 0) {
+      badge.textContent = pendingCount + ' pending';
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+    renderReservations(currentResFilter);
+  } catch(e) { console.error('Reservations load error:', e); }
+}
+
+function filterReservations(status, btn) {
+  currentResFilter = status;
+  document.querySelectorAll('.res-filter-btn').forEach(b => {
+    b.style.background = 'transparent'; b.style.color = '#888';
+  });
+  btn.style.background = '#f97316'; btn.style.color = '#fff';
+  renderReservations(status);
+}
+
+function renderReservations(filter) {
+  const el = document.getElementById('reservations-mgmt-list');
+  const empty = document.getElementById('reservations-mgmt-empty');
+  const filtered = filter === 'all'
+    ? allReservations.filter(r => r.status !== 'cancelled')
+    : allReservations.filter(r => r.status === filter);
+
+  if (!filtered.length) {
+    el.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+  const statusColors = {
+    pending: { bg: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: 'rgba(251,191,36,0.3)' },
+    confirmed: { bg: 'rgba(34,197,94,0.1)', color: '#22c55e', border: 'rgba(34,197,94,0.3)' },
+    seated: { bg: 'rgba(99,102,241,0.1)', color: '#818cf8', border: 'rgba(99,102,241,0.3)' },
+    cancelled: { bg: 'rgba(239,68,68,0.08)', color: '#ef4444', border: 'rgba(239,68,68,0.2)' },
+  };
+  el.innerHTML = filtered.map(r => {
+    const sc = statusColors[r.status] || statusColors.pending;
+    const dt = new Date(r.reserved_at);
+    const dtLabel = dt.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+    const isUpcoming = dt > new Date();
+    const preorderHtml = r.items && r.items.length
+      ? `<div style="margin-top:10px; padding:10px; background:#0d0d0d; border-radius:8px; font-size:12px;">
+          <div style="color:#f97316; font-weight:600; margin-bottom:6px;">🛒 Pre-Order Items</div>
+          ${r.items.map(i => `<div style="display:flex;justify-content:space-between;color:#999;padding:2px 0;">${i.product_name} <span>×${i.qty} — ₹${(i.qty * i.price).toFixed(0)}</span></div>`).join('')}
+          <div style="border-top:1px solid #222;margin-top:6px;padding-top:6px;font-weight:700;color:#f97316;display:flex;justify-content:space-between;">
+            <span>Total</span><span>₹${r.items.reduce((s,i)=>s+i.qty*i.price,0).toFixed(0)}</span>
+          </div>
+        </div>` : '';
+    return `
+    <div style="border:1px solid ${sc.border}; background:${sc.bg}; border-radius:14px; padding:16px; transition:all .2s;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+        <div>
+          <div style="font-size:15px; font-weight:700; color:#fff;">📅 ${dtLabel}
+            ${isUpcoming ? '' : '<span style="font-size:10px;color:#666;margin-left:8px;">(past)</span>'}
+          </div>
+          <div style="font-size:12px; color:#888; margin-top:4px;">
+            👤 ${escHtml(r.customer_name || 'Guest')}
+            ${r.table ? ` · 🪑 Table ${r.table}` : ' · <span style="color:#f97316;">No table assigned</span>'}
+            · 👥 ${r.party_size} people
+            ${r.notes ? ` · <em style="color:#999;">${escHtml(r.notes)}</em>` : ''}
+          </div>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+          <span style="display:inline-block; padding:4px 12px; border-radius:8px; font-size:12px; font-weight:700; background:${sc.bg}; color:${sc.color}; border:1px solid ${sc.border};">
+            ${r.status.charAt(0).toUpperCase() + r.status.slice(1)}
+          </span>
+        </div>
+      </div>
+      ${preorderHtml}
+      ${r.status !== 'seated' && r.status !== 'cancelled' ? `
+      <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+        ${r.status === 'pending' ? `
+        <button onclick="confirmReservation(${r.id})" style="flex:1;min-width:100px;padding:8px 12px;background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.4);border-radius:8px;color:#22c55e;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;" onmouseover="this.style.background='rgba(34,197,94,0.25)'" onmouseout="this.style.background='rgba(34,197,94,0.15)'">
+          ✅ Confirm
+        </button>` : ''}
+        ${r.status === 'confirmed' ? `
+        <button onclick="seatReservation(${r.id})" style="flex:1;min-width:100px;padding:8px 12px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.4);border-radius:8px;color:#818cf8;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;" onmouseover="this.style.background='rgba(99,102,241,0.25)'" onmouseout="this.style.background='rgba(99,102,241,0.15)'">
+          🪑 Seat & Start Order
+        </button>` : ''}
+        <button onclick="cancelReservation(${r.id})" style="flex:1;min-width:100px;padding:8px 12px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:8px;color:#ef4444;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;" onmouseover="this.style.background='rgba(239,68,68,0.18)'" onmouseout="this.style.background='rgba(239,68,68,0.08)'">
+          ✕ Cancel
+        </button>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+async function confirmReservation(id) {
+  const r = await api('/api/reservations/' + id + '/confirm', 'POST');
+  if (r.ok) { toast('✅ Reservation confirmed!', 'success'); loadReservations(); }
+  else toast(r.error || 'Error', 'error');
+}
+
+async function seatReservation(id) {
+  if (!confirm('Seat this party? Pre-order items will be sent to kitchen automatically.')) return;
+  const r = await api('/api/reservations/' + id + '/seat', 'POST');
+  if (r.ok) { toast('🪑 Party seated! Kitchen ticket created.', 'success'); loadReservations(); }
+  else toast(r.error || 'Error', 'error');
+}
+
+async function cancelReservation(id) {
+  if (!confirm('Cancel this reservation?')) return;
+  const r = await api('/api/reservations/' + id, 'DELETE');
+  if (r.ok) { toast('Reservation cancelled', 'success'); loadReservations(); }
+  else toast(r.error || 'Error', 'error');
+}
+
 loadStats('today');
 loadReviews();
+loadReservations();
+// Auto-refresh reservations every 60s
+setInterval(loadReservations, 60000);
 </script>
 {% endblock %}
