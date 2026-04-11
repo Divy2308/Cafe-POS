@@ -89,14 +89,147 @@
   .sidebar {
     width: 260px;
     min-width: 260px;
+    position: relative;
+    z-index: 40;
   }
 
-  /* Takeaway toggle */
-  .order-type-toggle {
+  @media (max-width: 1024px) {
+    .sidebar {
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100vh;
+      max-height: 100vh;
+      transition: transform 0.3s ease;
+      transform: translateX(-100%);
+      box-shadow: 2px 0 12px rgba(0,0,0,0.4);
+    }
+    .sidebar.open {
+      transform: translateX(0);
+    }
+    #main-content {
+      width: 100%;
+    }
+  }
+
+  /* Mobile menu toggle button */
+  .mobile-menu-btn {
+    display: none;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 8px;
+    background: transparent;
+    border: none;
+    color: #f0f0f0;
+    cursor: pointer;
+    z-index: 50;
+  }
+
+  @media (max-width: 1024px) {
+    .mobile-menu-btn { display: flex; }
+  }
+
+  /* Responsive grid for tables */
+  #tables-grid {
+    gap: 12px;
+  }
+
+  @media (max-width: 768px) {
+    #tables-grid {
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 8px;
+      padding: 16px !important;
+    }
+  }
+
+  @media (max-width: 480px) {
+    #tables-grid {
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 6px;
+      padding: 12px !important;
+    }
+  }
+
+  /* Responsive product grid */
+  #products-grid {
+    gap: 12px;
+  }
+
+  @media (max-width: 768px) {
+    #products-grid {
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)) !important;
+      gap: 8px;
+      padding: 12px !important;
+    }
+  }
+
+  @media (max-width: 480px) {
+    #products-grid {
+      grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)) !important;
+      gap: 6px;
+    }
+  }
+
+  /* Responsive cart and products layout */
+  @media (max-width: 1024px) {
+    #view-order {
+      flex-direction: column !important;
+    }
+    #view-order > div:last-child {
+      width: 100% !important;
+      min-width: auto !important;
+      border-right: none !important;
+      border-top: 1px solid #2a2a2a;
+      max-height: 35vh;
+    }
+  }
+
+  /* Responsive category pills */
+  #cat-pills {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  @media (max-width: 480px) {
+    #cat-pills {
+      gap: 6px;
+    }
+    .cat-pill {
+      padding: 6px 12px !important;
+      font-size: 11px !important;
+    }
+  }
+
+  /* Responsive payment view */
+  @media (max-width: 768px) {
+    #view-payment {
+      padding: 12px !important;
+    }
+    .card {
+      max-height: calc(100vh - 100px) !important;
+    }
+  }
+
+  /* Touch-friendly buttons */
+  .table-card,
+  .product-btn,
+  .pay-method,
+  .cat-pill {
+    min-height: 44px;
     display: flex;
-    border-radius: 10px;
-    overflow: hidden;
-    border: 1px solid #333;
+    align-items: center;
+    justify-content: center;
+  }
+
+  @media (max-width: 1024px) {
+    .product-btn {
+      padding: 12px 8px !important;
+      min-height: 48px;
+    }
+    .table-card {
+      padding: 16px 8px !important;
+      min-height: 48px;
+    }
   }
 
   .order-type-btn {
@@ -148,9 +281,15 @@
 {% endblock %}
 {% block body %}
 <div class="flex h-screen overflow-hidden">
+  <!-- Mobile Menu Toggle -->
+  <button class="mobile-menu-btn" id="mobile-menu-toggle" onclick="toggleMobileMenu()" title="Toggle menu">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  </button>
 
   <!-- Sidebar -->
-  <div class="sidebar bg-card border-r border-border flex flex-col" style="background:#111">
+  <div class="sidebar bg-card border-r border-border flex flex-col" id="sidebar" style="background:#111">
     <div class="p-5 border-b border-border">
       <div class="flex items-center gap-3">
         <div class="w-9 h-9 brand-gradient rounded-xl flex items-center justify-center flex-shrink-0">
@@ -226,7 +365,7 @@
   </div>
 
   <!-- Main Content -->
-  <div class="flex-1 flex flex-col overflow-hidden">
+  <div class="flex-1 flex flex-col overflow-hidden" id="main-content">
 
     <!-- Top Bar -->
     <div class="border-b border-border px-6 py-3 flex items-center justify-between" style="background:#111">
@@ -459,6 +598,16 @@
       btn.className = 'order-type-btn w-full';
     }
     document.getElementById('takeaway-name-wrap').classList.toggle('hidden', !isTakeaway);
+  }
+
+  function toggleMobileMenu() {
+    const sidebar = document.getElementById('sidebar');
+    sidebar.classList.toggle('open');
+  }
+
+  function closeMobileMenu() {
+    const sidebar = document.getElementById('sidebar');
+    sidebar.classList.remove('open');
   }
 
   async function init() {
@@ -932,6 +1081,7 @@
 
   // ─── Views ────────────────────────────────────────────────
   function showView(v) {
+    closeMobileMenu();
     ['floor', 'order', 'bills', 'reservations', 'payment', 'qr', 'confirm'].forEach(n => {
       document.getElementById('view-' + n).classList.toggle('hidden', n !== v);
       if (n !== 'floor' && n !== 'order' && n !== 'bills' && n !== 'reservations') document.getElementById('view-' + n).classList.toggle('flex', n === v);

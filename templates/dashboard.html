@@ -5,8 +5,19 @@
 <style>
   .stat-card { transition:transform .2s; }
   .stat-card:hover { transform:translateY(-2px); }
-  .period-btn { transition:all .2s; }
+  .period-btn { transition:all .2s; min-height:44px; }
   .period-btn.active { background:rgba(249,115,22,0.15); color:#f97316; border-color:rgba(249,115,22,0.3); }
+  /* Mobile optimizations */
+  @media (max-width:1024px) {
+    .sidebar { position:absolute; left:0; height:100vh; transform:translateX(-100%); transition:transform .3s ease; z-index:40; }
+    .sidebar.open { transform:translateX(0); }
+  }
+  @media (max-width:768px) {
+    .grid-cols-3 { grid-template-columns:1fr !important; }
+    .grid-cols-2 { grid-template-columns:1fr !important; }
+    .stat-card { padding:16px !important; }
+    .period-btn { padding:8px 12px; font-size:12px; }
+  }
 </style>
 {% endblock %}
 {% block body %}
