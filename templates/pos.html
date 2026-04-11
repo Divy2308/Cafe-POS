@@ -9,7 +9,8 @@
     flex-direction: column;
     justify-content: space-between;
     min-height: 140px;
-    padding: 16px !important;
+    padding: 14px !important;
+    border-radius: 12px;
   }
 
   .table-card:hover {
@@ -29,19 +30,21 @@
   .table-card .table-header {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    margin-bottom: 12px;
+    gap: 6px;
+    margin-bottom: 10px;
   }
 
   .table-card .table-number {
-    font-size: 28px;
+    font-size: 24px;
     font-weight: 800;
     line-height: 1;
+    letter-spacing: -0.5px;
   }
 
   .table-card .table-seats {
-    font-size: 12px;
+    font-size: 13px;
     color: #9ca3af;
+    font-weight: 500;
   }
 
   .table-card .table-footer {
@@ -59,13 +62,15 @@
 
   .table-card .table-status .tag {
     font-size: 11px;
-    padding: 4px 8px;
+    padding: 5px 10px;
     border-radius: 6px;
+    font-weight: 600;
   }
 
   .table-card .table-hint {
-    font-size: 11px;
+    font-size: 10px;
     color: #6b7280;
+    font-weight: 500;
   }
 
   .product-btn {
@@ -713,9 +718,9 @@
       </div>
       <div class="table-footer">
         <div class="table-status">
-          <span class="tag ${t.status === 'occupied' ? 'bg-orange-900/40 text-orange-400' : 'bg-gray-800 text-gray-500'}">${t.status === 'occupied' ? 'Occupied' : 'Free'}</span>
+          <span class="tag ${t.status === 'occupied' ? 'bg-orange-900/40 text-orange-400' : 'bg-gray-800 text-gray-500'}">${t.status === 'occupied' ? '🔴 Occupied' : '🟢 Free'}</span>
         </div>
-        <div class="table-hint">(right-click to toggle)</div>
+        <div class="table-hint">right-click ⟲</div>
       </div>
     </div>`).join('');
   }
