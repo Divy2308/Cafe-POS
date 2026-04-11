@@ -9,25 +9,25 @@
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
     <style>
         body {
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a0f0a 100%);
-            color: #f0f0f0;
+            background: #f9fafb;
+            color: #111827;
             font-family: 'DM Sans', sans-serif;
         }
         .brand-gradient {
-            background: linear-gradient(135deg, #f97316, #ea580c);
+            background: #714B67;
         }
         .hero-gradient {
-            background: linear-gradient(135deg, rgba(249, 115, 22, 0.1), rgba(234, 88, 12, 0.05));
+            background: linear-gradient(135deg, rgba(113, 75, 103, 0.1), rgba(113, 75, 103, 0.05));
         }
         .nav-link {
             transition: all 0.2s;
-            color: #f0f0f0;
+            color: #111827;
         }
         .nav-link:hover {
-            color: #f97316;
+            color: #714b67;
         }
         .btn-primary {
-            background: linear-gradient(135deg, #f97316, #ea580c);
+            background: #714B67;
             transition: all 0.2s;
             color: white;
             font-weight: 600;
@@ -37,24 +37,24 @@
             box-shadow: 0 12px 32px rgba(249, 115, 22, 0.4);
         }
         .btn-secondary {
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: #f0f0f0;
+            background: rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            color: #111827;
             transition: all 0.2s;
         }
         .btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.1);
-            border-color: #f97316;
+            background: rgba(0, 0, 0, 0.1);
+            border-color: #714b67;
         }
         .card-glass {
-            background: rgba(26, 26, 26, 0.8);
+            background: rgba(255, 255, 255, 0.8);
             backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(0, 0, 0, 0.08);
         }
         .feature-icon {
             width: 60px;
             height: 60px;
-            background: linear-gradient(135deg, #f97316, #ea580c);
+            background: #714B67;
             border-radius: 12px;
             display: flex;
             align-items: center;
@@ -62,14 +62,14 @@
             font-size: 30px;
         }
         .menu-item {
-            background: rgba(26, 26, 26, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.08);
             border-radius: 12px;
             padding: 16px;
             transition: all 0.3s;
         }
         .menu-item:hover {
-            border-color: #f97316;
+            border-color: #714b67;
             transform: translateY(-4px);
         }
         .fade-in {
@@ -102,14 +102,14 @@
 </head>
 <body>
     <!-- Navigation -->
-    <nav class="fixed w-full top-0 z-50 backdrop-blur-md bg-black/40 border-b border-[rgba(255,255,255,0.08)]">
+    <nav class="fixed w-full top-0 z-50 backdrop-blur-md bg-white/80 border-b border-border">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
                 <div class="flex items-center space-x-2">
                     <div class="w-10 h-10 brand-gradient rounded-lg flex items-center justify-center">
-                        <span class="text-white font-bold text-xl">☕</span>
+                        <span class="text-gray-900 font-bold text-xl">☕</span>
                     </div>
-                    <span class="text-xl font-bold text-white">POS Cafe</span>
+                    <span class="text-xl font-bold text-gray-900">POS Cafe</span>
                 </div>
                 <div class="hidden md:flex items-center space-x-8">
                     <a href="#home" class="nav-link">Home</a>
@@ -133,7 +133,7 @@
                     <h1 class="text-5xl md:text-6xl font-bold mb-6 leading-tight">
                         Manage Your Cafe <span class="brand-gradient bg-clip-text text-transparent">Smarter</span>
                     </h1>
-                    <p class="text-gray-400 text-lg mb-8 leading-relaxed">
+                    <p class="text-gray-500 text-lg mb-8 leading-relaxed">
                         A modern, all-in-one Point of Sale system designed for cafes. From orders to kitchen management, handle everything with ease.
                     </p>
                     <div class="flex flex-col sm:flex-row gap-4">
@@ -144,13 +144,13 @@
                             Learn More →
                         </button>
                     </div>
-                    <div class="mt-12 flex items-center space-x-8 text-sm text-gray-400">
+                    <div class="mt-12 flex items-center space-x-8 text-sm text-gray-500">
                         <div>
-                            <div class="font-bold text-2xl text-white">500+</div>
+                            <div class="font-bold text-2xl text-gray-900">500+</div>
                             <div>Active Users</div>
                         </div>
                         <div>
-                            <div class="font-bold text-2xl text-white">⭐ 4.8</div>
+                            <div class="font-bold text-2xl text-gray-900">⭐ 4.8</div>
                             <div>Rating</div>
                         </div>
                     </div>
@@ -159,7 +159,7 @@
                     <div class="hero-gradient rounded-2xl p-8 min-h-96 flex items-center justify-center">
                         <div class="text-center">
                             <div class="text-6xl mb-4">📱</div>
-                            <p class="text-gray-400">Modern, intuitive interface</p>
+                            <p class="text-gray-500">Modern, intuitive interface</p>
                         </div>
                     </div>
                 </div>
@@ -172,7 +172,7 @@
         <div class="max-w-7xl mx-auto">
             <div class="text-center mb-16">
                 <h2 class="text-4xl font-bold mb-4">About POS Cafe</h2>
-                <p class="text-gray-400 text-lg">Everything you need to run a modern cafe</p>
+                <p class="text-gray-500 text-lg">Everything you need to run a modern cafe</p>
             </div>
             <div class="grid md:grid-cols-2 gap-12 items-center">
                 <div>
@@ -180,29 +180,29 @@
                         <div class="flex items-start space-x-4">
                             <div class="text-2xl">✅</div>
                             <div>
-                                <h3 class="font-bold text-white mb-2">Easy to Use</h3>
-                                <p class="text-gray-400">Intuitive interface designed for cafe staff and customers alike</p>
+                                <h3 class="font-bold text-gray-900 mb-2">Easy to Use</h3>
+                                <p class="text-gray-500">Intuitive interface designed for cafe staff and customers alike</p>
                             </div>
                         </div>
                         <div class="flex items-start space-x-4">
                             <div class="text-2xl">⚡</div>
                             <div>
-                                <h3 class="font-bold text-white mb-2">Real-time Updates</h3>
-                                <p class="text-gray-400">Live order tracking and kitchen updates powered by WebSocket</p>
+                                <h3 class="font-bold text-gray-900 mb-2">Real-time Updates</h3>
+                                <p class="text-gray-500">Live order tracking and kitchen updates powered by WebSocket</p>
                             </div>
                         </div>
                         <div class="flex items-start space-x-4">
                             <div class="text-2xl">📊</div>
                             <div>
-                                <h3 class="font-bold text-white mb-2">Analytics & Reports</h3>
-                                <p class="text-gray-400">Comprehensive insights into sales, orders, and customer preferences</p>
+                                <h3 class="font-bold text-gray-900 mb-2">Analytics & Reports</h3>
+                                <p class="text-gray-500">Comprehensive insights into sales, orders, and customer preferences</p>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="card-glass rounded-2xl p-8">
                     <h3 class="text-2xl font-bold mb-6">Why Choose Us?</h3>
-                    <ul class="space-y-4 text-gray-300">
+                    <ul class="space-y-4 text-gray-600">
                         <li>✨ Modern, responsive design</li>
                         <li>🔒 Secure authentication & data</li>
                         <li>🚀 Fast and reliable</li>
@@ -220,38 +220,38 @@
         <div class="max-w-7xl mx-auto">
             <div class="text-center mb-16">
                 <h2 class="text-4xl font-bold mb-4">Powerful Features</h2>
-                <p class="text-gray-400 text-lg">Everything built for cafe management</p>
+                <p class="text-gray-500 text-lg">Everything built for cafe management</p>
             </div>
             <div class="grid md:grid-cols-3 gap-8">
                 <div class="card-glass p-8 rounded-xl">
                     <div class="feature-icon mb-4">📦</div>
                     <h3 class="text-xl font-bold mb-3">Menu Management</h3>
-                    <p class="text-gray-400">Easy product categorization, pricing, and availability management</p>
+                    <p class="text-gray-500">Easy product categorization, pricing, and availability management</p>
                 </div>
                 <div class="card-glass p-8 rounded-xl">
                     <div class="feature-icon mb-4">🍽️</div>
                     <h3 class="text-xl font-bold mb-3">Table Management</h3>
-                    <p class="text-gray-400">Manage multiple floors and tables with real-time status updates</p>
+                    <p class="text-gray-500">Manage multiple floors and tables with real-time status updates</p>
                 </div>
                 <div class="card-glass p-8 rounded-xl">
                     <div class="feature-icon mb-4">💳</div>
                     <h3 class="text-xl font-bold mb-3">Payment Processing</h3>
-                    <p class="text-gray-400">Support for cash, cards, UPI and multiple payment methods</p>
+                    <p class="text-gray-500">Support for cash, cards, UPI and multiple payment methods</p>
                 </div>
                 <div class="card-glass p-8 rounded-xl">
                     <div class="feature-icon mb-4">👨‍🍳</div>
                     <h3 class="text-xl font-bold mb-3">Kitchen Display</h3>
-                    <p class="text-gray-400">Real-time kitchen tickets with order status tracking</p>
+                    <p class="text-gray-500">Real-time kitchen tickets with order status tracking</p>
                 </div>
                 <div class="card-glass p-8 rounded-xl">
                     <div class="feature-icon mb-4">📈</div>
                     <h3 class="text-xl font-bold mb-3">Analytics</h3>
-                    <p class="text-gray-400">Detailed sales reports and business insights</p>
+                    <p class="text-gray-500">Detailed sales reports and business insights</p>
                 </div>
                 <div class="card-glass p-8 rounded-xl">
                     <div class="feature-icon mb-4">👥</div>
                     <h3 class="text-xl font-bold mb-3">Staff Management</h3>
-                    <p class="text-gray-400">User roles and permissions for different staff members</p>
+                    <p class="text-gray-500">User roles and permissions for different staff members</p>
                 </div>
             </div>
         </div>
@@ -262,26 +262,26 @@
         <div class="max-w-7xl mx-auto">
             <div class="text-center mb-16">
                 <h2 class="text-4xl font-bold mb-4">Sample Menu</h2>
-                <p class="text-gray-400 text-lg">Easy to customize for your cafe</p>
+                <p class="text-gray-500 text-lg">Easy to customize for your cafe</p>
             </div>
             <div class="grid md:grid-cols-3 gap-6">
                 <div class="menu-item">
                     <div class="text-4xl mb-4">☕</div>
                     <h3 class="font-bold text-lg mb-2">Beverages</h3>
-                    <p class="text-gray-400 text-sm mb-4">Coffee, tea, juices, and more</p>
-                    <div class="text-2xl font-bold text-orange-500">From ₹30</div>
+                    <p class="text-gray-500 text-sm mb-4">Coffee, tea, juices, and more</p>
+                    <div class="text-2xl font-bold text-brand-600">From ₹30</div>
                 </div>
                 <div class="menu-item">
                     <div class="text-4xl mb-4">🍕</div>
                     <h3 class="font-bold text-lg mb-2">Food</h3>
-                    <p class="text-gray-400 text-sm mb-4">Pizza, pasta, sandwiches, salads</p>
-                    <div class="text-2xl font-bold text-orange-500">From ₹150</div>
+                    <p class="text-gray-500 text-sm mb-4">Pizza, pasta, sandwiches, salads</p>
+                    <div class="text-2xl font-bold text-brand-600">From ₹150</div>
                 </div>
                 <div class="menu-item">
                     <div class="text-4xl mb-4">🍰</div>
                     <h3 class="font-bold text-lg mb-2">Desserts</h3>
-                    <p class="text-gray-400 text-sm mb-4">Cake, ice cream, brownies</p>
-                    <div class="text-2xl font-bold text-orange-500">From ₹80</div>
+                    <p class="text-gray-500 text-sm mb-4">Cake, ice cream, brownies</p>
+                    <div class="text-2xl font-bold text-brand-600">From ₹80</div>
                 </div>
             </div>
         </div>
@@ -292,7 +292,7 @@
         <div class="max-w-4xl mx-auto">
             <div class="card-glass rounded-xl p-12 text-center">
                 <h2 class="text-3xl font-bold mb-4">Get Started Today</h2>
-                <p class="text-gray-400 text-lg mb-8">Join hundreds of cafes managing their business better</p>
+                <p class="text-gray-500 text-lg mb-8">Join hundreds of cafes managing their business better</p>
                 <div class="flex flex-col sm:flex-row gap-4 justify-center">
                     <button onclick="redirectToAuth('signup')" class="btn-primary px-8 py-3 rounded-lg font-semibold">
                         Create Free Account
@@ -309,42 +309,42 @@
     </section>
 
     <!-- Footer -->
-    <footer class="border-t border-[rgba(255,255,255,0.08)] py-12 px-4 mt-20">
+    <footer class="border-t border-border py-12 px-4 mt-20">
         <div class="max-w-7xl mx-auto">
             <div class="grid md:grid-cols-4 gap-8 mb-8">
                 <div>
                     <div class="flex items-center space-x-2 mb-4">
                         <div class="w-8 h-8 brand-gradient rounded-lg flex items-center justify-center">
-                            <span class="text-white font-bold text-lg">☕</span>
+                            <span class="text-gray-900 font-bold text-lg">☕</span>
                         </div>
                         <span class="font-bold">POS Cafe</span>
                     </div>
-                    <p class="text-gray-400 text-sm">Modern POS system for smart cafes</p>
+                    <p class="text-gray-500 text-sm">Modern POS system for smart cafes</p>
                 </div>
                 <div>
                     <h4 class="font-bold mb-4">Product</h4>
-                    <ul class="space-y-2 text-gray-400 text-sm">
-                        <li><a href="#features" class="hover:text-orange-500">Features</a></li>
-                        <li><a href="#" class="hover:text-orange-500">Pricing</a></li>
-                        <li><a href="#" class="hover:text-orange-500">Demo</a></li>
+                    <ul class="space-y-2 text-gray-500 text-sm">
+                        <li><a href="#features" class="hover:text-brand-600">Features</a></li>
+                        <li><a href="#" class="hover:text-brand-600">Pricing</a></li>
+                        <li><a href="#" class="hover:text-brand-600">Demo</a></li>
                     </ul>
                 </div>
                 <div>
                     <h4 class="font-bold mb-4">Company</h4>
-                    <ul class="space-y-2 text-gray-400 text-sm">
-                        <li><a href="#about" class="hover:text-orange-500">About</a></li>
-                        <li><a href="#contact" class="hover:text-orange-500">Contact</a></li>
+                    <ul class="space-y-2 text-gray-500 text-sm">
+                        <li><a href="#about" class="hover:text-brand-600">About</a></li>
+                        <li><a href="#contact" class="hover:text-brand-600">Contact</a></li>
                     </ul>
                 </div>
                 <div>
                     <h4 class="font-bold mb-4">Legal</h4>
-                    <ul class="space-y-2 text-gray-400 text-sm">
-                        <li><a href="#" class="hover:text-orange-500">Privacy</a></li>
-                        <li><a href="#" class="hover:text-orange-500">Terms</a></li>
+                    <ul class="space-y-2 text-gray-500 text-sm">
+                        <li><a href="#" class="hover:text-brand-600">Privacy</a></li>
+                        <li><a href="#" class="hover:text-brand-600">Terms</a></li>
                     </ul>
                 </div>
             </div>
-            <div class="border-t border-[rgba(255,255,255,0.08)] pt-8 text-center text-gray-500 text-sm">
+            <div class="border-t border-border pt-8 text-center text-gray-500 text-sm">
                 <p>&copy; 2024 POS Cafe. All rights reserved.</p>
             </div>
         </div>
