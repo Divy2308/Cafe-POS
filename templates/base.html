@@ -134,15 +134,29 @@ function toast(msg, type='success') {
   setTimeout(()=>t.className='toast',3000);
 }
 async function api(url, method='GET', data=null) {
-  const opts = { method, headers:{'Content-Type':'application/json'} };
-  if (data) opts.body = JSON.stringify(data);
-  const r = await fetch(url, opts);
-  const payload = await r.json().catch(()=>({}));
-  if (r.status === 401 && window.location.pathname !== '/auth') {
-    window.location.href = '/auth';
-    return { error: 'unauthorized' };
+  try {
+    const opts = { method, headers:{'Content-Type':'application/json'} };
+    if (data) opts.body = JSON.stringify(data);
+    const r = await fetch(url, opts);
+    
+    if (r.status === 401 && window.location.pathname !== '/auth') {
+      window.location.href = '/auth';
+      return { error: 'unauthorized' };
+    }
+    
+    const payload = await r.json().catch(()=>({}));
+    
+    if (!r.ok) {
+      console.error('API Error:', payload);
+      toast(payload.error || `Error ${r.status}: ${r.statusText}`, 'error');
+    }
+    
+    return payload;
+  } catch (e) {
+    console.error('Network Error:', e);
+    toast('Network error. Check connection.', 'error');
+    return { error: 'network_error' };
   }
-  return payload;
 }
 
 document.addEventListener('DOMContentLoaded', () => {

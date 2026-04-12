@@ -1,163 +1,179 @@
-{% extends "base.html" %}
-{% block title %}Receipt #{{ order.order_number }} — POS Cafe{% endblock %}
-{% block extra_head %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Receipt #{{ order.order_number }}</title>
 <style>
-  body { background:#050505; }
-  .receipt-wrap { max-width:480px; margin:40px auto; padding:20px; }
-  .receipt-card { background:#111; border:1px solid #222; border-radius:20px; overflow:hidden; font-family:'DM Sans',sans-serif; }
-  .receipt-header { background:linear-gradient(135deg,#f97316,#ea580c); padding:28px 28px 24px; color:#fff; text-align:center; }
-  .receipt-body { padding:24px 28px; }
-  .receipt-row { display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid #1a1a1a; font-size:14px; }
-  .receipt-row:last-child { border-bottom:none; }
-  .receipt-total-row { display:flex; justify-content:space-between; align-items:center; padding:14px 0; font-size:17px; font-weight:800; }
-  .receipt-meta { display:flex; justify-content:space-between; padding:10px 0; font-size:12px; color:#888; border-bottom:1px solid #1a1a1a; }
-  .receipt-footer { background:#0a0a0a; padding:18px 28px; text-align:center; font-size:12px; color:#555; border-top:1px solid #1a1a1a; }
-  .status-badge { display:inline-block; padding:4px 14px; border-radius:20px; font-size:12px; font-weight:700; }
-  .status-paid { background:rgba(34,197,94,0.15); color:#22c55e; border:1px solid rgba(34,197,94,0.3); }
-  .status-sent { background:rgba(249,115,22,0.15); color:#f97316; border:1px solid rgba(249,115,22,0.3); }
-  .action-btns { display:flex; gap:10px; margin-top:20px; flex-wrap:wrap; }
-  .action-btn { flex:1; min-width:140px; display:flex; align-items:center; justify-content:center; gap:8px; padding:12px 16px; border-radius:12px; font-size:13px; font-weight:700; cursor:pointer; transition:all .2s; border:none; text-decoration:none; }
-  .btn-print { background:#1a1a1a; color:#ccc; border:1px solid #333; }
-  .btn-print:hover { background:#222; }
-  .btn-wa { background:#25D366; color:#fff; }
-  .btn-wa:hover { background:#20ba58; transform:translateY(-1px); box-shadow:0 6px 20px rgba(37,211,102,0.3); }
-  .btn-back { background:transparent; color:#888; border:1px solid #333; }
-  .btn-back:hover { color:#ccc; }
-  /* Print styles */
+  @page { margin: 0; size: 58mm auto; }
+  body {
+    background: #f4f4f4;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 10px;
+    line-height: 1.1;
+    margin: 0;
+    padding: 10px 0;
+    display: flex;
+    justify-content: center;
+  }
+  .receipt {
+    background: #fff;
+    width: 58mm;
+    padding: 5px 8px;
+    box-sizing: border-box;
+    color: #000;
+  }
+  .r-center { text-align: center; }
+  .r-bold { font-weight: bold; }
+  .r-shop-title { font-size: 14px; margin-bottom: 2px; text-transform: uppercase; }
+  .r-shop-address { font-size: 10px; margin-bottom: 2px; }
+  .r-shop-contact { font-size: 10px; margin-bottom: 4px; }
+  .r-invoice-header { font-size: 12px; margin: 10px 0 5px; text-transform: uppercase; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 3px 0; }
+  
+  .r-meta-row { display: flex; justify-content: space-between; margin-bottom: 2px; position: relative; }
+  .r-border-top { border-top: 1px solid #000; margin-top: 5px; padding-top: 5px; }
+  .r-border-bottom { border-bottom: 1px solid #000; margin-bottom: 5px; padding-bottom: 5px; }
+  
+  table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+  th { text-align: left; border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 4px 0; font-size: 10px; text-transform: uppercase; }
+  td { padding: 4px 0; vertical-align: top; }
+  
+  .col-item { width: 45%; }
+  .col-qty { width: 15%; text-align: center; }
+  .col-rate { width: 20%; text-align: right; }
+  .col-amt { width: 20%; text-align: right; }
+
+  .r-totals { margin-top: 5px; font-size: 11px; }
+  .r-totals-row { display: flex; justify-content: flex-end; margin-bottom: 2px; }
+  .r-totals-label { flex: 1; text-align: right; padding-right: 15px; color: #333; }
+  .r-totals-val { width: 80px; text-align: right; }
+  .r-grand { font-size: 13px; font-weight: bold; border-top: 1.5px solid #000; border-bottom: 1.5px solid #000; padding: 4px 0; margin-top: 4px; }
+  
+  .r-footer { margin-top: 15px; font-size: 10px; text-transform: lowercase; }
+  .no-print { position: fixed; top: 10px; right: 10px; background: #007bff; color: #fff; border: none; padding: 8px 15px; cursor: pointer; border-radius: 4px; }
+  
   @media print {
-    body { background:#fff !important; color:#000 !important; }
-    .no-print { display:none !important; }
-    .receipt-wrap { margin:0; padding:0; max-width:100%; }
-    .receipt-card { border:none; border-radius:0; background:#fff; }
-    .receipt-header { background:#f97316 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-    .receipt-body { background:#fff; color:#000; }
-    .receipt-row, .receipt-meta, .receipt-total-row { color:#000; border-color:#ddd; }
-    .receipt-footer { background:#f5f5f5; color:#555; }
+    body { background: #fff; padding: 0; }
+    .no-print { display: none; }
+    .receipt { width: 100%; box-shadow: none; padding: 0; }
   }
 </style>
-{% endblock %}
-{% block body %}
-<div class="receipt-wrap">
-  <!-- Back button -->
-  <div class="no-print" style="margin-bottom:16px;">
-    <a href="javascript:history.back()" class="action-btn btn-back" style="display:inline-flex; width:auto; padding:8px 16px; font-size:13px;">
-      ← Back
-    </a>
+</head>
+<body>
+
+<button class="no-print" onclick="window.print()">Print Receipt</button>
+
+<div class="receipt">
+  <div class="r-center">
+    <div class="r-bold r-invoice-header">RETAIL INVOICE</div>
+    <div class="r-shop-title r-bold">{{ cafe_settings.name }}</div>
+    {% if cafe_settings.address %}
+    <div class="r-shop-address">{{ cafe_settings.address }}</div>
+    {% endif %}
+    {% if cafe_settings.phone %}
+    <div class="r-shop-contact">Contact: {{ cafe_settings.phone }}</div>
+    {% endif %}
+    {% if cafe_settings.gst_no %}
+    <div class="r-bold">GST NO : {{ cafe_settings.gst_no }}</div>
+    {% endif %}
+    {% if cafe_settings.fssai_no %}
+    <div class="r-bold">FSSAI : {{ cafe_settings.fssai_no }}</div>
+    {% endif %}
   </div>
 
-  <div class="receipt-card">
-    <!-- Header -->
-    <div class="receipt-header">
-      <div style="font-size:36px; margin-bottom:8px;">🍽️</div>
-      <div style="font-size:22px; font-weight:800; letter-spacing:.3px;">POS Cafe</div>
-      <div style="font-size:13px; opacity:.85; margin-top:4px;">Official Receipt</div>
+  <div class="r-border-top r-border-bottom">
+    <div class="r-meta-row">
+       <span>Name: {{ order.customer_name or 'Walk-in' }}</span>
+       <span>{{ '(M: ' ~ order.customer_phone ~ ')' if order.customer_phone else '' }}</span>
     </div>
+  </div>
 
-    <!-- Body -->
-    <div class="receipt-body">
-      <!-- Order meta -->
-      <div class="receipt-meta">
-        <span>Order</span>
-        <span style="color:#f97316; font-weight:700;">#{{ order.order_number }}</span>
-      </div>
-      <div class="receipt-meta">
-        <span>Date</span>
-        <span>{{ order.created_at.strftime('%d %b %Y, %I:%M %p') if order.created_at else '—' }}</span>
-      </div>
-      <div class="receipt-meta">
-        <span>{{ 'Takeaway' if not order.table else 'Table' }}</span>
-        <span>{{ order.table.number if order.table else (order.customer_name or 'Takeaway') }}</span>
-      </div>
-      <div class="receipt-meta" style="border-bottom:2px solid #222; padding-bottom:14px;">
-        <span>Status</span>
-        <span class="status-badge status-{{ order.status }}">{{ order.status.capitalize() }}</span>
-      </div>
+  <div class="r-meta-row">
+    <span>Date: {{ order.created_at.strftime('%d/%m/%y') }}</span>
+    <span class="r-bold">{{ 'Pick Up' if not order.table else 'Dine In (' ~ order.table.number ~ ')' }}</span>
+  </div>
+  <div class="r-meta-row">
+    <span>{{ order.created_at.strftime('%H:%M') }}</span>
+    <span></span>
+  </div>
+  <div class="r-meta-row">
+    <span>Cashier: {{ order.user.name if order.user else 'biller' }}</span>
+    <span>Bill No.: {{ order.order_number[-4:] }}</span>
+  </div>
+  <div class="r-bold" style="font-size: 13px; margin-top: 3px;">
+    Token No.: {{ order.order_number[-2:] }}
+  </div>
 
-      <!-- Items -->
-      <div style="margin-top:14px; margin-bottom:6px; font-size:11px; color:#666; text-transform:uppercase; letter-spacing:.08em; font-weight:600;">Items Ordered</div>
+  <table>
+    <thead>
+      <tr>
+        <th class="col-item">Item</th>
+        <th class="col-qty">Qty.</th>
+        <th class="col-rate">Price</th>
+        <th class="col-amt">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
       {% for item in order.items %}
-      <div class="receipt-row">
-        <div>
-          <div style="font-weight:600; color:#e5e5e5;">{{ item.product_name }}</div>
-          {% if item.notes %}<div style="font-size:11px; color:#f97316; font-style:italic; margin-top:2px;">📝 {{ item.notes }}</div>{% endif %}
-        </div>
-        <div style="text-align:right; flex-shrink:0; margin-left:12px;">
-          <div style="color:#888; font-size:12px;">₹{{ item.price|int }} × {{ item.qty }}</div>
-          <div style="color:#f97316; font-weight:700;">₹{{ (item.price * item.qty)|int }}</div>
-        </div>
+      <tr>
+        <td class="col-item">
+            {{ item.product_name }}
+            {% if item.notes %}<br><small style="font-style:italic">({{ item.notes }})</small>{% endif %}
+        </td>
+        <td class="col-qty">{{ item.qty }}</td>
+        <td class="col-rate">{{ "%.2f"|format(item.price) }}</td>
+        <td class="col-amt">{{ "%.2f"|format(item.price * item.qty) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="r-totals r-border-top">
+    <div class="r-totals-row">
+      <div class="r-totals-label">Total Qty: {{ order.total_qty }}</div>
+      <div class="r-totals-label">Sub Total</div>
+      <div class="r-totals-val">{{ "%.2f"|format(order.subtotal) }}</div>
+    </div>
+    
+    {% if order.tax_breakdown_json %}
+      {% set breakdown = [] %}
+      {# Use a simple hack to parse JSON in jinja if no filter available, though here we passed it as dict via backend usually #}
+      {# But serialize_bill gives dict, so it should be fine if cafe_settings is passed from backend route #}
+      {% set data = order.tax_breakdown_json|from_json %}
+      {% for label, amt in data.items() %}
+      <div class="r-totals-row">
+        <div class="r-totals-label">{{ label }}</div>
+        <div class="r-totals-val">{{ "%.2f"|format(amt) }}</div>
       </div>
       {% endfor %}
+    {% endif %}
 
-      <!-- Totals -->
-      {% set subtotal = order.items | map(attribute='price') | list %}
-      {% set subtotal_val = namespace(v=0) %}
-      {% for item in order.items %}{% set subtotal_val.v = subtotal_val.v + item.price * item.qty %}{% endfor %}
-      <div style="border-top:2px solid #222; margin-top:10px; padding-top:10px;">
-        <div style="display:flex; justify-content:space-between; font-size:13px; color:#888; padding:4px 0;">
-          <span>Subtotal</span>
-          <span>₹{{ subtotal_val.v|int }}</span>
-        </div>
-        {% if order.tip and order.tip > 0 %}
-        <div style="display:flex; justify-content:space-between; font-size:13px; color:#888; padding:4px 0;">
-          <span>Tip</span>
-          <span>₹{{ order.tip|int }}</span>
-        </div>
-        {% endif %}
-        <div class="receipt-total-row" style="border-top:1px solid #333; margin-top:8px;">
-          <span style="color:#ccc;">Total Paid</span>
-          <span style="color:#22c55e; font-size:22px;">₹{{ (subtotal_val.v + (order.tip or 0))|int }}</span>
-        </div>
-        {% if order.payment_method %}
-        <div style="display:flex; justify-content:space-between; font-size:12px; color:#888; margin-top:4px;">
-          <span>Payment</span>
-          <span style="text-transform:capitalize;">{{ order.payment_method }}</span>
-        </div>
-        {% endif %}
-      </div>
+    <div class="r-totals-row">
+      <div class="r-totals-label">Round off</div>
+      <div class="r-totals-val">{{ "%.2f"|format(order.round_off) }}</div>
     </div>
 
-    <!-- Footer -->
-    <div class="receipt-footer">
-      <div style="margin-bottom:4px;">Thank you for dining with us! 😊</div>
-      <div>POS Cafe · {{ order.created_at.strftime('%Y') if order.created_at else '' }}</div>
+    <div class="r-grand r-totals-row">
+      <div class="r-totals-label r-bold">Grand Total</div>
+      <div class="r-totals-val r-bold" style="font-size: 16px;">₹{{ "%.2f"|format(order.total + order.tip) }}</div>
     </div>
   </div>
 
-  <!-- Action buttons -->
-  <div class="action-btns no-print">
-    <button onclick="window.print()" class="action-btn btn-print">
-      🖨️ Print Receipt
-    </button>
-    <button onclick="shareOnWhatsApp()" class="action-btn btn-wa">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-      Share on WhatsApp
-    </button>
+  <div class="r-center r-footer">
+    <div class="r-bold" style="margin-bottom: 10px;">{{ cafe_settings.footer_note or 'Thanks. Visit Again!!!' }}</div>
+    <div class="r-bold">Order Once Placed can not Be cancelled.</div>
   </div>
+
 </div>
 
 <script>
-function shareOnWhatsApp() {
-  const orderNum = '{{ order.order_number }}';
-  const table = '{{ order.table.number if order.table else (order.customer_name or "Takeaway") }}';
-  const tableLabel = {{ 'false' if not order.table else 'true' }} ? `Table ${table}` : `${table}`;
-  {% set subtotal_ws = namespace(v=0) %}
-  {% for item in order.items %}{% set subtotal_ws.v = subtotal_ws.v + item.price * item.qty %}{% endfor %}
-  const lines = [
-    '🧾 *POS Cafe — Receipt*',
-    `Order: ${orderNum} | ${tableLabel}`,
-    '───────────────',
-    {% for item in order.items %}
-    `{{ item.product_name }} × {{ item.qty }} — ₹{{ (item.price * item.qty)|int }}`,
-    {% endfor %}
-    '───────────────',
-    `*Total: ₹{{ (subtotal_ws.v + (order.tip or 0))|int }}*`,
-    {{ ('"Tip: ₹" + ' ~ (order.tip|int|string)) if order.tip and order.tip > 0 else '""' }},
-    '',
-    'Thank you for dining with us! 😊',
-    'POS Cafe'
-  ].filter(Boolean);
-  const text = lines.join('\n');
-  window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
-}
+  {% if auto_print %}
+  window.onload = function() {
+    window.print();
+    setTimeout(function() { window.close(); }, 500);
+  };
+  {% endif %}
 </script>
-{% endblock %}
+
+</body>
+</html>

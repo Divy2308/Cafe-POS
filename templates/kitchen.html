@@ -107,14 +107,105 @@
 let tickets = [];
 const socket = io();
 const OVERDUE_MINUTES = 15;
+const KITCHEN_ORDERS_ENDPOINT = '/api/kitchen/orders';
+const KITCHEN_POLL_INTERVAL_MS = 5000;
+const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+
+let audioContext = null;
+let audioUnlocked = false;
+let hasHydratedTickets = false;
+let knownActiveTicketIds = new Set();
+
+function getKitchenAudioContext() {
+  if (!AudioContextClass) return null;
+  if (!audioContext) {
+    audioContext = new AudioContextClass();
+  }
+  return audioContext;
+}
+
+async function unlockKitchenAudio() {
+  const ctx = getKitchenAudioContext();
+  if (!ctx) return;
+  if (ctx.state === 'suspended') {
+    await ctx.resume();
+  }
+  audioUnlocked = ctx.state === 'running';
+}
+
+function playKitchenChime() {
+  const ctx = getKitchenAudioContext();
+  if (!ctx || (!audioUnlocked && ctx.state !== 'running')) return;
+  if (ctx.state === 'suspended') {
+    ctx.resume().catch(() => {});
+    if (ctx.state !== 'running') return;
+  }
+
+  const now = ctx.currentTime;
+  const masterGain = ctx.createGain();
+  masterGain.gain.setValueAtTime(0.12, now);
+  masterGain.connect(ctx.destination);
+
+  const scheduleTone = (frequency, startOffset, duration, peakGain) => {
+    const startAt = now + startOffset;
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(frequency, startAt);
+    oscillator.frequency.exponentialRampToValueAtTime(frequency * 1.012, startAt + duration);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(2400, startAt);
+    filter.Q.setValueAtTime(0.7, startAt);
+
+    gainNode.gain.setValueAtTime(0.0001, startAt);
+    gainNode.gain.linearRampToValueAtTime(peakGain, startAt + 0.018);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
+
+    oscillator.connect(filter);
+    filter.connect(gainNode);
+    gainNode.connect(masterGain);
+
+    oscillator.start(startAt);
+    oscillator.stop(startAt + duration + 0.05);
+  };
+
+  scheduleTone(880, 0, 0.22, 0.85);
+  scheduleTone(1174.66, 0.16, 0.3, 0.6);
+}
+
+function findNewTicketIds(nextTickets) {
+  const nextIds = new Set(nextTickets.map(ticket => ticket.id));
+  const newIds = [];
+
+  nextIds.forEach(id => {
+    if (!knownActiveTicketIds.has(id)) {
+      newIds.push(id);
+    }
+  });
+
+  knownActiveTicketIds = nextIds;
+  return newIds;
+}
+
+document.addEventListener('click', () => {
+  unlockKitchenAudio().catch(() => {});
+}, { once: true, capture: true });
 
 socket.on('new_ticket', t => {
-  // Insert so oldest stays at top: append to end (render will sort)
-  tickets.push(t);
+  const alreadyKnown = knownActiveTicketIds.has(t.id);
+  knownActiveTicketIds = new Set([...knownActiveTicketIds, t.id]);
+  if (!tickets.some(ticket => ticket.id === t.id)) {
+    // Insert so oldest stays at top: append to end (render will sort)
+    tickets.push(t);
+  }
   render();
-  toast('🍳 New order: '+t.order_number);
-  // Play a subtle beep sound
-  try { new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAA...').play(); } catch(e) {}
+  if (hasHydratedTickets && !alreadyKnown) {
+    toast('🍳 New order: ' + t.order_number);
+    playKitchenChime();
+  }
 });
 
 socket.on('ticket_update', d => {
@@ -133,12 +224,19 @@ socket.on('ticket_update', d => {
 });
 
 async function loadTickets() {
-  const data = await api('/api/kitchen/tickets');
+  const data = await api(KITCHEN_ORDERS_ENDPOINT);
+  const newTicketIds = findNewTicketIds(data);
   tickets = data;
   // Update avg prep badge from first ticket (all have same avg)
   if (tickets.length > 0 && tickets[0].avg_prep_minutes) {
     updateAvgBadge(tickets[0].avg_prep_minutes);
   }
+  if (hasHydratedTickets && newTicketIds.length > 0) {
+    const latestNewTicket = tickets.find(ticket => newTicketIds.includes(ticket.id));
+    toast(latestNewTicket ? '🍳 New order: ' + latestNewTicket.order_number : '🍳 New order received');
+    playKitchenChime();
+  }
+  hasHydratedTickets = true;
   render();
 }
 
@@ -260,6 +358,6 @@ setInterval(()=>{
 }, 1000);
 
 loadTickets();
-setInterval(loadTickets, 30000);
+setInterval(loadTickets, KITCHEN_POLL_INTERVAL_MS);
 </script>
 {% endblock %}

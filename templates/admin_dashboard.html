@@ -1,586 +1,650 @@
 {% extends "base.html" %}
-
 {% block title %}Admin Dashboard - POS Cafe{% endblock %}
 
 {% block body %}
 <div class="flex h-screen bg-surface">
-    <!-- Sidebar -->
-    <div class="w-64 bg-card border-r border-border overflow-y-auto">
-        <div class="p-6 border-b border-border">
-            <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 brand-gradient text-white rounded-lg flex items-center justify-center">
-                    <span class=" font-bold">☕</span>
+  <aside class="w-72 bg-card border-r border-border flex flex-col">
+    <div class="p-6 border-b border-border">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 brand-gradient text-white rounded-xl flex items-center justify-center">☕</div>
+        <div>
+          <div class="font-display font-700">POS Cafe</div>
+          <div class="text-xs text-gray-500">Admin Dashboard</div>
+        </div>
+      </div>
+    </div>
+
+    <nav class="p-4 space-y-2">
+      <button onclick="switchTab('users', this)" class="nav-link w-full text-left px-4 py-3 rounded-lg transition-all flex items-center gap-3 active">
+        <span>👥</span><span>Staff</span>
+      </button>
+      <button onclick="switchTab('attendance', this)" class="nav-link w-full text-left px-4 py-3 rounded-lg transition-all flex items-center gap-3">
+        <span>⏱️</span><span>Attendance</span>
+      </button>
+      <button onclick="switchTab('compare', this)" class="nav-link w-full text-left px-4 py-3 rounded-lg transition-all flex items-center gap-3">
+        <span>🏪</span><span>Compare Branches</span>
+      </button>
+      <button onclick="switchTab('settings', this)" class="nav-link w-full text-left px-4 py-3 rounded-lg transition-all flex items-center gap-3">
+        <span>⚙️</span><span>Settings</span>
+      </button>
+    </nav>
+
+    <div class="mt-auto p-4 border-t border-border">
+      <div class="card p-4">
+        <div class="text-sm font-semibold">{{ user_name }}</div>
+        <div class="text-xs text-gray-500 mt-1">
+          {% if active_branch %}{{ active_branch.name }}{% else %}No branch selected{% endif %}
+        </div>
+        <div class="flex gap-2 mt-4">
+          <button onclick="goToPOS()" class="flex-1 btn-primary py-2 rounded-lg text-sm text-white">Go to POS</button>
+          <button onclick="logout()" class="flex-1 btn-ghost py-2 rounded-lg text-sm">Logout</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="flex-1 overflow-auto">
+    <div class="border-b border-border px-6 py-4 flex items-center justify-between">
+      <div>
+        <h1 class="text-3xl font-bold" id="pageTitle">Staff Management</h1>
+        <div class="text-sm text-gray-500 mt-1" id="pageSubtitle">Manage staff, rates, and branch assignments.</div>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="hidden" id="branchSwitcherWrap">
+          <label class="text-xs text-gray-500 block mb-1">Active Branch</label>
+          <select id="branchSwitcher" class="min-w-[220px]" onchange="handleBranchSwitch()"></select>
+        </div>
+        <div class="card px-4 py-3">
+          <div class="text-[11px] uppercase tracking-wider text-gray-500">Current Scope</div>
+          <div class="font-semibold" id="activeBranchLabel">{% if active_branch %}{{ active_branch.name }}{% else %}All branches{% endif %}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="p-6 space-y-6">
+      <section id="users-tab" class="tab-content">
+        <div class="flex items-center justify-between mb-5">
+          <div>
+            <h2 class="text-2xl font-bold">Staff Management</h2>
+            <p class="text-sm text-gray-500 mt-1">Each staff member belongs to a branch and can have an hourly rate.</p>
+          </div>
+          <button onclick="openAddUserModal()" class="btn-primary px-4 py-2 rounded-lg text-white font-semibold">+ Add Staff</button>
+        </div>
+
+        <div class="card p-6 overflow-x-auto">
+          <table class="w-full">
+            <thead>
+              <tr class="border-b border-border">
+                <th class="text-left py-3 px-4 text-gray-500 font-semibold">Name</th>
+                <th class="text-left py-3 px-4 text-gray-500 font-semibold">Email</th>
+                <th class="text-left py-3 px-4 text-gray-500 font-semibold">Role</th>
+                <th class="text-left py-3 px-4 text-gray-500 font-semibold">Hourly Rate</th>
+                <th class="text-left py-3 px-4 text-gray-500 font-semibold">Branch</th>
+                <th class="text-left py-3 px-4 text-gray-500 font-semibold">Joined</th>
+                <th class="text-left py-3 px-4 text-gray-500 font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="staffTable">
+              <tr><td colspan="7" class="py-8 text-center text-gray-500">Loading staff...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="attendance-tab" class="tab-content hidden">
+        <div class="flex items-center justify-between mb-5">
+          <div>
+            <h2 class="text-2xl font-bold">Attendance & Payroll</h2>
+            <p class="text-sm text-gray-500 mt-1">Review clock-in/out pairs and adjust missed clock-outs.</p>
+          </div>
+        </div>
+
+        <div class="card p-6 mb-6">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label class="block text-sm text-gray-500 mb-2">Staff</label>
+              <select id="attendanceStaffFilter"></select>
+            </div>
+            <div>
+              <label class="block text-sm text-gray-500 mb-2">Start Date</label>
+              <input type="date" id="attendanceStartDate">
+            </div>
+            <div>
+              <label class="block text-sm text-gray-500 mb-2">End Date</label>
+              <input type="date" id="attendanceEndDate">
+            </div>
+            <div class="flex items-end">
+              <button onclick="loadAttendanceReport()" class="w-full btn-primary py-2 rounded-lg text-white font-semibold">Apply Filters</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card p-6 overflow-x-auto">
+          <table class="w-full">
+            <thead>
+              <tr class="border-b border-border">
+                <th class="text-left py-3 px-4 text-gray-500 font-semibold">Staff</th>
+                <th class="text-left py-3 px-4 text-gray-500 font-semibold">Date</th>
+                <th class="text-left py-3 px-4 text-gray-500 font-semibold">Clock In</th>
+                <th class="text-left py-3 px-4 text-gray-500 font-semibold">Clock Out</th>
+                <th class="text-left py-3 px-4 text-gray-500 font-semibold">Hours</th>
+                <th class="text-left py-3 px-4 text-gray-500 font-semibold">Pay</th>
+                <th class="text-left py-3 px-4 text-gray-500 font-semibold">Manual Edit</th>
+              </tr>
+            </thead>
+            <tbody id="attendanceTable">
+              <tr><td colspan="7" class="py-8 text-center text-gray-500">Loading attendance...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="compare-tab" class="tab-content hidden">
+        <div class="flex items-center justify-between mb-5">
+          <div>
+            <h2 class="text-2xl font-bold">Compare Branches</h2>
+            <p class="text-sm text-gray-500 mt-1">Side-by-side sales summary across outlets for a selected date range.</p>
+          </div>
+          <button id="addBranchBtn" onclick="openBranchModal()" class="hidden btn-primary px-4 py-2 rounded-lg text-white font-semibold">+ Add Branch</button>
+        </div>
+
+        <div class="card p-6 mb-6">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-sm text-gray-500 mb-2">Start Date</label>
+              <input type="date" id="compareStartDate">
+            </div>
+            <div>
+              <label class="block text-sm text-gray-500 mb-2">End Date</label>
+              <input type="date" id="compareEndDate">
+            </div>
+            <div class="flex items-end">
+              <button onclick="loadBranchComparison()" class="w-full btn-primary py-2 rounded-lg text-white font-semibold">Compare</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="branchCompareGrid" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+      </section>
+
+      <section id="settings-tab" class="tab-content hidden">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-2 card p-6">
+            <h2 class="text-2xl font-bold mb-6">Cafe Settings</h2>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm text-gray-500 mb-2">Cafe Name</label>
+                <input type="text" id="cafeName">
+              </div>
+              <div>
+                <label class="block text-sm text-gray-500 mb-2">Phone Number</label>
+                <input type="tel" id="cafePhone">
+              </div>
+              <div>
+                <label class="block text-sm text-gray-500 mb-2">Email</label>
+                <input type="email" id="cafeEmail">
+              </div>
+              <div>
+                <label class="block text-sm text-gray-500 mb-2">Address</label>
+                <textarea id="cafeAddress" rows="3"></textarea>
+              </div>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm text-gray-500 mb-2">Open Time</label>
+                  <input type="time" id="openTime">
                 </div>
                 <div>
-                    <div class="font-bold ">POS Cafe</div>
-                    <div class="text-xs ">Admin Panel</div>
+                  <label class="block text-sm text-gray-500 mb-2">Close Time</label>
+                  <input type="time" id="closeTime">
                 </div>
+              </div>
+              <div>
+                <label class="block text-sm text-gray-500 mb-2">Default Tax Rate (%)</label>
+                <input type="number" id="taxRate" min="0" max="100">
+              </div>
             </div>
-        </div>
+          </div>
 
-        <nav class="p-4 space-y-2">
-            <button onclick="switchTab('users')" class="nav-link w-full text-left px-4 py-3 rounded-lg transition-all flex items-center space-x-3 active">
-                <span class="text-xl">👥</span>
-                <span>Staff Management</span>
-            </button>
-            <button onclick="switchTab('settings')" class="nav-link w-full text-left px-4 py-3 rounded-lg transition-all flex items-center space-x-3">
-                <span class="text-xl">⚙️</span>
-                <span>Cafe Settings</span>
-            </button>
-        </nav>
-
-        <div class="p-4 border-t border-border mt-auto">
-            <div class="bg-gray-50 rounded-lg p-4 mb-4 text-center">
-                <div class="text-2xl font-bold text-brand-600 mb-2">Welcome</div>
-                <div class="text-sm text-gray-600 mb-4">{{ user_name }}</div>
-                <button onclick="logout()" class="w-full bg-brand-600 hover:bg-brand-700 text-white rounded-lg py-2 text-sm font-semibold transition">
-                    Logout
-                </button>
-            </div>
+          <div class="card p-6">
+            <h3 class="text-xl font-bold mb-4">Actions</h3>
+            <button onclick="saveCafeSettings()" class="w-full btn-primary py-2 rounded-lg text-white font-semibold">Save Changes</button>
+          </div>
         </div>
+      </section>
     </div>
-
-    <!-- Main Content -->
-    <div class="flex-1 overflow-auto">
-        <!-- Top Bar -->
-        <div class="border-b border-border p-6 flex justify-between items-center">
-            <h1 class="text-3xl font-bold" id="pageTitle">Staff Management</h1>
-            <div class="flex items-center space-x-4">
-                <button onclick="goToPOS()" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg font-semibold transition">
-                    Go to POS
-                </button>
-            </div>
-        </div>
-
-        <!-- Content Area -->
-        <div class="p-6">
-            <!-- Dashboard Tab - HIDDEN -->
-            <div id="overview-tab" class="tab-content hidden">
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-                    <div class="card">
-                        <div class="text-gray-500 text-sm mb-2">Total Staff</div>
-                        <div class="text-3xl font-bold" id="totalStaff">0</div>
-                        <div class="text-gray-500 text-xs mt-2">Active users</div>
-                    </div>
-                    <div class="card">
-                        <div class="text-gray-500 text-sm mb-2">Active Sessions</div>
-                        <div class="text-3xl font-bold" id="activeSessions">0</div>
-                        <div class="text-gray-500 text-xs mt-2">Open today</div>
-                    </div>
-                    <div class="card">
-                        <div class="text-gray-500 text-sm mb-2">Total Products</div>
-                        <div class="text-3xl font-bold" id="totalProducts">0</div>
-                        <div class="text-gray-500 text-xs mt-2">In menu</div>
-                    </div>
-                    <div class="card">
-                        <div class="text-gray-500 text-sm mb-2">System Status</div>
-                        <div class="text-3xl font-bold text-green-500">✓</div>
-                        <div class="text-gray-500 text-xs mt-2">Running healthy</div>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div class="lg:col-span-2 card p-6">
-                        <h2 class="text-xl font-bold mb-4">Recent Activity</h2>
-                        <div class="space-y-3" id="activityList">
-                            <div class="text-gray-500 text-sm">System initialized and ready</div>
-                        </div>
-                    </div>
-                    <div class="card p-6">
-                        <h2 class="text-xl font-bold mb-4">Quick Stats</h2>
-                        <div class="space-y-3">
-                            <div>
-                                <div class="text-sm text-gray-500">Database</div>
-                                <div class="text-lg font-bold">Connected</div>
-                            </div>
-                            <div>
-                                <div class="text-sm text-gray-500">API Status</div>
-                                <div class="text-lg font-bold text-green-500">200 OK</div>
-                            </div>
-                            <div>
-                                <div class="text-sm text-gray-500">Last Backup</div>
-                                <div class="text-lg font-bold">Today</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Staff Management Tab -->
-            <div id="users-tab" class="tab-content hidden">
-                <div class="mb-6 flex justify-between items-center">
-                    <h2 class="text-2xl font-bold">Staff Management</h2>
-                    <div class="flex gap-2">
-                        <button onclick="openAddUserModal()" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg font-semibold transition">
-                            + Add Staff
-                        </button>
-                        <button onclick="deleteAllStaff()" class="bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-600/40 px-4 py-2 rounded-lg font-semibold transition">
-                            🗑️ Delete All
-                        </button>
-                    </div>
-                </div>
-
-                <div class="card p-6">
-                    <div class="overflow-x-auto">
-                        <table class="w-full">
-                            <thead>
-                                <tr class="border-b border-border">
-                                    <th class="text-left py-3 px-4 text-gray-500 font-semibold">Name</th>
-                                    <th class="text-left py-3 px-4 text-gray-500 font-semibold">Email</th>
-                                    <th class="text-left py-3 px-4 text-gray-500 font-semibold">Role</th>
-                                    <th class="text-left py-3 px-4 text-gray-500 font-semibold">Joined</th>
-                                    <th class="text-left py-3 px-4 text-gray-500 font-semibold">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="staffTable">
-                                <tr class="border-b border-border">
-                                    <td colspan="5" class="py-8 text-center text-gray-500">Loading staff...</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Reviews Tab -->
-            <div id="reviews-tab" class="tab-content hidden">
-                <h2 class="text-2xl font-bold mb-6">Customer Reviews</h2>
-                
-                <div class="card p-6">
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                        <div>
-                            <div class="text-gray-500 text-sm mb-2">Total Reviews</div>
-                            <div class="text-3xl font-bold" id="totalReviews">0</div>
-                        </div>
-                        <div>
-                            <div class="text-gray-500 text-sm mb-2">Average Rating</div>
-                            <div class="text-3xl font-bold text-brand-600" id="avgRating">0.0</div>
-                        </div>
-                        <div>
-                            <div class="text-gray-500 text-sm mb-2">5 Star Reviews</div>
-                            <div class="text-3xl font-bold text-green-500" id="fiveStarCount">0</div>
-                        </div>
-                        <div>
-                            <div class="text-gray-500 text-sm mb-2">Latest Review</div>
-                            <div class="text-lg font-bold" id="latestReviewTime">-</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card p-6 mt-6">
-                    <h3 class="text-xl font-bold mb-4">All Reviews</h3>
-                    <div class="overflow-x-auto">
-                        <table class="w-full">
-                            <thead>
-                                <tr class="border-b border-border">
-                                    <th class="text-left py-3 px-4 text-gray-500 font-semibold">Order</th>
-                                    <th class="text-left py-3 px-4 text-gray-500 font-semibold">Table</th>
-                                    <th class="text-left py-3 px-4 text-gray-500 font-semibold">Rating</th>
-                                    <th class="text-left py-3 px-4 text-gray-500 font-semibold">Comment</th>
-                                    <th class="text-left py-3 px-4 text-gray-500 font-semibold">Amount</th>
-                                    <th class="text-left py-3 px-4 text-gray-500 font-semibold">Date</th>
-                                </tr>
-                            </thead>
-                            <tbody id="reviewsTable">
-                                <tr class="border-b border-border">
-                                    <td colspan="6" class="py-8 text-center text-gray-500">Loading reviews...</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Settings Tab -->
-            <div id="settings-tab" class="tab-content hidden">
-                <h2 class="text-2xl font-bold mb-6">Cafe Settings</h2>
-
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <!-- Cafe Settings -->
-                    <div class="lg:col-span-2">
-                        <div class="card p-6 mb-6">
-                            <h3 class="text-xl font-bold mb-4">Cafe Information</h3>
-                            <div class="space-y-4">
-                                <div>
-                                    <label class="block text-sm text-gray-500 mb-2">Cafe Name</label>
-                                    <input type="text" id="cafeName" placeholder="Enter cafe name" class="w-full bg-card border border-border  px-4 py-2 rounded-lg">
-                                </div>
-                                <div>
-                                    <label class="block text-sm text-gray-500 mb-2">Phone Number</label>
-                                    <input type="tel" id="cafePhone" placeholder="+91-XXXX-XXX-XXX" class="w-full bg-card border border-border  px-4 py-2 rounded-lg">
-                                </div>
-                                <div>
-                                    <label class="block text-sm text-gray-500 mb-2">Email</label>
-                                    <input type="email" id="cafeEmail" placeholder="contact@cafe.com" class="w-full bg-card border border-border  px-4 py-2 rounded-lg">
-                                </div>
-                                <div>
-                                    <label class="block text-sm text-gray-500 mb-2">Address</label>
-                                    <textarea id="cafeAddress" placeholder="Enter full address" rows="3" class="w-full bg-card border border-border  px-4 py-2 rounded-lg"></textarea>
-                                </div>
-                                <div>
-                                    <label class="block text-sm text-gray-500 mb-2">Operating Hours</label>
-                                    <div class="grid grid-cols-2 gap-4">
-                                        <input type="time" id="openTime" class="bg-card border border-border  px-4 py-2 rounded-lg">
-                                        <input type="time" id="closeTime" class="bg-card border border-border  px-4 py-2 rounded-lg">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="card p-6">
-                            <h3 class="text-xl font-bold mb-4">Tax Settings</h3>
-                            <div class="space-y-4">
-                                <div>
-                                    <label class="block text-sm  mb-2">Default Tax Rate (%)</label>
-                                    <input type="number" id="taxRate" placeholder="5" min="0" max="100" class="w-full bg-card border border-border  px-4 py-2 rounded-lg">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Quick Actions -->
-                    <div class="card p-6">
-                        <h3 class="text-xl font-bold mb-4">Actions</h3>
-                        <div class="space-y-3">
-                            <button onclick="saveCafeSettings()" class="w-full bg-brand-600 hover:bg-brand-700 text-white py-2 rounded-lg font-semibold transition">
-                                Save Changes
-                            </button>
-                            <button onclick="resetSettings()" class="w-full bg-card hover:bg-[#2a2a2a]  py-2 rounded-lg font-semibold transition border border-border">
-                                Reset
-                            </button>
-                            <div class="border border-border rounded-lg p-4 mt-6">
-                                <div class="text-sm text-gray-500 mb-3">⚠️ Danger Zone</div>
-                                <button class="w-full bg-red-600/20 hover:bg-red-600/30 text-red-400 py-2 rounded-lg font-semibold transition border border-red-600/40">
-                                    Clear All Data
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+  </main>
 </div>
 
-<!-- Add User Modal -->
-<div id="addUserModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
-    <div class="card p-8 max-w-md w-full mx-4">
-        <h2 class="text-2xl font-bold mb-6">Add Staff Member</h2>
-        <div class="space-y-4">
-            <div>
-                <label class="block text-sm text-gray-500 mb-2">Full Name</label>
-                <input type="text" id="newUserName" placeholder="John Doe" class="w-full bg-card border border-border  px-4 py-2 rounded-lg">
-            </div>
-            <div>
-                <label class="block text-sm text-gray-500 mb-2">Email</label>
-                <input type="email" id="newUserEmail" placeholder="john@cafe.com" class="w-full bg-card border border-border  px-4 py-2 rounded-lg">
-            </div>
-            <div>
-                <label class="block text-sm text-gray-500 mb-2">Password</label>
-                <input type="password" id="newUserPassword" placeholder="••••••" class="w-full bg-card border border-border  px-4 py-2 rounded-lg">
-            </div>
-            <div>
-                <label class="block text-sm text-gray-500 mb-2">Role</label>
-                <select id="newUserRole" class="w-full bg-card border border-border  px-4 py-2 rounded-lg">
-                    <option value="cashier">Cashier</option>
-                    <option value="kitchen">Kitchen Staff</option>
-                    <option value="manager">Manager</option>
-                </select>
-            </div>
-        </div>
-        <div class="flex gap-3 mt-6">
-            <button onclick="closeAddUserModal()" class="flex-1 bg-card hover:bg-[#2a2a2a]  py-2 rounded-lg font-semibold transition border border-border">
-                Cancel
-            </button>
-            <button onclick="addStaffMember()" class="flex-1 bg-brand-600 hover:bg-brand-700 text-white py-2 rounded-lg font-semibold transition">
-                Add Staff
-            </button>
-        </div>
+<div id="addUserModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
+  <div class="card p-8 max-w-lg w-full mx-4">
+    <h2 class="text-2xl font-bold mb-6" id="userModalTitle">Add Staff Member</h2>
+    <input type="hidden" id="editUserId">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="md:col-span-2">
+        <label class="block text-sm text-gray-500 mb-2">Full Name</label>
+        <input type="text" id="newUserName">
+      </div>
+      <div>
+        <label class="block text-sm text-gray-500 mb-2">Email</label>
+        <input type="email" id="newUserEmail">
+      </div>
+      <div>
+        <label class="block text-sm text-gray-500 mb-2">Password</label>
+        <input type="password" id="newUserPassword">
+        <div class="text-[11px] text-gray-500 mt-1" id="userPasswordHint">Required for new staff.</div>
+      </div>
+      <div>
+        <label class="block text-sm text-gray-500 mb-2">Role</label>
+        <select id="newUserRole">
+          <option value="cashier">Cashier</option>
+          <option value="kitchen">Kitchen Staff</option>
+          <option value="manager">Manager</option>
+          <option value="restaurant">Admin</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm text-gray-500 mb-2">Hourly Rate</label>
+        <input type="number" id="newUserHourlyRate" min="0" step="0.01" placeholder="0.00">
+      </div>
+      <div class="md:col-span-2 hidden" id="newUserBranchWrap">
+        <label class="block text-sm text-gray-500 mb-2">Branch</label>
+        <select id="newUserBranch"></select>
+      </div>
     </div>
+    <div class="flex gap-3 mt-6">
+      <button onclick="closeAddUserModal()" class="flex-1 btn-ghost py-2 rounded-lg font-semibold">Cancel</button>
+      <button onclick="saveStaffMember()" class="flex-1 btn-primary py-2 rounded-lg text-white font-semibold" id="userModalSaveBtn">Add Staff</button>
+    </div>
+  </div>
 </div>
 
+<div id="branchModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
+  <div class="card p-8 max-w-lg w-full mx-4">
+    <h2 class="text-2xl font-bold mb-6">Add Branch</h2>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm text-gray-500 mb-2">Branch Name</label>
+        <input type="text" id="branchName">
+      </div>
+      <div>
+        <label class="block text-sm text-gray-500 mb-2">Address</label>
+        <textarea id="branchAddress" rows="3"></textarea>
+      </div>
+    </div>
+    <div class="flex gap-3 mt-6">
+      <button onclick="closeBranchModal()" class="flex-1 btn-ghost py-2 rounded-lg font-semibold">Cancel</button>
+      <button onclick="createBranch()" class="flex-1 btn-primary py-2 rounded-lg text-white font-semibold">Add Branch</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
 <script>
-let currentTab = 'users';
+const DASHBOARD_CONTEXT = {
+  isSuperadmin: {{ 'true' if is_superadmin else 'false' }},
+  activeBranchId: {{ active_branch.id if active_branch else 'null' }}
+};
 
-function switchTab(tab) {
-    // Hide all tabs
-    document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
-    document.querySelectorAll('.nav-link').forEach(n => n.classList.remove('active'));
-    
-    // Show selected tab
-    document.getElementById(tab + '-tab').classList.remove('hidden');
-    event.target.closest('button').classList.add('active');
-    
-    currentTab = tab;
-    
-    // Update page title
-    const titles = {
-        'users': 'Staff Management',
-        'settings': 'Cafe Settings'
-    };
-    document.getElementById('pageTitle').textContent = titles[tab];
-    
-    // Load data for specific tab
-    if (tab === 'users') {
-        loadStaff();
-    }
+let currentTab = 'users';
+let branches = [];
+let attendanceStaff = [];
+let staffUsers = [];
+
+function switchTab(tab, button) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+  document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
+  document.getElementById(tab + '-tab').classList.remove('hidden');
+  if (button) button.classList.add('active');
+  currentTab = tab;
+
+  const titles = {
+    users: ['Staff Management', 'Manage staff, rates, and branch assignments.'],
+    attendance: ['Attendance & Payroll', 'Review clock-in/out pairs and adjust missed clock-outs.'],
+    compare: ['Compare Branches', 'Compare order volume, revenue, and top sellers.'],
+    settings: ['Cafe Settings', 'Update shared cafe information.'],
+  };
+  document.getElementById('pageTitle').textContent = titles[tab][0];
+  document.getElementById('pageSubtitle').textContent = titles[tab][1];
+
+  if (tab === 'users') loadStaff();
+  if (tab === 'attendance') loadAttendanceReport();
+  if (tab === 'compare') loadBranchComparison();
 }
 
 function openAddUserModal() {
-    document.getElementById('addUserModal').classList.remove('hidden');
+  document.getElementById('editUserId').value = '';
+  document.getElementById('newUserEmail').disabled = false;
+  document.getElementById('userModalTitle').textContent = 'Add Staff Member';
+  document.getElementById('userModalSaveBtn').textContent = 'Add Staff';
+  document.getElementById('userPasswordHint').textContent = 'Required for new staff.';
+  document.getElementById('addUserModal').classList.remove('hidden');
 }
 
 function closeAddUserModal() {
-    document.getElementById('addUserModal').classList.add('hidden');
-    document.getElementById('newUserName').value = '';
-    document.getElementById('newUserEmail').value = '';
-    document.getElementById('newUserPassword').value = '';
+  document.getElementById('addUserModal').classList.add('hidden');
+  document.getElementById('newUserEmail').disabled = false;
+  ['newUserName', 'newUserEmail', 'newUserPassword', 'newUserHourlyRate', 'editUserId'].forEach(id => {
+    const field = document.getElementById(id);
+    if (field) field.value = '';
+  });
 }
 
-async function addStaffMember() {
-    const name = document.getElementById('newUserName').value.trim();
-    const email = document.getElementById('newUserEmail').value.trim();
-    const password = document.getElementById('newUserPassword').value;
-    const role = document.getElementById('newUserRole').value;
+function openBranchModal() {
+  document.getElementById('branchModal').classList.remove('hidden');
+}
 
-    if (!name || !email || !password) {
-        toast('Please fill all required fields', 'error');
-        return;
-    }
+function closeBranchModal() {
+  document.getElementById('branchModal').classList.add('hidden');
+  document.getElementById('branchName').value = '';
+  document.getElementById('branchAddress').value = '';
+}
 
-    try {
-        const response = await fetch('/api/signup', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, email, password, role })
-        });
+function formatMoney(amount) {
+  return '₹' + Number(amount || 0).toFixed(2);
+}
 
-        const data = await response.json();
+function formatDateTime(value) {
+  if (!value) return '—';
+  return new Date(value).toLocaleString();
+}
 
-        if (response.ok) {
-            toast('Staff member added successfully', 'success');
-            closeAddUserModal();
-            loadStaff();
-        } else {
-            toast('Error: ' + (data.error || 'Failed to add staff'), 'error');
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        toast('Network error adding staff member', 'error');
-    }
+function toDatetimeLocalValue(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  const pad = n => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+async function loadBranches() {
+  const wrap = document.getElementById('branchSwitcherWrap');
+  if (!DASHBOARD_CONTEXT.isSuperadmin) {
+    wrap.classList.add('hidden');
+    return;
+  }
+
+  const response = await api('/api/branches');
+  branches = response.branches || [];
+  wrap.classList.remove('hidden');
+
+  const switcher = document.getElementById('branchSwitcher');
+  const addUserBranch = document.getElementById('newUserBranch');
+  const activeBranchId = response.active_branch_id || DASHBOARD_CONTEXT.activeBranchId;
+
+  switcher.innerHTML = branches.map(branch => `<option value="${branch.id}">${branch.name}</option>`).join('');
+  addUserBranch.innerHTML = switcher.innerHTML;
+  if (activeBranchId) {
+    switcher.value = String(activeBranchId);
+    addUserBranch.value = String(activeBranchId);
+    const active = branches.find(branch => branch.id === activeBranchId);
+    document.getElementById('activeBranchLabel').textContent = active ? active.name : 'Unknown branch';
+  }
+  document.getElementById('newUserBranchWrap').classList.remove('hidden');
+  document.getElementById('addBranchBtn').classList.remove('hidden');
+}
+
+async function handleBranchSwitch() {
+  const branchId = Number(document.getElementById('branchSwitcher').value);
+  const result = await api('/api/branches/switch', 'POST', { branch_id: branchId });
+  if (result.error) {
+    toast(result.error, 'error');
+    return;
+  }
+  document.getElementById('activeBranchLabel').textContent = result.branch_name;
+  toast(`Switched to ${result.branch_name}`, 'success');
+  await Promise.all([loadStaff(), loadAttendanceReport(), loadBranchComparison()]);
+}
+
+async function saveStaffMember() {
+  const editUserId = document.getElementById('editUserId').value;
+  const payload = {
+    name: document.getElementById('newUserName').value.trim(),
+    email: document.getElementById('newUserEmail').value.trim(),
+    role: document.getElementById('newUserRole').value,
+    hourly_rate: parseFloat(document.getElementById('newUserHourlyRate').value || '0'),
+  };
+  const password = document.getElementById('newUserPassword').value;
+  if (DASHBOARD_CONTEXT.isSuperadmin) {
+    payload.branch_id = Number(document.getElementById('newUserBranch').value);
+  }
+  if (!payload.name || !payload.email || (!editUserId && !password)) {
+    toast('Name, email, and password are required', 'error');
+    return;
+  }
+  if (!editUserId) payload.password = password;
+  const result = editUserId
+    ? await api(`/api/users/${editUserId}`, 'PUT', payload)
+    : await api('/api/users', 'POST', payload);
+  if (result.error) {
+    toast(result.error, 'error');
+    return;
+  }
+  closeAddUserModal();
+  toast(editUserId ? 'Staff member updated' : 'Staff member created', 'success');
+  await loadStaff();
+  await loadAttendanceReport();
 }
 
 async function loadStaff() {
-    try {
-        const response = await fetch('/api/users');
-        const tbody = document.getElementById('staffTable');
-        
-        if (!response.ok) {
-            const data = await response.json();
-            tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-red-400">Error: ${data.error || 'Failed to load staff'}</td></tr>`;
-            return;
-        }
-        
-        const users = await response.json();
-        tbody.innerHTML = '';
-        
-        if (users.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-gray-500">No staff members yet. Click "+ Add Staff" to add your first team member.</td></tr>';
-            document.getElementById('totalStaff').textContent = '0';
-            return;
-        }
+  const users = await api('/api/users');
+  const tbody = document.getElementById('staffTable');
+  if (users.error) {
+    tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-red-400">${users.error}</td></tr>`;
+    return;
+  }
+  if (!users.length) {
+    staffUsers = [];
+    tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-gray-500">No staff found for this branch.</td></tr>';
+    return;
+  }
+  staffUsers = users;
 
-        users.forEach(user => {
-            const row = document.createElement('tr');
-            row.className = 'border-b border-border hover:bg-gray-50 transition';
-            row.innerHTML = `
-                <td class="py-4 px-4">${user.name}</td>
-                <td class="py-4 px-4 text-gray-500">${user.email}</td>
-                <td class="py-4 px-4">
-                    <span class="tag bg-brand-600/20 text-brand-600">${user.role || 'cashier'}</span>
-                </td>
-                <td class="py-4 px-4 text-gray-500">${new Date(user.created_at).toLocaleDateString()}</td>
-                <td class="py-4 px-4">
-                    <button onclick="editUser(${user.id})" class="text-brand-600 hover:text-[#ea580c] text-sm mr-4">Edit</button>
-                    <button onclick="deleteUser(${user.id})" class="text-red-500 hover:text-red-600 text-sm">Delete</button>
-                </td>
-            `;
-            tbody.appendChild(row);
-        });
-        
-        document.getElementById('totalStaff').textContent = users.length;
-    } catch (error) {
-        console.error('Error loading staff:', error);
-        document.getElementById('staffTable').innerHTML = `<tr><td colspan="5" class="py-8 text-center text-red-400">Network error loading staff. Check console for details.</td></tr>`;
-    }
+  tbody.innerHTML = users.map(user => `
+    <tr class="border-b border-border">
+      <td class="py-4 px-4 font-semibold">${user.name}</td>
+      <td class="py-4 px-4 text-gray-500">${user.email}</td>
+      <td class="py-4 px-4"><span class="tag bg-brand-600/20 text-brand-600">${user.role}</span></td>
+      <td class="py-4 px-4">${formatMoney(user.hourly_rate)}</td>
+      <td class="py-4 px-4 text-gray-500">${user.branch_name || '—'}</td>
+      <td class="py-4 px-4 text-gray-500">${new Date(user.created_at).toLocaleDateString()}</td>
+      <td class="py-4 px-4">
+        <button onclick="editUser(${user.id})" class="text-brand-400 hover:text-brand-300 text-sm mr-3">Edit</button>
+        <button onclick="deleteUser(${user.id})" class="text-red-400 hover:text-red-300 text-sm">Delete</button>
+      </td>
+    </tr>
+  `).join('');
 }
 
 function editUser(userId) {
-    toast('Edit functionality coming soon', 'success');
+  const user = staffUsers.find(item => item.id === userId);
+  if (!user) return;
+  document.getElementById('editUserId').value = user.id;
+  document.getElementById('newUserName').value = user.name;
+  document.getElementById('newUserEmail').value = user.email;
+  document.getElementById('newUserEmail').disabled = true;
+  document.getElementById('newUserPassword').value = '';
+  document.getElementById('newUserRole').value = user.role;
+  document.getElementById('newUserHourlyRate').value = user.hourly_rate;
+  if (DASHBOARD_CONTEXT.isSuperadmin && user.branch_id) {
+    document.getElementById('newUserBranch').value = user.branch_id;
+  }
+  document.getElementById('userModalTitle').textContent = 'Edit Staff Member';
+  document.getElementById('userModalSaveBtn').textContent = 'Update Staff';
+  document.getElementById('userPasswordHint').textContent = 'Leave blank to keep current password.';
+  document.getElementById('addUserModal').classList.remove('hidden');
 }
 
 async function deleteUser(userId) {
-    if (confirm('Are you sure you want to delete this staff member?')) {
-        try {
-            const response = await fetch(`/api/users/${userId}`, { method: 'DELETE' });
-            const data = await response.json();
-            
-            if (response.ok) {
-                toast('Staff member deleted successfully', 'success');
-                loadStaff();
-            } else {
-                toast('Error (HTTP ' + response.status + '): ' + (data.error || 'Failed to delete staff member'), 'error');
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            toast('Network error: ' + error.message, 'error');
-        }
-    }
+  if (!confirm('Delete this staff member?')) return;
+  const result = await api(`/api/users/${userId}`, 'DELETE');
+  if (result.error) {
+    toast(result.error, 'error');
+    return;
+  }
+  toast('Staff member deleted', 'success');
+  await loadStaff();
+  await loadAttendanceReport();
 }
 
-async function deleteAllStaff() {
-    if (!confirm('⚠️ Delete ALL staff members? This cannot be undone!')) return;
-    if (!confirm('⚠️⚠️ Final confirmation: Delete ALL staff members?')) return;
-    
-    try {
-        const response = await fetch('/api/users/delete-all', { method: 'POST' });
-        const data = await response.json();
-        
-        if (response.ok) {
-            toast('All staff members deleted', 'success');
-            loadStaff();
-        } else {
-            toast('Error: ' + (data.error || 'Failed to delete all'), 'error');
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        toast('Network error deleting staff', 'error');
-    }
+async function createBranch() {
+  const payload = {
+    name: document.getElementById('branchName').value.trim(),
+    address: document.getElementById('branchAddress').value.trim(),
+  };
+  if (!payload.name) {
+    toast('Branch name is required', 'error');
+    return;
+  }
+  const result = await api('/api/branches', 'POST', payload);
+  if (result.error) {
+    toast(result.error, 'error');
+    return;
+  }
+  closeBranchModal();
+  toast('Branch created', 'success');
+  await loadBranches();
+  await loadBranchComparison();
 }
 
-async function loadReviews() {
-    try {
-        const response = await fetch('/api/reviews');
-        if (response.ok) {
-            const reviews = await response.json();
-            const tbody = document.getElementById('reviewsTable');
-            tbody.innerHTML = '';
-            
-            if (reviews.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-gray-500">No reviews yet</td></tr>';
-                document.getElementById('totalReviews').textContent = '0';
-                document.getElementById('avgRating').textContent = '0.0';
-                document.getElementById('fiveStarCount').textContent = '0';
-                document.getElementById('latestReviewTime').textContent = '-';
-                return;
-            }
+async function loadAttendanceReport() {
+  const staffId = document.getElementById('attendanceStaffFilter').value;
+  const startDate = document.getElementById('attendanceStartDate').value;
+  const endDate = document.getElementById('attendanceEndDate').value;
+  const params = new URLSearchParams();
+  if (staffId) params.set('staff_id', staffId);
+  if (startDate) params.set('start_date', startDate);
+  if (endDate) params.set('end_date', endDate);
 
-            // Calculate stats
-            const avgRating = (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1);
-            const fiveStarCount = reviews.filter(r => r.rating === 5).length;
-            const latestTime = new Date(reviews[0].created_at).toLocaleDateString();
+  const report = await api('/api/admin/attendance-report?' + params.toString());
+  const tbody = document.getElementById('attendanceTable');
+  if (report.error) {
+    tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-red-400">${report.error}</td></tr>`;
+    return;
+  }
 
-            document.getElementById('totalReviews').textContent = reviews.length;
-            document.getElementById('avgRating').textContent = avgRating;
-            document.getElementById('fiveStarCount').textContent = fiveStarCount;
-            document.getElementById('latestReviewTime').textContent = latestTime;
+  attendanceStaff = report.staff || [];
+  const staffFilter = document.getElementById('attendanceStaffFilter');
+  const currentValue = staffFilter.value;
+  staffFilter.innerHTML = '<option value="">All staff</option>' + attendanceStaff.map(staff => `<option value="${staff.id}">${staff.name}</option>`).join('');
+  if (currentValue) staffFilter.value = currentValue;
 
-            reviews.forEach(review => {
-                const row = document.createElement('tr');
-                row.className = 'border-b border-border hover:bg-gray-50 transition';
-                const stars = '⭐'.repeat(review.rating) + '☆'.repeat(5 - review.rating);
-                row.innerHTML = `
-                    <td class="py-4 px-4 font-mono text-brand-600">${review.order_number}</td>
-                    <td class="py-4 px-4">Table ${review.table}</td>
-                    <td class="py-4 px-4">
-                        <span class="text-brand-600 font-bold">${stars}</span>
-                        <span class="text-gray-500">${review.rating}/5</span>
-                    </td>
-                    <td class="py-4 px-4 text-gray-500 max-w-xs truncate">${review.comment || '-'}</td>
-                    <td class="py-4 px-4 text-green-500 font-semibold">₹${review.total.toFixed(0)}</td>
-                    <td class="py-4 px-4 text-gray-500 text-sm">${new Date(review.created_at).toLocaleDateString()}</td>
-                `;
-                tbody.appendChild(row);
-            });
-        }
-    } catch (error) {
-        console.error('Error loading reviews:', error);
-        document.getElementById('reviewsTable').innerHTML = '<tr><td colspan="6" class="py-8 text-center text-red-400">Error loading reviews</td></tr>';
-    }
+  if (!report.rows.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-gray-500">No shifts found for the selected filters.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = report.rows.map(row => `
+    <tr class="border-b border-border align-top">
+      <td class="py-4 px-4 font-semibold">${row.staff_name}</td>
+      <td class="py-4 px-4 text-gray-500">${row.date}</td>
+      <td class="py-4 px-4">${formatDateTime(row.clock_in_time)}</td>
+      <td class="py-4 px-4 ${row.is_open_shift ? 'text-amber-400' : ''}">${row.clock_out_time ? formatDateTime(row.clock_out_time) : 'Open shift'}</td>
+      <td class="py-4 px-4">${row.hours_worked.toFixed(2)}</td>
+      <td class="py-4 px-4 font-semibold">${formatMoney(row.pay)}</td>
+      <td class="py-4 px-4">
+        <div class="flex gap-2 items-center">
+          <input type="datetime-local" id="clock-out-${row.clock_in_event_id}" value="${toDatetimeLocalValue(row.clock_out_time)}" class="text-sm">
+          <button onclick="saveClockOut(${row.clock_in_event_id}, ${row.clock_out_event_id || 'null'})" class="btn-ghost px-3 py-2 rounded-lg text-xs">Save</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
 }
 
-function saveCafeSettings() {
-    const settings = {
-        name: document.getElementById('cafeName').value,
-        phone: document.getElementById('cafePhone').value,
-        email: document.getElementById('cafeEmail').value,
-        address: document.getElementById('cafeAddress').value,
-        open_time: document.getElementById('openTime').value,
-        close_time: document.getElementById('closeTime').value,
-        tax_rate: parseFloat(document.getElementById('taxRate').value) || 0
-    };
-
-    fetch('/api/cafe-settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings)
-    })
-    .then(r => {
-        if (r.ok) {
-            toast('Cafe settings saved successfully', 'success');
-        } else {
-            toast('Error saving settings', 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        toast('Error saving settings', 'error');
-    });
+async function saveClockOut(clockInEventId, clockOutEventId) {
+  const value = document.getElementById(`clock-out-${clockInEventId}`).value;
+  if (!value) {
+    toast('Choose a clock-out time first', 'error');
+    return;
+  }
+  const result = await api(`/api/admin/attendance/shifts/${clockInEventId}`, 'PATCH', {
+    clock_out_at: value,
+    clock_out_event_id: clockOutEventId
+  });
+  if (result.error) {
+    toast(result.error, 'error');
+    return;
+  }
+  toast('Clock-out updated', 'success');
+  await loadAttendanceReport();
 }
 
-function resetSettings() {
-    document.getElementById('cafeName').value = '';
-    document.getElementById('cafePhone').value = '';
-    document.getElementById('cafeEmail').value = '';
-    document.getElementById('cafeAddress').value = '';
-    document.getElementById('taxRate').value = '';
-    toast('Form reset', 'success');
+async function loadBranchComparison() {
+  const startDate = document.getElementById('compareStartDate').value;
+  const endDate = document.getElementById('compareEndDate').value;
+  const params = new URLSearchParams();
+  if (startDate) params.set('start_date', startDate);
+  if (endDate) params.set('end_date', endDate);
+  const result = await api('/api/admin/branches/compare?' + params.toString());
+  const grid = document.getElementById('branchCompareGrid');
+  if (result.error) {
+    grid.innerHTML = `<div class="card p-6 text-red-400">${result.error}</div>`;
+    return;
+  }
+  if (!(result.branches || []).length) {
+    grid.innerHTML = '<div class="card p-6 text-gray-500">No branch data available.</div>';
+    return;
+  }
+  grid.innerHTML = result.branches.map(branch => `
+    <div class="card p-6">
+      <div class="flex items-start justify-between gap-4 mb-4">
+        <div>
+          <div class="text-xl font-bold">${branch.branch_name}</div>
+          <div class="text-sm text-gray-500 mt-1">${branch.address || 'No address set'}</div>
+        </div>
+        <span class="tag bg-brand-600/20 text-brand-600">Branch #${branch.branch_id}</span>
+      </div>
+      <div class="space-y-3">
+        <div class="flex justify-between"><span class="text-gray-500">Total Orders</span><span class="font-semibold">${branch.total_orders}</span></div>
+        <div class="flex justify-between"><span class="text-gray-500">Total Revenue</span><span class="font-semibold">${formatMoney(branch.total_revenue)}</span></div>
+        <div class="flex justify-between gap-4"><span class="text-gray-500">Top Selling Item</span><span class="font-semibold text-right">${branch.top_selling_item}${branch.top_selling_qty ? ` × ${branch.top_selling_qty}` : ''}</span></div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function saveCafeSettings() {
+  const payload = {
+    name: document.getElementById('cafeName').value,
+    phone: document.getElementById('cafePhone').value,
+    email: document.getElementById('cafeEmail').value,
+    address: document.getElementById('cafeAddress').value,
+    open_time: document.getElementById('openTime').value,
+    close_time: document.getElementById('closeTime').value,
+    tax_rate: parseFloat(document.getElementById('taxRate').value || '0'),
+  };
+  const result = await api('/api/cafe-settings', 'POST', payload);
+  if (result.error) {
+    toast(result.error, 'error');
+    return;
+  }
+  toast('Settings saved', 'success');
+}
+
+async function loadCafeSettings() {
+  const settings = await api('/api/cafe-settings');
+  if (settings.error) return;
+  document.getElementById('cafeName').value = settings.name || '';
+  document.getElementById('cafePhone').value = settings.phone || '';
+  document.getElementById('cafeEmail').value = settings.email || '';
+  document.getElementById('cafeAddress').value = settings.address || '';
+  document.getElementById('openTime').value = settings.open_time || '';
+  document.getElementById('closeTime').value = settings.close_time || '';
+  document.getElementById('taxRate').value = settings.tax_rate || '';
 }
 
 async function logout() {
-    await fetch('/api/logout', { method: 'POST' });
-    window.location.href = '/auth';
+  await api('/api/logout', 'POST');
+  window.location.href = '/auth';
 }
 
 function goToPOS() {
-    window.location.href = '/pos';
+  window.location.href = '/pos';
 }
 
-// Load initial data
-document.addEventListener('DOMContentLoaded', () => {
-    // Load staff data on page load
-    loadStaff();
-    loadCafeSettings();
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadBranches();
+  await Promise.all([loadCafeSettings(), loadStaff(), loadAttendanceReport(), loadBranchComparison()]);
 });
-
-async function loadCafeSettings() {
-    try {
-        const response = await fetch('/api/cafe-settings');
-        if (response.ok) {
-            const settings = await response.json();
-            document.getElementById('cafeName').value = settings.name || '';
-            document.getElementById('cafePhone').value = settings.phone || '';
-            document.getElementById('cafeEmail').value = settings.email || '';
-            document.getElementById('cafeAddress').value = settings.address || '';
-            document.getElementById('openTime').value = settings.open_time || '';
-            document.getElementById('closeTime').value = settings.close_time || '';
-            document.getElementById('taxRate').value = settings.tax_rate || '';
-        }
-    } catch (error) {
-        console.log('Cafe settings not yet configured');
-    }
-}
-
 </script>
-</body>
 {% endblock %}

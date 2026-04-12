@@ -101,43 +101,86 @@ except ImportError:
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode=_async_mode)
 CORS(app)
 
+@app.template_filter('from_json')
+def from_json_filter(s):
+    try:
+        return json.loads(s)
+    except:
+        return {}
+
 # ─── Models ───────────────────────────────────────────────
+class Tenant(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    slug = db.Column(db.String(50), unique=True, nullable=False)
+    logo_b64 = db.Column(db.Text, default='')
+    plan = db.Column(db.String(20), default='free')
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    owner_id = db.Column(db.Integer, nullable=True)
+
+class Branch(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    address = db.Column(db.Text, default='')
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    tenant = db.relationship('Tenant', backref='branches')
+
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(20), default='cashier')
+    hourly_rate = db.Column(db.Float, default=0)
+    is_superadmin = db.Column(db.Boolean, default=False)
+    is_platform_admin = db.Column(db.Boolean, default=False)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey('branch.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    tenant = db.relationship('Tenant', backref='users')
+    branch = db.relationship('Branch', backref='users')
 
 class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
     products = db.relationship('Product', backref='category', lazy=True)
+    tenant = db.relationship('Tenant', backref='categories')
 
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     price = db.Column(db.Float, nullable=False)
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'))
+    branch_id = db.Column(db.Integer, db.ForeignKey('branch.id'), nullable=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
     description = db.Column(db.Text, default='')
     tax = db.Column(db.Float, default=0)
+    tax_config_json = db.Column(db.Text, default='{}')  # JSON: {"CGST": 2.5, "SGST": 2.5}
     unit = db.Column(db.String(20), default='pcs')
     active = db.Column(db.Boolean, default=True)
     image_b64 = db.Column(db.Text, default='')  # base64 data URL for product photo
+    branch = db.relationship('Branch', backref='products')
+    tenant = db.relationship('Tenant', backref='products')
 
 class Floor(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
     tables = db.relationship('Table', backref='floor', lazy=True)
+    tenant = db.relationship('Tenant', backref='floors')
 
 class Table(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     number = db.Column(db.String(10), nullable=False)
     seats = db.Column(db.Integer, default=4)
     floor_id = db.Column(db.Integer, db.ForeignKey('floor.id'))
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
     active = db.Column(db.Boolean, default=True)
     status = db.Column(db.String(20), default='free')  # free, occupied
+    tenant = db.relationship('Tenant', backref='tables')
 
 class PaymentMethod(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -145,6 +188,8 @@ class PaymentMethod(db.Model):
     type = db.Column(db.String(20), nullable=False)  # cash, digital, upi
     enabled = db.Column(db.Boolean, default=True)
     upi_id = db.Column(db.String(100), default='')
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
+    tenant = db.relationship('Tenant', backref='payment_methods')
 
 class CafeSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -152,20 +197,41 @@ class CafeSettings(db.Model):
     phone = db.Column(db.String(20), default='')
     email = db.Column(db.String(120), default='')
     address = db.Column(db.Text, default='')
+    logo_b64 = db.Column(db.Text, default='')  # base64 data URL for cafe logo
     open_time = db.Column(db.String(5), default='09:00')  # HH:MM format
     close_time = db.Column(db.String(5), default='22:00')  # HH:MM format
     tax_rate = db.Column(db.Float, default=5.0)
+    gst_no = db.Column(db.String(50), default='')
+    fssai_no = db.Column(db.String(50), default='')
+    footer_note = db.Column(db.Text, default='')
+    loyalty_points_per_100 = db.Column(db.Float, default=10.0)  # Owner decides ratio
+    points_redemption_value = db.Column(db.Float, default=0.5)  # 1 point = ₹0.50
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    tenant = db.relationship('Tenant', backref='settings')
 
 class Session(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
     opened_at = db.Column(db.DateTime, default=datetime.utcnow)
     closed_at = db.Column(db.DateTime, nullable=True)
     status = db.Column(db.String(20), default='open')
     closing_amount = db.Column(db.Float, default=0)
     user = db.relationship('User', backref='sessions')
+    tenant = db.relationship('Tenant', backref='sessions')
+
+class Customer(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), default='')
+    phone = db.Column(db.String(20), index=True)
+    email = db.Column(db.String(120), default='')
+    loyalty_points = db.Column(db.Float, default=0.0)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    tenant = db.relationship('Tenant', backref='customers')
+
 
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -173,19 +239,32 @@ class Order(db.Model):
     table_id = db.Column(db.Integer, db.ForeignKey('table.id'), nullable=True)
     session_id = db.Column(db.Integer, db.ForeignKey('session.id'))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    customer_name = db.Column(db.String(100), default='')  # For takeaway orders
+    branch_id = db.Column(db.Integer, db.ForeignKey('branch.id'), nullable=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'), nullable=True)
+    customer_name = db.Column(db.String(100), default='')  # For takeaway orders or fast input
+    customer_phone = db.Column(db.String(20), default='')
     status = db.Column(db.String(30), default='draft')  # draft, sent, paid
     payment_method = db.Column(db.String(30), default='')
+    subtotal = db.Column(db.Float, default=0)
+    tax_amount = db.Column(db.Float, default=0)
+    tax_breakdown_json = db.Column(db.Text, default='{}')
+    round_off = db.Column(db.Float, default=0)
+    total_qty = db.Column(db.Integer, default=0)
     total = db.Column(db.Float, default=0)
     tip = db.Column(db.Float, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     sent_to_kitchen_at = db.Column(db.DateTime, nullable=True)  # When sent to kitchen
     started_at = db.Column(db.DateTime, nullable=True)  # When kitchen starts preparing
     completed_at = db.Column(db.DateTime, nullable=True)  # When order is ready
+    razorpay_order_id = db.Column(db.String(100), nullable=True)  # Razorpay order ID for payment tracking
     items = db.relationship('OrderItem', backref='order', lazy=True, cascade='all, delete-orphan')
     reviews = db.relationship('Review', backref='order', lazy=True, cascade='all, delete-orphan')
+    order_customer = db.relationship('Customer', backref='orders')
     table = db.relationship('Table', backref='orders')
     user = db.relationship('User', backref='orders')
+    branch = db.relationship('Branch', backref='orders')
+    tenant = db.relationship('Tenant', backref='orders')
 
 class OrderItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -195,6 +274,9 @@ class OrderItem(db.Model):
     qty = db.Column(db.Integer, default=1)
     price = db.Column(db.Float, default=0)
     notes = db.Column(db.Text, default='')  # Item modifier notes (e.g. 'no onion')
+    tax_rate = db.Column(db.Float, default=0)
+    tax_amount = db.Column(db.Float, default=0)
+    tax_info_json = db.Column(db.Text, default='{}')
     kitchen_status = db.Column(db.String(20), default='pending')  # pending, to_cook, preparing, completed
     started_at = db.Column(db.DateTime, nullable=True)  # When item preparation starts
     completed_at = db.Column(db.DateTime, nullable=True)  # When item is ready
@@ -203,11 +285,13 @@ class OrderItem(db.Model):
 class KitchenTicket(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.Integer, db.ForeignKey('order.id'))
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
     status = db.Column(db.String(20), default='to_cook')
     sent_at = db.Column(db.DateTime, default=datetime.utcnow)
     started_at = db.Column(db.DateTime, nullable=True)  # When preparing starts
     completed_at = db.Column(db.DateTime, nullable=True)  # When all items completed
     order = db.relationship('Order')
+    tenant = db.relationship('Tenant', backref='kitchen_tickets')
 
 class Review(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -220,6 +304,7 @@ class Reservation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     table_id = db.Column(db.Integer, db.ForeignKey('table.id'), nullable=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
     reserved_at = db.Column(db.DateTime, nullable=False)  # date+time of booking
     party_size = db.Column(db.Integer, default=2)
     status = db.Column(db.String(20), default='pending')  # pending, confirmed, seated, completed, cancelled
@@ -228,6 +313,7 @@ class Reservation(db.Model):
     items = db.relationship('ReservationItem', backref='reservation', cascade='all, delete-orphan', lazy=True)
     customer = db.relationship('User', backref='reservations')
     table = db.relationship('Table', backref='reservations')
+    tenant = db.relationship('Tenant', backref='reservations')
 
 class ReservationItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -243,8 +329,61 @@ class PushSubscription(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     table_id = db.Column(db.Integer, nullable=True)  # For guest self-orders via QR
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
     subscription_json = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    tenant = db.relationship('Tenant', backref='push_subscriptions')
+
+class AttendanceEvent(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    staff_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    branch_id = db.Column(db.Integer, db.ForeignKey('branch.id'), nullable=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
+    action = db.Column(db.String(10), nullable=False)  # in/out
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    staff = db.relationship('User', backref='attendance_events')
+    branch = db.relationship('Branch', backref='attendance_events')
+    tenant = db.relationship('Tenant', backref='attendance_events')
+
+class InventoryItem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    unit = db.Column(db.String(20), default='unit')  # kg, litre, gram, pcs, box etc.
+    current_stock = db.Column(db.Float, default=0.0)
+    min_threshold = db.Column(db.Float, default=0.0)
+    unit_cost = db.Column(db.Float, default=0.0)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
+    tenant = db.relationship('Tenant', backref='inventory_items')
+
+class ProductRecipe(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    inventory_item_id = db.Column(db.Integer, db.ForeignKey('inventory_item.id'), nullable=False)
+    quantity = db.Column(db.Float, default=1.0)  # Amount of inventory item used per product unit
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
+    product = db.relationship('Product', backref='recipe_items')
+    inventory_item = db.relationship('InventoryItem')
+
+class InventoryLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    inventory_item_id = db.Column(db.Integer, db.ForeignKey('inventory_item.id'), nullable=False)
+    action = db.Column(db.String(20), nullable=False)  # purchase, sale, adjustment, wastage
+    quantity = db.Column(db.Float, nullable=False)
+    note = db.Column(db.Text, default='')
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    inventory_item = db.relationship('InventoryItem', backref='logs')
+
+class WastageLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    inventory_item_id = db.Column(db.Integer, db.ForeignKey('inventory_item.id'), nullable=False)
+    quantity = db.Column(db.Float, nullable=False)
+    reason = db.Column(db.Text, default='')
+    reported_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    inventory_item = db.relationship('InventoryItem', backref='wastage_logs')
+    user = db.relationship('User')
 
 # ─── Auth Helpers ──────────────────────────────────────────
 def login_required(f):
@@ -268,7 +407,7 @@ def normalize_role(role):
 def role_home(role):
     role = normalize_role(role)
     if role == 'restaurant':
-        return url_for('admin_dashboard')
+        return url_for('dashboard')
     if role == 'customer':
         return url_for('customer')
     return url_for('pos')
@@ -305,7 +444,10 @@ def admin_required(f):
         if 'user_id' not in session:
             return redirect(url_for('auth'))
         user = User.query.get(session['user_id'])
-        if not user or normalize_role(user.role) != 'restaurant':
+        if not user:
+            return redirect(url_for('auth'))
+        role = normalize_role(user.role)
+        if role not in ('restaurant', 'manager') and not user.is_superadmin:
             return redirect(role_home(normalize_role(session.get('user_role'))))
         return f(*args, **kwargs)
     return decorated
@@ -320,6 +462,171 @@ def find_user_by_email(email):
     if not email:
         return None
     return User.query.filter(db.func.lower(User.email) == email.lower()).first()
+
+def make_slug(name):
+    """Convert a name like 'Chai Point Cafe' to 'chai-point-cafe'."""
+    slug = re.sub(r'[^a-z0-9]+', '-', (name or '').strip().lower()).strip('-')
+    return slug or 'my-cafe'
+
+def get_current_tenant_id():
+    """Get the current tenant_id from session."""
+    return session.get('tenant_id')
+
+def get_current_tenant():
+    """Get the current Tenant object."""
+    tid = get_current_tenant_id()
+    if tid:
+        return Tenant.query.get(tid)
+    return None
+
+def utc_iso(dt):
+    """Format a naive UTC datetime as an ISO string with Z suffix.
+    This tells JavaScript's Date constructor to treat it as UTC
+    so toLocaleString() converts correctly to the user's timezone."""
+    if dt is None:
+        return None
+    return dt.isoformat() + 'Z'
+
+def apply_tenant_scope(query, model_class):
+    """Filter any query to the current tenant. Skips for platform admins."""
+    user = get_current_user()
+    if user and getattr(user, 'is_platform_admin', False):
+        return query  # Platform admins see everything
+    tid = get_current_tenant_id()
+    if tid and hasattr(model_class, 'tenant_id'):
+        return query.filter(model_class.tenant_id == tid)
+    return query
+
+def get_default_branch():
+    tid = get_current_tenant_id()
+    q = Branch.query
+    if tid:
+        q = q.filter_by(tenant_id=tid)
+    return q.order_by(Branch.id.asc()).first()
+
+def is_superadmin(user=None):
+    user = user or get_current_user()
+    return bool(user and user.is_superadmin)
+
+def get_active_branch_id(user=None):
+    user = user or get_current_user()
+    if not user:
+        return None
+    if is_superadmin(user):
+        branch_id = session.get('active_branch_id') or user.branch_id
+        if branch_id:
+            return int(branch_id)
+        default_branch = get_default_branch()
+        if default_branch:
+            session['active_branch_id'] = default_branch.id
+            return default_branch.id
+        return None
+    return user.branch_id
+
+def get_accessible_branch_ids(user=None):
+    user = user or get_current_user()
+    if not user:
+        return []
+    if is_superadmin(user):
+        q = Branch.query
+        if user.tenant_id:
+            q = q.filter_by(tenant_id=user.tenant_id)
+        return [b.id for b in q.order_by(Branch.name.asc()).all()]
+    return [user.branch_id] if user.branch_id else []
+
+def apply_branch_scope(query, column, include_all_for_superadmin=False):
+    user = get_current_user()
+    if not user:
+        default_branch = get_default_branch()
+        if default_branch:
+            return query.filter(column == default_branch.id)
+        return query
+    if include_all_for_superadmin and is_superadmin(user):
+        return query
+    active_branch_id = get_active_branch_id(user)
+    if active_branch_id is None:
+        return query.filter(column.is_(None))
+    return query.filter(column == active_branch_id)
+
+def ensure_branch_access(branch_id, user=None):
+    user = user or get_current_user()
+    if not user:
+        return False
+    if branch_id is None:
+        return not get_accessible_branch_ids(user)
+    return branch_id in get_accessible_branch_ids(user)
+
+def require_branch_access_or_403(branch_id):
+    if not ensure_branch_access(branch_id):
+        return jsonify({'error': 'forbidden'}), 403
+    return None
+
+def get_selected_branch():
+    active_branch_id = get_active_branch_id()
+    if not active_branch_id:
+        return None
+    return Branch.query.get(active_branch_id)
+
+def get_current_shift_start(staff_id):
+    events = AttendanceEvent.query.filter_by(staff_id=staff_id).order_by(AttendanceEvent.timestamp.asc(), AttendanceEvent.id.asc()).all()
+    open_event = None
+    for event in events:
+        if event.action == 'in':
+            open_event = event
+        elif event.action == 'out' and open_event:
+            open_event = None
+    return open_event
+
+def build_attendance_shifts(events, start_date=None, end_date=None, staff_filter=None):
+    shifts = []
+    events_by_staff = {}
+    for event in events:
+        if staff_filter and event.staff_id != staff_filter:
+            continue
+        events_by_staff.setdefault(event.staff_id, []).append(event)
+
+    for staff_events in events_by_staff.values():
+        open_in = None
+        for event in sorted(staff_events, key=lambda e: (e.timestamp, e.id)):
+            if event.action == 'in':
+                if open_in:
+                    shifts.append((open_in, None))
+                open_in = event
+            elif event.action == 'out':
+                if open_in:
+                    shifts.append((open_in, event))
+                    open_in = None
+        if open_in:
+            shifts.append((open_in, None))
+
+    rows = []
+    for clock_in_event, clock_out_event in shifts:
+        shift_date = clock_in_event.timestamp.date()
+        if start_date and shift_date < start_date:
+            continue
+        if end_date and shift_date > end_date:
+            continue
+        staff = clock_in_event.staff
+        hours_worked = 0
+        if clock_out_event and clock_out_event.timestamp >= clock_in_event.timestamp:
+            hours_worked = round((clock_out_event.timestamp - clock_in_event.timestamp).total_seconds() / 3600, 2)
+        hourly_rate = float(getattr(staff, 'hourly_rate', 0) or 0)
+        rows.append({
+            'clock_in_event_id': clock_in_event.id,
+            'clock_out_event_id': clock_out_event.id if clock_out_event else None,
+            'staff_id': staff.id,
+            'staff_name': staff.name,
+            'date': shift_date.isoformat(),
+            'clock_in_at': clock_in_event.timestamp,
+            'clock_out_at': clock_out_event.timestamp if clock_out_event else None,
+            'hours_worked': hours_worked,
+            'hourly_rate': hourly_rate,
+            'pay': round(hours_worked * hourly_rate, 2),
+            'is_open_shift': clock_out_event is None,
+            'branch_id': clock_in_event.branch_id,
+        })
+    rows.sort(key=lambda row: (row['clock_in_at'], row['staff_name']), reverse=True)
+    return rows
 
 def password_strength_issues(password, email=''):
     password = password or ''
@@ -448,6 +755,17 @@ def verify_razorpay_signature(order_id, payment_id, signature):
     ).hexdigest()
     return hmac.compare_digest(expected, signature or '')
 
+def verify_razorpay_webhook_signature(webhook_data, signature):
+    if not RAZORPAY_KEY_SECRET:
+        return False
+    message = webhook_data.encode('utf-8')
+    expected = hmac.new(
+        RAZORPAY_KEY_SECRET.encode('utf-8'),
+        message,
+        hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(expected, signature or '')
+
 def cleanup_reset_codes():
     now = datetime.utcnow()
     expired = [email for email, record in PASSWORD_RESET_CODES.items() if record['expires_at'] <= now]
@@ -469,7 +787,7 @@ def auth():
 
 @app.route('/api/signup', methods=['POST'])
 def signup():
-    d = request.json
+    d = request.json or {}
     if User.query.filter_by(email=d['email']).first():
         return jsonify({'error': 'Email already exists'}), 400
     password_error = strong_password_error(d.get('password', ''), d.get('email', ''))
@@ -479,29 +797,226 @@ def signup():
     # Map unsupported roles to the closest valid role.
     if role not in ('cashier', 'restaurant', 'kitchen', 'manager', 'customer'):
         role = 'cashier'
-    u = User(name=d['name'], email=d['email'], password=generate_password_hash(d['password'], method='scrypt'), role=role)
+    creator = get_current_user()
+    branch_id = d.get('branch_id')
+    if branch_id:
+        try:
+            branch_id = int(branch_id)
+        except (TypeError, ValueError):
+            branch_id = None
+    elif creator:
+        branch_id = get_active_branch_id(creator)
+    else:
+        default_branch = get_default_branch()
+        branch_id = default_branch.id if default_branch else None
+
+    if creator and not is_superadmin(creator):
+        branch_id = creator.branch_id
+
+    tenant_id = None
+    if creator:
+        tenant_id = creator.tenant_id
+    elif d.get('tenant_id'):
+        tenant_id = int(d['tenant_id'])
+    else:
+        # Assign to default tenant
+        t = Tenant.query.order_by(Tenant.id.asc()).first()
+        tenant_id = t.id if t else None
+
+    u = User(
+        name=d['name'],
+        email=d['email'],
+        password=generate_password_hash(d['password'], method='scrypt'),
+        role=role,
+        branch_id=branch_id,
+        tenant_id=tenant_id,
+        hourly_rate=float(d.get('hourly_rate', 0) or 0),
+        is_superadmin=bool(d.get('is_superadmin', False)) and bool(creator and is_superadmin(creator)),
+    )
     db.session.add(u)
     db.session.commit()
-    session['user_id'] = u.id
-    session['user_name'] = u.name
-    session['user_role'] = role
+    if not creator:
+        session['user_id'] = u.id
+        session['user_name'] = u.name
+        session['user_role'] = role
+        session['tenant_id'] = u.tenant_id
+        if u.branch_id:
+            session['active_branch_id'] = u.branch_id
     return jsonify({'ok': True, 'name': u.name, 'role': u.role})
 
 @app.route('/api/login', methods=['POST'])
 def login():
-    d = request.json
+    d = request.json or {}
     u = User.query.filter_by(email=d['email']).first()
     if not u or not check_password_hash(u.password, d['password']):
         return jsonify({'error': 'Invalid credentials'}), 401
     session['user_id'] = u.id
     session['user_name'] = u.name
     session['user_role'] = normalize_role(u.role)
-    return jsonify({'ok': True, 'name': u.name, 'role': session['user_role']})
+    session['tenant_id'] = u.tenant_id
+    if u.branch_id:
+        session['active_branch_id'] = u.branch_id
+    elif is_superadmin(u):
+        default_branch = get_default_branch()
+        if default_branch:
+            session['active_branch_id'] = default_branch.id
+    else:
+        session.pop('active_branch_id', None)
+    return jsonify({
+        'ok': True,
+        'name': u.name,
+        'role': session['user_role'],
+        'is_superadmin': u.is_superadmin,
+        'active_branch_id': session.get('active_branch_id'),
+        'tenant_id': u.tenant_id,
+    })
 
 @app.route('/api/logout', methods=['POST'])
 def logout():
     session.clear()
     return jsonify({'ok': True})
+
+@app.route('/api/quick-login', methods=['POST'])
+def quick_login():
+    """Dev endpoint: quickly login as a test user by role (customer/staff/owner)."""
+    d = request.json or {}
+    role_param = (d.get('role') or '').strip().lower()
+    
+    role_map = {
+        'customer': 'customer',
+        'user': 'customer',
+        'staff': 'cashier',
+        'pos': 'cashier',
+        'owner': 'restaurant',
+        'admin': 'restaurant'
+    }
+    
+    role = role_map.get(role_param, 'customer')
+    test_email = f'{role_param}@test.cafe'
+    test_password = 'Test@1234567'
+    
+    # Try to find existing test user
+    user = User.query.filter_by(email=test_email).first()
+    
+    # Create test user if doesn't exist
+    if not user:
+        from werkzeug.security import generate_password_hash
+        # Get or create Default Tenant for test users
+        default_tenant = Tenant.query.filter_by(slug='default').first()
+        if not default_tenant:
+            default_tenant = Tenant(name='Default Tenant', slug='default', plan='free', is_active=True)
+            db.session.add(default_tenant)
+            db.session.flush()
+        
+        default_branch = Branch.query.filter_by(tenant_id=default_tenant.id).order_by(Branch.id.asc()).first()
+        branch_id = default_branch.id if default_branch else None
+        
+        user = User(
+            name=f'Test {role_param.title()}',
+            email=test_email,
+            password=generate_password_hash(test_password, method='scrypt'),
+            role=role,
+            tenant_id=default_tenant.id,
+            branch_id=branch_id,
+            is_superadmin=(role == 'restaurant')
+        )
+        db.session.add(user)
+        db.session.commit()
+    
+    # Log them in
+    session['user_id'] = user.id
+    session['user_name'] = user.name
+    session['user_role'] = normalize_role(user.role)
+    session['tenant_id'] = user.tenant_id or Tenant.query.filter_by(slug='default').first().id
+    if user.branch_id:
+        session['active_branch_id'] = user.branch_id
+    elif is_superadmin(user):
+        default_branch = get_default_branch()
+        if default_branch:
+            session['active_branch_id'] = default_branch.id
+    
+    session.modified = True  # Force Flask to save session
+    home_url = role_home(session['user_role'])
+    
+    return jsonify({
+        'ok': True,
+        'name': user.name,
+        'role': session['user_role'],
+        'home': home_url
+    })
+
+@app.route('/api/register-restaurant', methods=['POST'])
+def register_restaurant():
+    """Onboard a new restaurant: creates Tenant + Branch + Owner user."""
+    d = request.json or {}
+    restaurant_name = (d.get('restaurant_name') or '').strip()
+    name = (d.get('name') or '').strip()
+    email = (d.get('email') or '').strip()
+    password = d.get('password') or ''
+
+    if not restaurant_name or not name or not email or not password:
+        return jsonify({'error': 'Restaurant name, your name, email, and password are required'}), 400
+    if find_user_by_email(email):
+        return jsonify({'error': 'Email already exists'}), 400
+    password_error = strong_password_error(password, email)
+    if password_error:
+        return jsonify({'error': password_error}), 400
+
+    # Create unique slug
+    base_slug = make_slug(restaurant_name)
+    slug = base_slug
+    counter = 1
+    while Tenant.query.filter_by(slug=slug).first():
+        slug = f'{base_slug}-{counter}'
+        counter += 1
+
+    # Create tenant
+    tenant = Tenant(name=restaurant_name, slug=slug)
+    db.session.add(tenant)
+    db.session.flush()
+
+    # Create default branch
+    branch = Branch(name=f'{restaurant_name} — Main', tenant_id=tenant.id)
+    db.session.add(branch)
+    db.session.flush()
+
+    # Create owner user
+    owner = User(
+        name=name,
+        email=email,
+        password=generate_password_hash(password, method='scrypt'),
+        role='restaurant',
+        tenant_id=tenant.id,
+        branch_id=branch.id,
+        is_superadmin=True,
+    )
+    db.session.add(owner)
+    db.session.flush()
+
+    tenant.owner_id = owner.id
+
+    # Create default payment methods for this tenant
+    for pm_name, pm_type in [('Cash', 'cash'), ('UPI / QR', 'upi'), ('Card', 'digital')]:
+        db.session.add(PaymentMethod(name=pm_name, type=pm_type, enabled=True, tenant_id=tenant.id))
+
+    # Create default cafe settings for this tenant
+    db.session.add(CafeSettings(name=restaurant_name, tenant_id=tenant.id))
+
+    db.session.commit()
+
+    # Log them in
+    session['user_id'] = owner.id
+    session['user_name'] = owner.name
+    session['user_role'] = 'restaurant'
+    session['tenant_id'] = tenant.id
+    session['active_branch_id'] = branch.id
+
+    return jsonify({
+        'ok': True,
+        'name': owner.name,
+        'role': 'restaurant',
+        'tenant_slug': tenant.slug,
+    })
 
 @app.route('/api/password-reset/request', methods=['POST'])
 def password_reset_request():
@@ -582,6 +1097,7 @@ def pos():
         'pos.html',
         user_name=session.get('user_name'),
         user_role=session.get('user_role'),
+        active_branch=get_selected_branch(),
     )
 
 @app.route('/backend')
@@ -594,12 +1110,8 @@ def backend():
     )
 
 @app.route('/admin')
-@admin_required
-def admin_dashboard():
-    return render_template(
-        'admin_dashboard.html',
-        user_name=session.get('user_name'),
-    )
+def admin_redirect():
+    return redirect(url_for('dashboard'))
 
 @app.route('/kitchen')
 @page_login_required(allowed_roles=('cashier', 'kitchen', 'manager', 'restaurant'))
@@ -618,15 +1130,31 @@ def dashboard():
         'dashboard.html',
         user_name=session.get('user_name'),
         user_role=session.get('user_role'),
+        active_branch=get_selected_branch(),
+        is_superadmin=is_superadmin(),
     )
 
 # ─── API: Products ─────────────────────────────────────────
 @app.route('/api/products', methods=['GET'])
 def get_products():
-    cats = Category.query.all()
+    branch_id = get_active_branch_id()
+    products = apply_tenant_scope(apply_branch_scope(Product.query.filter_by(active=True), Product.branch_id), Product).all()
+    products_by_category = {}
+    for product in products:
+        products_by_category.setdefault(product.category_id, []).append(product)
+    cats = apply_tenant_scope(Category.query, Category).all()
     result = []
     for c in cats:
-        prods = [{'id':p.id,'name':p.name,'price':p.price,'description':p.description,'tax':p.tax,'unit':p.unit,'image_b64':p.image_b64 or ''} for p in c.products if p.active]
+        prods = [{
+            'id': p.id,
+            'name': p.name,
+            'price': p.price,
+            'description': p.description,
+            'tax': p.tax,
+            'unit': p.unit,
+            'image_b64': p.image_b64 or '',
+            'branch_id': p.branch_id or branch_id,
+        } for p in products_by_category.get(c.id, [])]
         if prods:
             result.append({'id':c.id,'name':c.name,'products':prods})
     return jsonify(result)
@@ -634,10 +1162,10 @@ def get_products():
 @app.route('/api/products/all', methods=['GET'])
 @staff_required
 def get_all_products():
-    products = Product.query.all()
-    cats = Category.query.all()
+    products = apply_tenant_scope(apply_branch_scope(Product.query, Product.branch_id), Product).all()
+    cats = apply_tenant_scope(Category.query, Category).all()
     return jsonify({
-        'products': [{'id':p.id,'name':p.name,'price':p.price,'category_id':p.category_id,'description':p.description,'tax':p.tax,'unit':p.unit,'active':p.active,'image_b64':p.image_b64 or ''} for p in products],
+        'products': [{'id':p.id,'name':p.name,'price':p.price,'category_id':p.category_id,'description':p.description,'tax':p.tax,'unit':p.unit,'active':p.active,'image_b64':p.image_b64 or '', 'branch_id': p.branch_id} for p in products],
         'categories': [{'id':c.id,'name':c.name} for c in cats]
     })
 
@@ -645,13 +1173,17 @@ def get_all_products():
 @staff_required
 def add_product():
     d = request.json
-    cat = Category.query.filter_by(name=d.get('category','')).first()
+    cat = apply_tenant_scope(Category.query.filter_by(name=d.get('category','')), Category).first()
     if not cat:
-        cat = Category(name=d.get('category','General'))
+        cat = Category(name=d.get('category','General'), tenant_id=get_current_tenant_id())
         db.session.add(cat)
         db.session.flush()
     p = Product(name=d['name'], price=float(d['price']), category_id=cat.id,
-                description=d.get('description',''), tax=float(d.get('tax',0)), unit=d.get('unit','pcs'))
+                description=d.get('description',''), 
+                tax=float(d.get('tax',0)), 
+                tax_config_json=json.dumps(d.get('tax_config', {})),
+                unit=d.get('unit','pcs'),
+                branch_id=get_active_branch_id(), tenant_id=get_current_tenant_id())
     db.session.add(p)
     db.session.commit()
     return jsonify({'ok':True,'id':p.id})
@@ -659,20 +1191,26 @@ def add_product():
 @app.route('/api/products/<int:pid>', methods=['PUT'])
 @staff_required
 def update_product(pid):
-    p = Product.query.get_or_404(pid)
+    tid = get_current_tenant_id()
+    p = Product.query.filter_by(id=pid, tenant_id=tid).first_or_404()
+    access_error = require_branch_access_or_403(p.branch_id)
+    if access_error:
+        return access_error
     d = request.json
     p.name = d.get('name', p.name)
     p.price = float(d.get('price', p.price))
     p.description = d.get('description', p.description)
     p.tax = float(d.get('tax', p.tax))
+    if 'tax_config' in d:
+        p.tax_config_json = json.dumps(d['tax_config'])
     p.unit = d.get('unit', p.unit)
     p.active = d.get('active', p.active)
     if 'image_b64' in d:
         p.image_b64 = d['image_b64'] or ''
     if 'category' in d and d['category']:
-        cat = Category.query.filter_by(name=d['category']).first()
+        cat = apply_tenant_scope(Category.query.filter_by(name=d['category']), Category).first()
         if not cat:
-            cat = Category(name=d['category'])
+            cat = Category(name=d['category'], tenant_id=get_current_tenant_id())
             db.session.add(cat)
             db.session.flush()
         p.category_id = cat.id
@@ -682,7 +1220,11 @@ def update_product(pid):
 @app.route('/api/products/<int:pid>', methods=['DELETE'])
 @staff_required
 def delete_product(pid):
-    p = Product.query.get_or_404(pid)
+    tid = get_current_tenant_id()
+    p = Product.query.filter_by(id=pid, tenant_id=tid).first_or_404()
+    access_error = require_branch_access_or_403(p.branch_id)
+    if access_error:
+        return access_error
     db.session.delete(p)
     db.session.commit()
     return jsonify({'ok':True})
@@ -690,7 +1232,7 @@ def delete_product(pid):
 # ─── API: Floors & Tables ──────────────────────────────────
 @app.route('/api/floors', methods=['GET'])
 def get_floors():
-    floors = Floor.query.all()
+    floors = apply_tenant_scope(Floor.query, Floor).all()
     result = []
     for f in floors:
         tables = [{'id':t.id,'number':t.number,'seats':t.seats,'status':t.status,'active':t.active} for t in f.tables if t.active]
@@ -701,7 +1243,7 @@ def get_floors():
 @staff_required
 def add_floor():
     d = request.json
-    f = Floor(name=d['name'])
+    f = Floor(name=d['name'], tenant_id=get_current_tenant_id())
     db.session.add(f)
     db.session.commit()
     return jsonify({'ok':True,'id':f.id})
@@ -710,7 +1252,7 @@ def add_floor():
 @staff_required
 def add_table():
     d = request.json
-    t = Table(number=d['number'], seats=int(d.get('seats',4)), floor_id=int(d['floor_id']))
+    t = Table(number=d['number'], seats=int(d.get('seats',4)), floor_id=int(d['floor_id']), tenant_id=get_current_tenant_id())
     db.session.add(t)
     db.session.commit()
     return jsonify({'ok':True,'id':t.id})
@@ -738,13 +1280,13 @@ def update_table_status(tid):
 # ─── API: Payment Methods ──────────────────────────────────
 @app.route('/api/payment-methods', methods=['GET'])
 def get_payment_methods():
-    methods = PaymentMethod.query.all()
+    methods = apply_tenant_scope(PaymentMethod.query, PaymentMethod).all()
     return jsonify([{'id':m.id,'name':m.name,'type':m.type,'enabled':m.enabled,'upi_id':m.upi_id} for m in methods])
 
 @app.route('/api/payment-methods/<int:mid>', methods=['PUT'])
 @staff_required
 def update_payment_method(mid):
-    m = PaymentMethod.query.get_or_404(mid)
+    m = PaymentMethod.query.filter_by(id=mid, tenant_id=get_current_tenant_id()).first_or_404()
     d = request.json
     m.enabled = d.get('enabled', m.enabled)
     m.upi_id = d.get('upi_id', m.upi_id)
@@ -780,6 +1322,20 @@ def create_razorpay_order():
         message = err.get('error') if isinstance(err, dict) else str(err)
         return jsonify({'error': message or 'Unable to create Razorpay order'}), 400
 
+    # Save Razorpay order ID
+    order.razorpay_order_id = result.get('id')
+    db.session.commit()
+
+    # Generate QR code for payment link
+    payment_link = f"https://rzp.io/i/{result.get('id')}"
+    qr = qrcode.QRCode(box_size=10, border=2)
+    qr.add_data(payment_link)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    qr_b64 = base64.b64encode(buf.getvalue()).decode()
+
     return jsonify({
         'ok': True,
         'razorpay_order_id': result.get('id'),
@@ -789,6 +1345,8 @@ def create_razorpay_order():
         'merchant_name': RAZORPAY_MERCHANT_NAME,
         'order_number': order.order_number,
         'customer_name': session.get('user_name', 'Customer'),
+        'qr_code': f'data:image/png;base64,{qr_b64}',
+        'payment_link': payment_link,
     })
 
 @app.route('/api/razorpay/verify', methods=['POST'])
@@ -822,6 +1380,100 @@ def generate_qr(upi_id, amount):
 def qr_image():
     return send_from_directory(os.path.dirname(__file__), 'qr.jpeg')
 
+# ─── API: Razorpay Payment Integration ──────────────────────
+@app.route('/api/razorpay-webhook', methods=['POST'])
+def razorpay_webhook():
+    """Webhook endpoint to handle Razorpay payment confirmations"""
+    try:
+        event_data = request.get_data(as_text=True)
+        webhook_signature = request.headers.get('X-Razorpay-Signature', '')
+        
+        # Verify webhook signature
+        if not verify_razorpay_webhook_signature(event_data, webhook_signature):
+            return jsonify({'error': 'Invalid signature'}), 401
+        
+        event = json.loads(event_data)
+        event_type = event.get('event', '')
+        
+        # Handle payment.authorized event (payment successful)
+        if event_type == 'payment.authorized':
+            payment = event.get('payload', {}).get('payment', {}).get('entity', {})
+            razorpay_order_id = payment.get('order_id', '')
+            payment_id = payment.get('id', '')
+            
+            # Find order by Razorpay order ID
+            o = Order.query.filter_by(razorpay_order_id=razorpay_order_id).first()
+            if not o:
+                return jsonify({'error': 'Order not found'}), 404
+            
+            # Mark order as paid
+            if o.status != 'paid':
+                o.status = 'paid'
+                o.payment_method = 'razorpay'
+                if o.table:
+                    o.table.status = 'free'
+                process_loyalty_earning(o)
+                db.session.commit()
+                
+                # Notify via WebSocket
+                socketio.emit('order_paid', {
+                    'order_number': o.order_number,
+                    'total': o.total,
+                    'tip': o.tip,
+                    'method': 'razorpay',
+                    'razorpay_payment_id': payment_id
+                })
+        
+        # Handle payment.captured event (payment captured)
+        elif event_type == 'payment.captured':
+            payment = event.get('payload', {}).get('payment', {}).get('entity', {})
+            razorpay_order_id = payment.get('order_id', '')
+            payment_id = payment.get('id', '')
+            
+            # Find order by Razorpay order ID
+            o = Order.query.filter_by(razorpay_order_id=razorpay_order_id).first()
+            if not o:
+                return jsonify({'error': 'Order not found'}), 404
+            
+            # Mark order as paid
+            if o.status != 'paid':
+                o.status = 'paid'
+                o.payment_method = 'razorpay'
+                if o.table:
+                    o.table.status = 'free'
+                process_loyalty_earning(o)
+                db.session.commit()
+                
+                # Notify via WebSocket
+                socketio.emit('order_paid', {
+                    'order_number': o.order_number,
+                    'total': o.total,
+                    'tip': o.tip,
+                    'method': 'razorpay',
+                    'razorpay_payment_id': payment_id
+                })
+        
+        return jsonify({'status': 'ok'}), 200
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 500
+
+@app.route('/api/orders/<int:oid>/payment-status', methods=['GET'])
+def check_payment_status(oid):
+    """Check if payment has been confirmed for an order"""
+    o = Order.query.filter_by(id=oid, tenant_id=get_current_tenant_id()).first_or_404()
+    access_error = require_branch_access_or_403(o.branch_id)
+    if access_error:
+        return access_error
+    return jsonify({
+        'order_id': o.id,
+        'order_number': o.order_number,
+        'status': o.status,
+        'razorpay_order_id': o.razorpay_order_id,
+        'payment_method': o.payment_method,
+        'total': o.total,
+        'is_paid': o.status == 'paid'
+    })
+
 # ─── API: Sessions ─────────────────────────────────────────
 @app.route('/api/sessions/current', methods=['GET'])
 @staff_required
@@ -837,7 +1489,7 @@ def open_session():
     existing = Session.query.filter_by(user_id=session['user_id'], status='open').first()
     if existing:
         return jsonify({'id':existing.id,'opened_at':existing.opened_at.isoformat()})
-    s = Session(user_id=session['user_id'])
+    s = Session(user_id=session['user_id'], tenant_id=get_current_tenant_id())
     db.session.add(s)
     db.session.commit()
     return jsonify({'id':s.id,'opened_at':s.opened_at.isoformat()})
@@ -854,7 +1506,60 @@ def close_session():
         db.session.commit()
     return jsonify({'ok':True})
 
+@app.route('/api/customer/lookup', methods=['GET'])
+@staff_required
+def lookup_customer():
+    phone = request.args.get('phone', '').strip()
+    if not phone:
+        return jsonify({'error': 'Phone required'}), 400
+    tenant_id = get_current_tenant_id()
+    c = Customer.query.filter_by(tenant_id=tenant_id, phone=phone).first()
+    if c:
+        return jsonify({'found': True, 'name': c.name, 'id': c.id})
+    return jsonify({'found': False})
+
 # ─── API: Orders ───────────────────────────────────────────
+# ─── Inventory Deduction Helper ────────────────────────
+def deduct_inventory_for_order(order):
+    """Deduct stock from ingredients based on product recipes."""
+    if not order: return
+    
+    for item in order.items:
+        # Get recipe for this product
+        recipe = ProductRecipe.query.filter_by(product_id=item.product_id).all()
+        for r_item in recipe:
+            ing = InventoryItem.query.get(r_item.inventory_item_id)
+            if ing:
+                total_deduction = r_item.quantity * item.qty
+                ing.current_stock -= total_deduction
+                
+                # Log the deduction
+                log = InventoryLog(
+                    inventory_item_id=ing.id,
+                    action='sale',
+                    quantity=-total_deduction,
+                    note=f'Order #{order.order_number}',
+                    tenant_id=order.tenant_id
+                )
+                db.session.add(log)
+    db.session.commit()
+
+# ─── Loyalty Helper ──────────────────────────────────
+def process_loyalty_earning(order):
+    """Calculate and grant loyalty points based on order total."""
+    if not order or not order.customer_id: return
+    
+    settings = CafeSettings.query.filter_by(tenant_id=order.tenant_id).first()
+    if not settings: return
+    
+    ratio = settings.loyalty_points_per_100 or 10.0
+    points_earned = (order.total / 100.0) * ratio
+    
+    customer = Customer.query.get(order.customer_id)
+    if customer:
+        customer.loyalty_points += points_earned
+        db.session.commit()
+
 @app.route('/api/orders', methods=['POST'])
 @staff_required
 def create_order():
@@ -862,32 +1567,126 @@ def create_order():
     s = Session.query.filter_by(user_id=session['user_id'], status='open').first()
     if not s:
         return jsonify({'error':'No open session'}), 400
-    total = sum(item['price'] * item['qty'] for item in d['items'])
+    branch_id = get_active_branch_id()
+    tenant_id = get_current_tenant_id()
+    settings = CafeSettings.query.filter_by(tenant_id=tenant_id).first()
+    global_tax_rate = settings.tax_rate if settings else 0.0
+
+    subtotal = 0
+    total_item_tax = 0
+    total_qty = 0
+    tax_breakdown = {} # Label -> total amount
+
+    order_items_data = []
+
+    for item in d['items']:
+        prod = Product.query.get(item['product_id'])
+        item_price = float(item['price'])
+        qty = int(item['qty'])
+        item_subtotal = item_price * qty
+        subtotal += item_subtotal
+        total_qty += qty
+
+        # Item-level taxes
+        tax_config = {}
+        if prod and prod.tax_config_json:
+            try:
+                tax_config = json.loads(prod.tax_config_json)
+            except: pass
+        
+        # If no custom config, fallback to product.tax if > 0
+        if not tax_config and prod and prod.tax > 0:
+            tax_config = {"Tax": prod.tax}
+        
+        item_tax_total = 0
+        item_tax_details = {}
+        for tax_label, rate in tax_config.items():
+            t_amt = round(item_subtotal * (float(rate) / 100), 2)
+            item_tax_total += t_amt
+            item_tax_details[tax_label] = t_amt
+            tax_breakdown[tax_label] = tax_breakdown.get(tax_label, 0) + t_amt
+        
+        total_item_tax += item_tax_total
+        order_items_data.append({
+            'product_id': item['product_id'],
+            'name': item['name'],
+            'qty': qty,
+            'price': item_price,
+            'notes': item.get('notes', ''),
+            'tax_rate': sum(float(r) for r in tax_config.values()),
+            'tax_amount': item_tax_total,
+            'tax_info_json': json.dumps(item_tax_details)
+        })
+
+    # Second layer: Global Tax
+    intermediate_total = subtotal + total_item_tax
+    global_tax_amount = round(intermediate_total * (global_tax_rate / 100), 2)
+    if global_tax_rate > 0:
+        tax_breakdown['Service Tax'] = tax_breakdown.get('Service Tax', 0) + global_tax_amount
+
+    raw_total = intermediate_total + global_tax_amount
+    final_total = round(raw_total)
+    round_off = round(final_total - raw_total, 2)
+
     table_id = d.get('table_id')  # None for takeaway
     is_takeaway = d.get('takeaway', False) or not table_id
-    customer_name = d.get('customer_name', '')
+    customer_name = d.get('customer_name', '').strip()
+    customer_phone = d.get('customer_phone', '').strip()
+    
+    customer_id = None
+    if customer_phone:
+        c = Customer.query.filter_by(tenant_id=tenant_id, phone=customer_phone).first()
+        if not c:
+            c = Customer(phone=customer_phone, name=customer_name, tenant_id=tenant_id)
+            db.session.add(c)
+            db.session.flush()
+        else:
+            if customer_name and c.name != customer_name:
+                c.name = customer_name
+        customer_id = c.id
+        customer_name = c.name
+
     o = None
     if table_id and not is_takeaway:
         o = (
             Order.query
-            .filter_by(session_id=s.id, table_id=table_id)
+            .filter_by(session_id=s.id, table_id=table_id, branch_id=branch_id)
             .filter(Order.status.in_(['draft', 'sent']))
             .order_by(Order.created_at.desc())
             .first()
         )
 
     if o:
-        for item in d['items']:
+        for item_data in order_items_data:
             oi = OrderItem(
                 order_id=o.id,
-                product_id=item['product_id'],
-                product_name=item['name'],
-                qty=item['qty'],
-                price=item['price'],
-                notes=item.get('notes', ''),
+                product_id=item_data['product_id'],
+                product_name=item_data['name'],
+                qty=item_data['qty'],
+                price=item_data['price'],
+                notes=item_data['notes'],
+                tax_rate=item_data['tax_rate'],
+                tax_amount=item_data['tax_amount'],
+                tax_info_json=item_data['tax_info_json']
             )
             db.session.add(oi)
-        o.total = (o.total or 0) + total
+        o.subtotal = (o.subtotal or 0) + subtotal
+        o.tax_amount = (o.tax_amount or 0) + total_item_tax
+        o.total = (o.total or 0) + final_total
+        o.round_off = (o.round_off or 0) + round_off
+        o.total_qty = (o.total_qty or 0) + total_qty
+        
+        # Merge tax breakdown
+        try:
+            old_breakdown = json.loads(o.tax_breakdown_json or '{}')
+        except: old_breakdown = {}
+        for k, v in tax_breakdown.items():
+            old_breakdown[k] = old_breakdown.get(k, 0) + v
+        o.tax_breakdown_json = json.dumps(old_breakdown)
+        if customer_id:
+            o.customer_id = customer_id
+            o.customer_phone = customer_phone
+            o.customer_name = customer_name
         if table_id:
             t = Table.query.get(table_id)
             if t:
@@ -901,20 +1700,33 @@ def create_order():
             table_id=table_id if not is_takeaway else None,
             session_id=s.id,
             user_id=session['user_id'],
-            total=total,
+            subtotal=subtotal,
+            tax_amount=total_item_tax,
+            tax_breakdown_json=json.dumps(tax_breakdown),
+            round_off=round_off,
+            total_qty=total_qty,
+            total=final_total,
+            branch_id=branch_id,
+            tenant_id=get_current_tenant_id(),
         )
         if customer_name:
             o.customer_name = customer_name
+        if customer_phone:
+            o.customer_phone = customer_phone
+            o.customer_id = customer_id
         db.session.add(o)
         db.session.flush()
-        for item in d['items']:
+        for item_data in order_items_data:
             oi = OrderItem(
                 order_id=o.id,
-                product_id=item['product_id'],
-                product_name=item['name'],
-                qty=item['qty'],
-                price=item['price'],
-                notes=item.get('notes', ''),
+                product_id=item_data['product_id'],
+                product_name=item_data['name'],
+                qty=item_data['qty'],
+                price=item_data['price'],
+                notes=item_data['notes'],
+                tax_rate=item_data['tax_rate'],
+                tax_amount=item_data['tax_amount'],
+                tax_info_json=item_data['tax_info_json']
             )
             db.session.add(oi)
         if table_id and not is_takeaway:
@@ -925,17 +1737,34 @@ def create_order():
     return jsonify({'ok':True,'id':o.id,'order_number':order_num})
 
 def serialize_bill(order):
-    payable_total = 0 if not order.sent_to_kitchen_at and order.status != 'sent' else sum(i.qty * i.price for i in order.items)
+    subtotal = sum(i.qty * i.price for i in order.items)
+    is_sent = order.sent_to_kitchen_at or order.status == 'sent' or order.status == 'paid'
+    
+    # Calculate tax data
+    tax_breakdown = {}
+    total_tax = 0
+    if order.tax_breakdown_json:
+        try:
+            tax_breakdown = json.loads(order.tax_breakdown_json)
+            total_tax = sum(tax_breakdown.values())
+        except: pass
+
     return {
         'id': order.id,
         'order_number': order.order_number,
         'table_id': order.table_id,
         'table': order.table.number if order.table else 'Takeaway',
-        'customer_name': order.customer_name if hasattr(order, 'customer_name') else None,
+        'customer_name': order.customer_name or 'Walk-in',
+        'customer_phone': order.customer_phone or '',
         'is_takeaway': order.table_id is None,
         'status': order.status,
-        'total': payable_total,
-        'tip': order.tip,
+        'subtotal': subtotal,
+        'tax_amount': total_tax,
+        'tax_breakdown': tax_breakdown,
+        'round_off': order.round_off or 0,
+        'total': order.total if is_sent else 0,
+        'total_qty': order.total_qty or sum(i.qty for i in order.items),
+        'tip': order.tip or 0,
         'created_at': order.created_at.isoformat() if order.created_at else None,
         'sent_to_kitchen_at': order.sent_to_kitchen_at.isoformat() if order.sent_to_kitchen_at else None,
         'items': [{
@@ -944,6 +1773,7 @@ def serialize_bill(order):
             'name': i.product_name,
             'qty': i.qty,
             'price': i.price,
+            'tax_amount': i.tax_amount or 0,
             'notes': i.notes or '',
         } for i in order.items],
     }
@@ -952,7 +1782,10 @@ def serialize_bill(order):
 @staff_required
 def send_to_kitchen(oid):
     try:
-        o = Order.query.get_or_404(oid)
+        o = Order.query.filter_by(id=oid, tenant_id=get_current_tenant_id()).first_or_404()
+        access_error = require_branch_access_or_403(o.branch_id)
+        if access_error:
+            return access_error
         if o.status == 'paid':
             return jsonify({'error': 'Cannot send paid order to kitchen'}), 400
         pending_items = [item for item in o.items if item.kitchen_status == 'pending']
@@ -965,7 +1798,7 @@ def send_to_kitchen(oid):
         kt = KitchenTicket.query.filter_by(order_id=oid).order_by(KitchenTicket.sent_at.desc()).first()
         created_new_ticket = False
         if not kt or kt.status == 'completed':
-            kt = KitchenTicket(order_id=oid)
+            kt = KitchenTicket(order_id=oid, tenant_id=o.tenant_id)
             db.session.add(kt)
             created_new_ticket = True
 
@@ -998,7 +1831,18 @@ def get_bills():
     s = Session.query.filter_by(user_id=session['user_id'], status='open').first()
     if not s:
         return jsonify([])
-    orders = Order.query.filter_by(session_id=s.id, status='sent').order_by(Order.created_at.desc()).all()
+    orders = apply_branch_scope(
+        Order.query.filter_by(session_id=s.id, status='sent'),
+        Order.branch_id,
+    ).order_by(Order.created_at.desc()).all()
+    return jsonify([serialize_bill(o) for o in orders])
+
+@app.route('/api/orders/all', methods=['GET'])
+@admin_required
+def get_all_orders():
+    tid = get_current_tenant_id()
+    # Deep query for analytics, limited to last 1000 for performance
+    orders = Order.query.filter_by(tenant_id=tid).order_by(Order.created_at.desc()).limit(1000).all()
     return jsonify([serialize_bill(o) for o in orders])
 
 @app.route('/api/bills/table/<int:tid>', methods=['GET'])
@@ -1009,7 +1853,7 @@ def get_bill_for_table(tid):
         return jsonify({'bill': None})
     order = (
         Order.query
-        .filter_by(session_id=s.id, table_id=tid, status='sent')
+        .filter_by(session_id=s.id, table_id=tid, status='sent', branch_id=get_active_branch_id(), tenant_id=get_current_tenant_id())
         .order_by(Order.created_at.desc())
         .first()
     )
@@ -1020,13 +1864,20 @@ def get_bill_for_table(tid):
 @app.route('/api/orders/<int:oid>/pay', methods=['POST'])
 @staff_required
 def pay_order(oid):
-    o = Order.query.get_or_404(oid)
+    o = Order.query.filter_by(id=oid, tenant_id=get_current_tenant_id()).first_or_404()
+    access_error = require_branch_access_or_403(o.branch_id)
+    if access_error:
+        return access_error
     d = request.json
-    payable_total = sum(i.qty * i.price for i in o.items) if (o.sent_to_kitchen_at or o.status == 'sent') else 0
+    
     o.status = 'paid'
     o.payment_method = d.get('method','cash')
-    o.tip = d.get('tip', 0) or 0  # Add tip support
-    o.total = payable_total
+    o.tip = float(d.get('tip', 0) or 0)
+    
+    # Recalculate grand total based on persisted total (Sub + Taxes) + Tip
+    # Actually, order.total already has Sub + Taxes + RoundOff (calculated in create_order)
+    # We just need to ensure tip is part of the final captured amount if needed for reporting.
+    
     if o.table:
         o.table.status = 'free'
     db.session.commit()
@@ -1036,7 +1887,10 @@ def pay_order(oid):
 @app.route('/api/orders/<int:oid>', methods=['DELETE'])
 @staff_required
 def delete_order(oid):
-    o = Order.query.get_or_404(oid)
+    o = Order.query.filter_by(id=oid, tenant_id=get_current_tenant_id()).first_or_404()
+    access_error = require_branch_access_or_403(o.branch_id)
+    if access_error:
+        return access_error
     if o.status == 'paid':
         return jsonify({'error': 'Cannot delete a paid bill'}), 400
 
@@ -1047,7 +1901,7 @@ def delete_order(oid):
     if table_id:
         has_active_orders = (
             Order.query
-            .filter(Order.table_id == table_id, Order.id != oid, Order.status.in_(['draft', 'sent']))
+            .filter(Order.table_id == table_id, Order.id != oid, Order.status.in_(['draft', 'sent']), Order.branch_id == o.branch_id)
             .first()
         )
         if not has_active_orders:
@@ -1064,7 +1918,7 @@ def delete_order(oid):
 def get_table_order(tid):
     o = (
         Order.query
-        .filter_by(table_id=tid, status='draft')
+        .filter_by(table_id=tid, status='draft', branch_id=get_active_branch_id())
         .order_by(Order.created_at.desc())
         .first()
     )
@@ -1080,7 +1934,9 @@ def get_avg_prep_minutes():
     """Rolling average prep time from last 10 completed tickets."""
     completed = (
         KitchenTicket.query
+        .join(Order, Order.id == KitchenTicket.order_id)
         .filter(KitchenTicket.status == 'completed',
+                Order.branch_id == get_active_branch_id(),
                 KitchenTicket.started_at.isnot(None),
                 KitchenTicket.completed_at.isnot(None))
         .order_by(KitchenTicket.completed_at.desc())
@@ -1092,9 +1948,16 @@ def get_avg_prep_minutes():
     total = sum((kt.completed_at - kt.started_at).total_seconds() for kt in completed)
     return max(1, int(total / len(completed) / 60))
 
+@app.route('/api/kitchen/orders', methods=['GET'])
 @app.route('/api/kitchen/tickets', methods=['GET'])
 def get_tickets():
-    tickets = KitchenTicket.query.filter(KitchenTicket.status != 'completed').order_by(KitchenTicket.sent_at.asc()).all()
+    tickets = (
+        KitchenTicket.query
+        .join(Order, Order.id == KitchenTicket.order_id)
+        .filter(KitchenTicket.status != 'completed', Order.branch_id == get_active_branch_id(), KitchenTicket.tenant_id == get_current_tenant_id())
+        .order_by(KitchenTicket.sent_at.asc())
+        .all()
+    )
     result = []
     avg_prep = get_avg_prep_minutes()
     now = datetime.utcnow()
@@ -1141,8 +2004,11 @@ def get_tickets():
 @app.route('/api/kitchen/tickets/<int:kid>/advance', methods=['POST'])
 @staff_required
 def advance_ticket(kid):
-    kt = KitchenTicket.query.get_or_404(kid)
+    kt = KitchenTicket.query.filter_by(id=kid, tenant_id=get_current_tenant_id()).first_or_404()
     o = kt.order
+    access_error = require_branch_access_or_403(o.branch_id)
+    if access_error:
+        return access_error
     stages = ['to_cook','preparing','completed']
     idx = stages.index(kt.status) if kt.status in stages else 0
     if idx < len(stages)-1:
@@ -1173,7 +2039,13 @@ def advance_ticket(kid):
 @app.route('/api/kitchen/items/<int:item_id>/complete', methods=['POST'])
 @staff_required
 def mark_item_complete(item_id):
-    item = OrderItem.query.get_or_404(item_id)
+    item = OrderItem.query.join(Order).filter(
+        OrderItem.id == item_id,
+        Order.tenant_id == get_current_tenant_id()
+    ).first_or_404()
+    access_error = require_branch_access_or_403(item.order.branch_id)
+    if access_error:
+        return access_error
     if item.kitchen_status != 'completed':
         item.kitchen_status = 'completed'
         item.completed_at = datetime.utcnow()
@@ -1201,12 +2073,14 @@ def mark_item_complete(item_id):
 def get_my_reservations():
     uid = session['user_id']
     role = normalize_role(session.get('user_role'))
+    tid = get_current_tenant_id()
     if role == 'customer':
-        reservations = Reservation.query.filter_by(customer_id=uid).order_by(Reservation.reserved_at.asc()).all()
+        reservations = Reservation.query.filter_by(customer_id=uid, tenant_id=tid).order_by(Reservation.reserved_at.asc()).all()
     else:
         # Staff/admin see all upcoming reservations
         reservations = Reservation.query.filter(
-            Reservation.reserved_at >= datetime.utcnow() - timedelta(hours=2)
+            Reservation.reserved_at >= datetime.utcnow() - timedelta(hours=2),
+            Reservation.tenant_id == tid
         ).order_by(Reservation.reserved_at.asc()).all()
     return jsonify([_serialize_reservation(r) for r in reservations])
 
@@ -1235,6 +2109,7 @@ def _serialize_reservation(r):
 @login_required
 def create_reservation():
     d = request.json or {}
+    tid = get_current_tenant_id()
     try:
         dt_str = (d.get('reserved_at') or '').replace('Z', '+00:00')
         reserved_at = datetime.fromisoformat(dt_str)
@@ -1258,6 +2133,7 @@ def create_reservation():
             Reservation.status.in_(['pending', 'confirmed']),
             Reservation.reserved_at >= window_start,
             Reservation.reserved_at <= window_end,
+            Reservation.tenant_id == tid,
         ).first()
         if conflict:
             return jsonify({'error': 'Table already reserved in this time window'}), 409
@@ -1267,6 +2143,7 @@ def create_reservation():
         reserved_at=reserved_at,
         party_size=int(d.get('party_size', 2)),
         notes=d.get('notes', ''),
+        tenant_id=tid,
     )
     db.session.add(r)
     db.session.flush()
@@ -1287,6 +2164,8 @@ def create_reservation():
 @login_required
 def update_reservation(rid):
     r = Reservation.query.get_or_404(rid)
+    if r.tenant_id != get_current_tenant_id():
+        return jsonify({'error': 'forbidden'}), 403
     uid = session['user_id']
     role = normalize_role(session.get('user_role'))
     if role == 'customer' and r.customer_id != uid:
@@ -1322,6 +2201,8 @@ def update_reservation(rid):
 @login_required
 def cancel_reservation(rid):
     r = Reservation.query.get_or_404(rid)
+    if r.tenant_id != get_current_tenant_id():
+        return jsonify({'error': 'forbidden'}), 403
     uid = session['user_id']
     role = normalize_role(session.get('user_role'))
     if role == 'customer' and r.customer_id != uid:
@@ -1335,6 +2216,8 @@ def cancel_reservation(rid):
 def seat_reservation(rid):
     """Staff action: seat the party and auto-convert pre-order to kitchen ticket."""
     r = Reservation.query.get_or_404(rid)
+    if r.tenant_id != get_current_tenant_id():
+        return jsonify({'error': 'forbidden'}), 403
     r.status = 'seated'
     # Mark table occupied
     if r.table:
@@ -1354,6 +2237,8 @@ def seat_reservation(rid):
             table_id=r.table_id,
             session_id=s.id,
             user_id=session['user_id'],
+            branch_id=get_active_branch_id(),
+            tenant_id=get_current_tenant_id(),
             total=total,
             status='sent',
             sent_to_kitchen_at=datetime.utcnow(),
@@ -1371,7 +2256,7 @@ def seat_reservation(rid):
                 kitchen_status='to_cook',
             )
             db.session.add(oi)
-        kt = KitchenTicket(order_id=o.id)
+        kt = KitchenTicket(order_id=o.id, tenant_id=get_current_tenant_id())
         db.session.add(kt)
         db.session.commit()
         ticket_data = {
@@ -1393,6 +2278,8 @@ def seat_reservation(rid):
 @staff_required
 def confirm_reservation(rid):
     r = Reservation.query.get_or_404(rid)
+    if r.tenant_id != get_current_tenant_id():
+        return jsonify({'error': 'forbidden'}), 403
     r.status = 'confirmed'
     db.session.commit()
     return jsonify({'ok': True})
@@ -1402,6 +2289,8 @@ def confirm_reservation(rid):
 def finish_reservation(rid):
     """Staff action: mark reservation as done and free up the table."""
     r = Reservation.query.get_or_404(rid)
+    if r.tenant_id != get_current_tenant_id():
+        return jsonify({'error': 'forbidden'}), 403
     r.status = 'completed'
     
     # Mark table as free
@@ -1429,7 +2318,7 @@ def table_availability():
             Reservation.table_id.isnot(None),
         ).all()
     )
-    floors = Floor.query.all()
+    floors = apply_tenant_scope(Floor.query, Floor).all()
     result = []
     for f in floors:
         tables = []
@@ -1448,7 +2337,7 @@ def table_availability():
 # ─── API: Self-Order (Customer QR) ────────────────────────
 @app.route('/table/<int:table_id>/order')
 def self_order_page(table_id):
-    t = Table.query.get_or_404(table_id)
+    t = Table.query.filter_by(id=table_id, tenant_id=get_current_tenant_id()).first_or_404()
     return render_template('self_order.html',
         table_id=table_id,
         table_number=t.number,
@@ -1488,11 +2377,14 @@ def create_self_order():
             db.session.flush()
     count = Order.query.count() + 1
     order_num = f'ORD-{count:04d}'
+    tid = get_current_tenant_id()
     o = Order(
         order_number=order_num,
         table_id=table_id,
         session_id=s.id,
         user_id=session['user_id'],
+        branch_id=get_active_branch_id() or getattr(get_current_user(), 'branch_id', None),
+        tenant_id=tid,
         total=total,
         status='sent',
         sent_to_kitchen_at=datetime.utcnow(),
@@ -1511,7 +2403,7 @@ def create_self_order():
         )
         db.session.add(oi)
     t.status = 'occupied'
-    kt = KitchenTicket(order_id=o.id)
+    kt = KitchenTicket(order_id=o.id, tenant_id=tid)
     db.session.add(kt)
     db.session.commit()
     ticket_data = {
@@ -1534,7 +2426,10 @@ def create_self_order():
 
 @app.route('/api/self-order/<int:oid>/status', methods=['GET'])
 def self_order_status(oid):
-    o = Order.query.get_or_404(oid)
+    o = Order.query.filter_by(id=oid, tenant_id=get_current_tenant_id()).first_or_404()
+    access_error = require_branch_access_or_403(o.branch_id)
+    if access_error:
+        return access_error
     kt = KitchenTicket.query.filter_by(order_id=oid).order_by(KitchenTicket.sent_at.desc()).first()
     return jsonify({
         'order_id': o.id,
@@ -1613,7 +2508,7 @@ def dashboard_stats():
         start = now - timedelta(days=7)
     else:
         start = now - timedelta(days=30)
-    orders = Order.query.filter(Order.status=='paid', Order.created_at>=start).all()
+    orders = apply_tenant_scope(apply_branch_scope(Order.query, Order.branch_id), Order).filter(Order.status=='paid', Order.created_at>=start).all()
     total_sales = sum(o.total for o in orders)
     total_orders = len(orders)
     by_method = {}
@@ -1633,36 +2528,374 @@ def dashboard_stats():
         'top_products': [{'name':n,'qty':q} for n,q in top_products]
     })
 
+def parse_report_date(value, default=None):
+    value = (value or '').strip()
+    if not value:
+        return default
+    try:
+        return datetime.strptime(value, '%Y-%m-%d').date()
+    except ValueError:
+        return default
+
+@app.route('/api/branches', methods=['GET'])
+@admin_required
+def get_branches():
+    user = get_current_user()
+    tid = get_current_tenant_id()
+    if is_superadmin(user):
+        branches = Branch.query.filter_by(tenant_id=tid).order_by(Branch.name.asc()).all()
+    else:
+        branches = Branch.query.filter_by(id=user.branch_id, tenant_id=tid).all()
+    return jsonify({
+        'branches': [{
+            'id': branch.id,
+            'name': branch.name,
+            'address': branch.address,
+            'created_at': branch.created_at.isoformat() if branch.created_at else None,
+        } for branch in branches],
+        'active_branch_id': get_active_branch_id(user),
+        'is_superadmin': is_superadmin(user),
+    })
+
+@app.route('/api/branches', methods=['POST'])
+@admin_required
+def create_branch():
+    user = get_current_user()
+    if not is_superadmin(user):
+        return jsonify({'error': 'Only super-admins can add branches'}), 403
+    d = request.json or {}
+    name = (d.get('name') or '').strip()
+    address = (d.get('address') or '').strip()
+    if not name:
+        return jsonify({'error': 'Branch name is required'}), 400
+    tid = get_current_tenant_id()
+    if Branch.query.filter(db.func.lower(Branch.name) == name.lower(), Branch.tenant_id == tid).first():
+        return jsonify({'error': 'Branch already exists'}), 400
+    branch = Branch(name=name, address=address, tenant_id=tid)
+    db.session.add(branch)
+    db.session.commit()
+    return jsonify({'ok': True, 'id': branch.id, 'name': branch.name})
+
+@app.route('/api/branches/switch', methods=['POST'])
+@admin_required
+def switch_branch():
+    user = get_current_user()
+    if not is_superadmin(user):
+        return jsonify({'error': 'Only super-admins can switch branches'}), 403
+    branch_id = request.json.get('branch_id') if request.json else None
+    try:
+        branch_id = int(branch_id)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Invalid branch'}), 400
+    branch = Branch.query.filter_by(id=branch_id, tenant_id=get_current_tenant_id()).first_or_404()
+    session['active_branch_id'] = branch.id
+    return jsonify({'ok': True, 'active_branch_id': branch.id, 'branch_name': branch.name})
+
+@app.route('/api/attendance/status', methods=['GET'])
+@staff_required
+def attendance_status():
+    user = get_current_user()
+    open_shift = get_current_shift_start(user.id)
+    return jsonify({
+        'clocked_in': bool(open_shift),
+        'current_shift_started_at': utc_iso(open_shift.timestamp) if open_shift else None,
+        'hourly_rate': float(user.hourly_rate or 0),
+        'branch_id': get_active_branch_id(user),
+        'tenant_id': get_current_tenant_id(),
+    })
+
+@app.route('/api/attendance/clock', methods=['POST'])
+@staff_required
+def toggle_attendance_clock():
+    user = get_current_user()
+    action = (request.json or {}).get('action', '').strip().lower()
+    if action not in ('in', 'out'):
+        return jsonify({'error': 'Action must be "in" or "out"'}), 400
+    open_shift = get_current_shift_start(user.id)
+    if action == 'in' and open_shift:
+        return jsonify({'error': 'You are already clocked in'}), 400
+    if action == 'out' and not open_shift:
+        return jsonify({'error': 'You are not clocked in'}), 400
+
+    event = AttendanceEvent(
+        staff_id=user.id,
+        branch_id=get_active_branch_id(user),
+        tenant_id=get_current_tenant_id(),
+        action=action,
+        timestamp=datetime.utcnow(),
+    )
+    db.session.add(event)
+    db.session.commit()
+    return jsonify({
+        'ok': True,
+        'action': action,
+        'timestamp': utc_iso(event.timestamp),
+        'clocked_in': action == 'in',
+    })
+
+@app.route('/api/admin/attendance-report', methods=['GET'])
+@admin_required
+def attendance_report():
+    user = get_current_user()
+    staff_id = request.args.get('staff_id', '').strip()
+    try:
+        staff_id = int(staff_id) if staff_id else None
+    except ValueError:
+        return jsonify({'error': 'Invalid staff filter'}), 400
+
+    start_date = parse_report_date(request.args.get('start_date'))
+    end_date = parse_report_date(request.args.get('end_date'))
+    attendance_query = apply_tenant_scope(apply_branch_scope(
+        AttendanceEvent.query.join(User, User.id == AttendanceEvent.staff_id),
+        AttendanceEvent.branch_id,
+        include_all_for_superadmin=False,
+    ), AttendanceEvent)
+    if staff_id:
+        attendance_query = attendance_query.filter(AttendanceEvent.staff_id == staff_id)
+    events = attendance_query.order_by(AttendanceEvent.timestamp.asc(), AttendanceEvent.id.asc()).all()
+    rows = build_attendance_shifts(events, start_date=start_date, end_date=end_date, staff_filter=staff_id)
+
+    staff_query = apply_tenant_scope(apply_branch_scope(User.query, User.branch_id), User)
+    staff_options = staff_query.filter(User.role != 'customer').order_by(User.name.asc()).all()
+    return jsonify({
+        'rows': [{
+            'clock_in_event_id': row['clock_in_event_id'],
+            'clock_out_event_id': row['clock_out_event_id'],
+            'staff_id': row['staff_id'],
+            'staff_name': row['staff_name'],
+            'date': row['date'],
+            'clock_in_time': utc_iso(row['clock_in_at']),
+            'clock_out_time': utc_iso(row['clock_out_at']),
+            'hours_worked': row['hours_worked'],
+            'hourly_rate': row['hourly_rate'],
+            'pay': row['pay'],
+            'is_open_shift': row['is_open_shift'],
+            'branch_id': row['branch_id'],
+        } for row in rows],
+        'staff': [{
+            'id': member.id,
+            'name': member.name,
+            'hourly_rate': float(member.hourly_rate or 0),
+        } for member in staff_options],
+    })
+
+@app.route('/api/admin/attendance/shifts/<int:clock_in_event_id>', methods=['PATCH'])
+@admin_required
+def update_attendance_shift(clock_in_event_id):
+    clock_in_event = AttendanceEvent.query.filter_by(
+        id=clock_in_event_id,
+        tenant_id=get_current_tenant_id()
+    ).first_or_404()
+    access_error = require_branch_access_or_403(clock_in_event.branch_id)
+    if access_error:
+        return access_error
+
+    if clock_in_event.action != 'in':
+        return jsonify({'error': 'Shift must start with a clock-in event'}), 400
+
+    d = request.json or {}
+    clock_out_at = d.get('clock_out_at')
+    if not clock_out_at:
+        return jsonify({'error': 'clock_out_at is required'}), 400
+    try:
+        parsed_clock_out = datetime.fromisoformat(clock_out_at)
+    except ValueError:
+        return jsonify({'error': 'Invalid clock-out timestamp'}), 400
+    if parsed_clock_out < clock_in_event.timestamp:
+        return jsonify({'error': 'Clock-out cannot be before clock-in'}), 400
+
+    clock_out_event = None
+    if d.get('clock_out_event_id'):
+        clock_out_event = AttendanceEvent.query.get(int(d['clock_out_event_id']))
+    if not clock_out_event:
+        clock_out_event = AttendanceEvent.query.filter(
+            AttendanceEvent.staff_id == clock_in_event.staff_id,
+            AttendanceEvent.action == 'out',
+            AttendanceEvent.timestamp >= clock_in_event.timestamp,
+        ).order_by(AttendanceEvent.timestamp.asc(), AttendanceEvent.id.asc()).first()
+
+    if clock_out_event and clock_out_event.action != 'out':
+        clock_out_event = None
+
+    if clock_out_event:
+        clock_out_event.timestamp = parsed_clock_out
+    else:
+        clock_out_event = AttendanceEvent(
+            staff_id=clock_in_event.staff_id,
+            branch_id=clock_in_event.branch_id,
+            action='out',
+            timestamp=parsed_clock_out,
+        )
+        db.session.add(clock_out_event)
+    db.session.commit()
+    return jsonify({
+        'ok': True,
+        'clock_in_event_id': clock_in_event.id,
+        'clock_out_event_id': clock_out_event.id,
+        'clock_out_time': clock_out_event.timestamp.isoformat(),
+    })
+
+@app.route('/api/admin/branches/compare', methods=['GET'])
+@admin_required
+def compare_branches():
+    user = get_current_user()
+    tid = get_current_tenant_id()
+    start_date = parse_report_date(request.args.get('start_date'))
+    end_date = parse_report_date(request.args.get('end_date'))
+    start_dt = datetime.combine(start_date, datetime.min.time()) if start_date else None
+    end_dt = datetime.combine(end_date, datetime.max.time()) if end_date else None
+
+    branch_query = Branch.query.filter_by(tenant_id=tid).order_by(Branch.name.asc())
+    if not is_superadmin(user):
+        branch_query = branch_query.filter(Branch.id == user.branch_id)
+    branches = branch_query.all()
+
+    cards = []
+    for branch in branches:
+        order_query = Order.query.filter(
+            Order.branch_id == branch.id,
+            Order.status == 'paid',
+        )
+        if start_dt:
+            order_query = order_query.filter(Order.created_at >= start_dt)
+        if end_dt:
+            order_query = order_query.filter(Order.created_at <= end_dt)
+        orders = order_query.all()
+        total_orders = len(orders)
+        total_revenue = round(sum(float(order.total or 0) for order in orders), 2)
+        item_totals = {}
+        for order in orders:
+            for item in order.items:
+                item_totals[item.product_name] = item_totals.get(item.product_name, 0) + item.qty
+        top_item_name, top_item_qty = ('-', 0)
+        if item_totals:
+            top_item_name, top_item_qty = max(item_totals.items(), key=lambda entry: entry[1])
+        cards.append({
+            'branch_id': branch.id,
+            'branch_name': branch.name,
+            'address': branch.address,
+            'total_orders': total_orders,
+            'total_revenue': total_revenue,
+            'top_selling_item': top_item_name,
+            'top_selling_qty': top_item_qty,
+        })
+    return jsonify({'branches': cards})
+
 # ─── API: Admin / User Management ──────────────────────────
 @app.route('/api/users', methods=['GET'])
 @staff_required
 def get_users():
     user = User.query.get(session['user_id'])
-    if not user or normalize_role(user.role) != 'restaurant':
+    if not user or (normalize_role(user.role) != 'restaurant' and not user.is_superadmin):
         return jsonify({'error': 'unauthorized'}), 403
-    
-    # Get all users except the current admin
-    users = User.query.filter(User.id != session['user_id']).all()
+
+    users = apply_tenant_scope(apply_branch_scope(User.query, User.branch_id), User).filter(User.id != session['user_id']).all()
     return jsonify([{
         'id': u.id,
         'name': u.name,
         'email': u.email,
         'role': u.role,
-        'created_at': u.created_at.isoformat()
+        'created_at': u.created_at.isoformat(),
+        'hourly_rate': float(u.hourly_rate or 0),
+        'branch_id': u.branch_id,
+        'branch_name': u.branch.name if u.branch else '',
+        'is_superadmin': bool(u.is_superadmin),
     } for u in users])
+
+@app.route('/api/users', methods=['POST'])
+@admin_required
+def create_user():
+    admin = get_current_user()
+    if normalize_role(admin.role) not in ('restaurant', 'manager') and not admin.is_superadmin:
+        return jsonify({'error': 'unauthorized'}), 403
+
+    d = request.json or {}
+    name = (d.get('name') or '').strip()
+    email = (d.get('email') or '').strip()
+    password = d.get('password') or ''
+    role = normalize_role(d.get('role', 'cashier'))
+    hourly_rate = float(d.get('hourly_rate', 0) or 0)
+    branch_id = d.get('branch_id') or get_active_branch_id(admin)
+    tenant_id = get_current_tenant_id()
+    try:
+        branch_id = int(branch_id) if branch_id else None
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Invalid branch'}), 400
+
+    if not name or not email or not password:
+        return jsonify({'error': 'Name, email, and password are required'}), 400
+    if find_user_by_email(email):
+        return jsonify({'error': 'Email already exists'}), 400
+    password_error = strong_password_error(password, email)
+    if password_error:
+        return jsonify({'error': password_error}), 400
+    if not admin.is_superadmin:
+        branch_id = admin.branch_id
+    elif branch_id and not Branch.query.get(branch_id):
+        return jsonify({'error': 'Branch not found'}), 404
+
+    new_user = User(
+        name=name,
+        email=email,
+        password=generate_password_hash(password, method='scrypt'),
+        role=role,
+        hourly_rate=hourly_rate,
+        branch_id=branch_id,
+        tenant_id=tenant_id,
+        is_superadmin=bool(d.get('is_superadmin', False)) if admin.is_superadmin else False,
+    )
+    db.session.add(new_user)
+    db.session.commit()
+    return jsonify({'ok': True, 'id': new_user.id})
 
 @app.route('/api/users/<int:uid>', methods=['DELETE'])
 @staff_required
 def delete_user(uid):
     admin = User.query.get(session['user_id'])
-    if not admin or normalize_role(admin.role) != 'restaurant':
+    if not admin or (normalize_role(admin.role) != 'restaurant' and not admin.is_superadmin):
         return jsonify({'error': 'unauthorized'}), 403
     
     if uid == admin.id:
         return jsonify({'error': 'Cannot delete yourself'}), 400
     
-    user = User.query.get_or_404(uid)
+    user = User.query.filter_by(id=uid, tenant_id=get_current_tenant_id()).first_or_404()
+    access_error = require_branch_access_or_403(user.branch_id)
+    if access_error:
+        return access_error
     db.session.delete(user)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/api/users/<int:uid>', methods=['PUT'])
+@admin_required
+def update_user(uid):
+    admin = get_current_user()
+    user = User.query.filter_by(id=uid, tenant_id=get_current_tenant_id()).first_or_404()
+    if uid == admin.id and 'role' in (request.json or {}):
+        return jsonify({'error': 'You cannot change your own role'}), 400
+    access_error = require_branch_access_or_403(user.branch_id)
+    if access_error:
+        return access_error
+
+    d = request.json or {}
+    name = (d.get('name') or user.name).strip()
+    role = normalize_role(d.get('role', user.role))
+    hourly_rate = float(d.get('hourly_rate', user.hourly_rate or 0) or 0)
+    branch_id = d.get('branch_id', user.branch_id)
+    try:
+        branch_id = int(branch_id) if branch_id else None
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Invalid branch'}), 400
+
+    if not admin.is_superadmin:
+        branch_id = admin.branch_id
+    elif branch_id and not Branch.query.get(branch_id):
+        return jsonify({'error': 'Branch not found'}), 404
+
+    user.name = name
+    user.role = role
+    user.hourly_rate = hourly_rate
+    user.branch_id = branch_id
     db.session.commit()
     return jsonify({'ok': True})
 
@@ -1671,22 +2904,148 @@ def delete_user(uid):
 def delete_all_users():
     """Delete all staff except the current admin"""
     admin = User.query.get(session['user_id'])
-    if not admin or normalize_role(admin.role) != 'restaurant':
+    if not admin or (normalize_role(admin.role) != 'restaurant' and not admin.is_superadmin):
         return jsonify({'error': 'unauthorized'}), 403
-    
-    # Delete all users except admin
-    User.query.filter(User.id != admin.id).delete()
+
+    query = apply_branch_scope(User.query, User.branch_id).filter(User.id != admin.id)
+    query.delete()
     db.session.commit()
     
     return jsonify({'ok': True, 'message': 'All staff members deleted'})
 
 
+# ─── API: Inventory & Recipes ─────────────────────────
+@app.route('/api/inventory', methods=['GET'])
+@admin_required
+def get_inventory():
+    tid = get_current_tenant_id()
+    items = InventoryItem.query.filter_by(tenant_id=tid).all()
+    return jsonify([{
+        'id': i.id,
+        'name': i.name,
+        'unit': i.unit,
+        'current_stock': i.current_stock,
+        'min_threshold': i.min_threshold,
+        'unit_cost': i.unit_cost
+    } for i in items])
+
+@app.route('/api/inventory', methods=['POST'])
+@admin_required
+def add_inventory_item():
+    try:
+        tid = get_current_tenant_id()
+        d = request.json or {}
+        
+        name = d.get('name', '').strip()
+        if not name:
+            return jsonify({'error': 'Item name is required'}), 400
+            
+        item = InventoryItem(
+            name=name,
+            unit=d.get('unit', 'unit').strip(),
+            current_stock=float(d.get('current_stock', 0)),
+            min_threshold=float(d.get('min_threshold', 0)),
+            unit_cost=float(d.get('unit_cost', 0)),
+            tenant_id=tid
+        )
+        db.session.add(item)
+        db.session.flush() # Get item.id before commit
+        
+        # Log initial stock
+        log = InventoryLog(
+            inventory_item_id=item.id, 
+            action='adjustment', 
+            quantity=item.current_stock, 
+            note='Initial Stock', 
+            tenant_id=tid
+        )
+        db.session.add(log)
+        db.session.commit()
+        return jsonify({'ok': True, 'id': item.id})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/inventory/<int:iid>', methods=['PUT', 'DELETE'])
+@admin_required
+def manage_inventory_item(iid):
+    try:
+        tid = get_current_tenant_id()
+        item = InventoryItem.query.filter_by(id=iid, tenant_id=tid).first_or_404()
+        
+        if request.method == 'DELETE':
+            # Check for existing recipe logs or dependencies if necessary
+            ProductRecipe.query.filter_by(inventory_item_id=iid).delete()
+            db.session.delete(item)
+            db.session.commit()
+            return jsonify({'ok': True})
+        
+        d = request.json or {}
+        item.name = d.get('name', item.name)
+        item.unit = d.get('unit', item.unit)
+        item.min_threshold = float(d.get('min_threshold', item.min_threshold))
+        item.unit_cost = float(d.get('unit_cost', item.unit_cost))
+        
+        if 'stock_adjustment' in d:
+            adj = float(d['stock_adjustment'])
+            item.current_stock += adj
+            log = InventoryLog(
+                inventory_item_id=item.id, 
+                action='adjustment', 
+                quantity=adj, 
+                note=d.get('note', ''), 
+                tenant_id=tid
+            )
+            db.session.add(log)
+            
+        db.session.commit()
+        return jsonify({'ok': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/recipes', methods=['GET'])
+@admin_required
+def get_all_recipes():
+    tid = get_current_tenant_id()
+    recipes = ProductRecipe.query.filter_by(tenant_id=tid).all()
+    return jsonify([{
+        'id': r.id,
+        'product_id': r.product_id,
+        'inventory_item_id': r.inventory_item_id,
+        'quantity': r.quantity
+    } for r in recipes])
+
+@app.route('/api/recipes', methods=['POST'])
+@admin_required
+def save_product_recipe():
+    tid = get_current_tenant_id()
+    d = request.json or {}
+    pid = d.get('product_id')
+    items = d.get('items', []) # List of {inventory_item_id, quantity}
+    
+    # Delete existing recipe for this product
+    ProductRecipe.query.filter_by(product_id=pid, tenant_id=tid).delete()
+    
+    for it in items:
+        r = ProductRecipe(
+            product_id=pid,
+            inventory_item_id=it['inventory_item_id'],
+            quantity=float(it['quantity']),
+            tenant_id=tid
+        )
+        db.session.add(r)
+    
+    db.session.commit()
+    return jsonify({'ok': True})
+
 # ─── API: Cafe Settings ─────────────────────────────────
 @app.route('/api/cafe-settings', methods=['GET'])
 def get_cafe_settings():
-    settings = CafeSettings.query.first()
+    tid = get_current_tenant_id()
+    settings = CafeSettings.query.filter_by(tenant_id=tid).first() if tid else None
     if not settings:
-        settings = CafeSettings()
+        settings = CafeSettings(tenant_id=tid)
         db.session.add(settings)
         db.session.commit()
     
@@ -1695,36 +3054,72 @@ def get_cafe_settings():
         'phone': settings.phone,
         'email': settings.email,
         'address': settings.address,
+        'logo_b64': settings.logo_b64 or '',
         'open_time': settings.open_time,
         'close_time': settings.close_time,
-        'tax_rate': settings.tax_rate
+        'tax_rate': settings.tax_rate,
+        'gst_no': settings.gst_no or '',
+        'fssai_no': settings.fssai_no or '',
+        'footer_note': settings.footer_note or '',
+        'loyalty_points_per_100': settings.loyalty_points_per_100,
+        'points_redemption_value': settings.points_redemption_value
     })
 
 @app.route('/api/cafe-settings', methods=['POST'])
 @admin_required
 def save_cafe_settings():
-    settings = CafeSettings.query.first()
+    tid = get_current_tenant_id()
+    settings = CafeSettings.query.filter_by(tenant_id=tid).first() if tid else None
     if not settings:
-        settings = CafeSettings()
+        settings = CafeSettings(tenant_id=tid)
     
     d = request.json or {}
     settings.name = (d.get('name') or '').strip() or settings.name
     settings.phone = (d.get('phone') or '').strip()
     settings.email = (d.get('email') or '').strip()
     settings.address = (d.get('address') or '').strip()
+    if 'logo_b64' in d:
+        settings.logo_b64 = (d.get('logo_b64') or '').strip()
     settings.open_time = (d.get('open_time') or '').strip()
     settings.close_time = (d.get('close_time') or '').strip()
     settings.tax_rate = float(d.get('tax_rate', 5.0))
+    settings.gst_no = (d.get('gst_no') or '').strip()
+    settings.fssai_no = (d.get('fssai_no') or '').strip()
+    settings.footer_note = (d.get('footer_note') or '').strip()
+    settings.loyalty_points_per_100 = float(d.get('loyalty_points_per_100', 10.0))
+    settings.points_redemption_value = float(d.get('points_redemption_value', 0.5))
     
     db.session.add(settings)
     db.session.commit()
     
     return jsonify({'ok': True, 'message': 'Cafe settings saved successfully'})
 
+@app.route('/api/orders/history', methods=['GET'])
+@staff_required
+def order_history():
+    """Return recent paid orders for the POS order history view."""
+    limit = min(int(request.args.get('limit', 50)), 200)
+    query = apply_tenant_scope(
+        apply_branch_scope(Order.query, Order.branch_id),
+        Order
+    ).filter(Order.status == 'paid').order_by(Order.created_at.desc()).limit(limit)
+    orders = query.all()
+    return jsonify([{
+        'id': o.id,
+        'order_number': o.order_number,
+        'table': o.table.number if o.table else 'Takeaway',
+        'customer_name': o.customer_name or '',
+        'total': o.total,
+        'tip': o.tip,
+        'payment_method': o.payment_method,
+        'items': [{'name': i.product_name, 'qty': i.qty, 'price': i.price} for i in o.items],
+        'created_at': utc_iso(o.created_at),
+    } for o in orders])
+
 # ─── API: Reviews and Tips ─────────────────────────────────
 @app.route('/api/orders/<int:oid>/review', methods=['POST'])
 def submit_review(oid):
-    o = Order.query.get_or_404(oid)
+    o = Order.query.filter_by(id=oid, tenant_id=get_current_tenant_id()).first_or_404()
     if o.status != 'paid':
         return jsonify({'error': 'Can only review paid orders'}), 400
     
@@ -1752,7 +3147,13 @@ def submit_review(oid):
 @app.route('/api/reviews', methods=['GET'])
 @admin_required
 def get_reviews():
-    reviews = Review.query.order_by(Review.created_at.desc()).all()
+    reviews = (
+        Review.query
+        .join(Order, Order.id == Review.order_id)
+        .filter(Order.branch_id == get_active_branch_id(), Order.tenant_id == get_current_tenant_id())
+        .order_by(Review.created_at.desc())
+        .all()
+    )
     return jsonify([{
         'id': r.id,
         'order_number': r.order.order_number,
@@ -1773,8 +3174,9 @@ def check_review(oid):
 # ─── Receipt Page ─────────────────────────────────────────
 @app.route('/receipt/<int:order_id>')
 def receipt_page(order_id):
-    o = Order.query.get_or_404(order_id)
-    return render_template('receipt.html', order=o)
+    o = Order.query.filter_by(id=order_id, tenant_id=get_current_tenant_id()).first_or_404()
+    settings = CafeSettings.query.filter_by(tenant_id=get_current_tenant_id()).first()
+    return render_template('receipt.html', order=o, cafe_settings=settings)
 
 # ─── CSV Export ────────────────────────────────────────────
 import csv
@@ -1792,7 +3194,7 @@ def export_orders_csv():
         start = now - timedelta(days=30)
     else:
         start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    orders = Order.query.filter(Order.status == 'paid', Order.created_at >= start).order_by(Order.created_at.desc()).all()
+    orders = apply_branch_scope(Order.query, Order.branch_id).filter(Order.status == 'paid', Order.created_at >= start).order_by(Order.created_at.desc()).all()
     si = StringIO()
     writer = csv.writer(si)
     writer.writerow(['Date', 'Order #', 'Table', 'Customer', 'Items', 'Subtotal', 'Tip', 'Total', 'Payment Method'])
@@ -1857,6 +3259,11 @@ def seed_data():
     db.session.commit()
 
 def ensure_payment_methods():
+    # Get Default Tenant
+    default_tenant = Tenant.query.filter_by(slug='default').first()
+    if not default_tenant:
+        return  # Can't create payment methods without a tenant
+    
     defaults = [
         {'name': 'Cash', 'type': 'cash', 'upi_id': ''},
         {'name': 'Card / Bank', 'type': 'digital', 'upi_id': ''},
@@ -1865,9 +3272,9 @@ def ensure_payment_methods():
     ]
     changed = False
     for item in defaults:
-        method = PaymentMethod.query.filter_by(type=item['type']).first()
+        method = PaymentMethod.query.filter_by(type=item['type'], tenant_id=default_tenant.id).first()
         if not method:
-            db.session.add(PaymentMethod(name=item['name'], type=item['type'], enabled=True, upi_id=item['upi_id']))
+            db.session.add(PaymentMethod(name=item['name'], type=item['type'], enabled=True, upi_id=item['upi_id'], tenant_id=default_tenant.id))
             changed = True
     if changed:
         db.session.commit()
@@ -1885,6 +3292,9 @@ def ensure_order_table_schema():
         if 'customer_name' not in columns:
             conn.exec_driver_sql('ALTER TABLE "order" ADD COLUMN customer_name VARCHAR(100) DEFAULT NULL')
             conn.commit()
+        if 'branch_id' not in columns:
+            conn.exec_driver_sql('ALTER TABLE "order" ADD COLUMN branch_id INTEGER')
+            conn.commit()
         # OrderItem notes
         rows2 = conn.exec_driver_sql('PRAGMA table_info("order_item")').fetchall()
         cols2 = {row[1] for row in rows2}
@@ -1897,8 +3307,50 @@ def ensure_order_table_schema():
         if 'image_b64' not in cols3:
             conn.exec_driver_sql('ALTER TABLE "product" ADD COLUMN image_b64 TEXT DEFAULT ""')
             conn.commit()
+        if 'branch_id' not in cols3:
+            conn.exec_driver_sql('ALTER TABLE "product" ADD COLUMN branch_id INTEGER')
+            conn.commit()
+        rows4 = conn.exec_driver_sql('PRAGMA table_info("user")').fetchall()
+        cols4 = {row[1] for row in rows4}
+        if 'hourly_rate' not in cols4:
+            conn.exec_driver_sql('ALTER TABLE "user" ADD COLUMN hourly_rate FLOAT DEFAULT 0')
+            conn.commit()
+        if 'is_superadmin' not in cols4:
+            conn.exec_driver_sql('ALTER TABLE "user" ADD COLUMN is_superadmin BOOLEAN DEFAULT 0')
+            conn.commit()
+        if 'branch_id' not in cols4:
+            conn.exec_driver_sql('ALTER TABLE "user" ADD COLUMN branch_id INTEGER')
+            conn.commit()
+
+def ensure_branch_schema():
+    default_branch = Branch.query.order_by(Branch.id.asc()).first()
+    if not default_branch:
+        default_branch = Branch(name='Main Branch', address='Primary outlet')
+        db.session.add(default_branch)
+        db.session.commit()
+
+    changed = False
+    for user in User.query.filter(User.branch_id.is_(None)).all():
+        user.branch_id = default_branch.id
+        changed = True
+    for product in Product.query.filter(Product.branch_id.is_(None)).all():
+        product.branch_id = default_branch.id
+        changed = True
+    for order in Order.query.filter(Order.branch_id.is_(None)).all():
+        order.branch_id = order.user.branch_id if order.user and order.user.branch_id else default_branch.id
+        changed = True
+    for event in AttendanceEvent.query.filter(AttendanceEvent.branch_id.is_(None)).all():
+        event.branch_id = event.staff.branch_id if event.staff and event.staff.branch_id else default_branch.id
+        changed = True
+    if changed:
+        db.session.commit()
 
 def ensure_demo_catalog():
+    # Get Default Tenant
+    default_tenant = Tenant.query.filter_by(slug='default').first()
+    if not default_tenant:
+        return  # Can't create demo catalog without a tenant
+    
     demo_catalog = {
         'Food': [
             ('Margherita Pizza', 350),
@@ -1934,23 +3386,28 @@ def ensure_demo_catalog():
 
     changed = False
     for category_name, items in demo_catalog.items():
-        category = Category.query.filter_by(name=category_name).first()
+        category = Category.query.filter_by(name=category_name, tenant_id=default_tenant.id).first()
         if not category:
-            category = Category(name=category_name)
+            category = Category(name=category_name, tenant_id=default_tenant.id)
             db.session.add(category)
             db.session.flush()
             changed = True
 
         for product_name, price in items:
-            existing = Product.query.filter_by(name=product_name, category_id=category.id).first()
+            existing = Product.query.filter_by(name=product_name, category_id=category.id, tenant_id=default_tenant.id).first()
             if not existing:
-                db.session.add(Product(name=product_name, price=price, category_id=category.id))
+                db.session.add(Product(name=product_name, price=price, category_id=category.id, tenant_id=default_tenant.id))
                 changed = True
 
     if changed:
         db.session.commit()
 
 def ensure_demo_floors_and_tables():
+    # Get Default Tenant
+    default_tenant = Tenant.query.filter_by(slug='default').first()
+    if not default_tenant:
+        return  # Can't create demo tables without a tenant
+    
     floor_specs = {
         'Ground Floor': ['1', '2', '3', '4', '5', '6'],
         'First Floor': ['7', '8', '9', '10', '11', '12'],
@@ -1959,17 +3416,17 @@ def ensure_demo_floors_and_tables():
 
     changed = False
     for floor_name, table_numbers in floor_specs.items():
-        floor = Floor.query.filter_by(name=floor_name).first()
+        floor = Floor.query.filter_by(name=floor_name, tenant_id=default_tenant.id).first()
         if not floor:
-            floor = Floor(name=floor_name)
+            floor = Floor(name=floor_name, tenant_id=default_tenant.id)
             db.session.add(floor)
             db.session.flush()
             changed = True
 
         for number in table_numbers:
-            existing = Table.query.filter_by(number=number, floor_id=floor.id).first()
+            existing = Table.query.filter_by(number=number, floor_id=floor.id, tenant_id=default_tenant.id).first()
             if not existing:
-                db.session.add(Table(number=number, seats=4 if int(number) <= 8 else 6, floor_id=floor.id))
+                db.session.add(Table(number=number, seats=4 if int(number) <= 8 else 6, floor_id=floor.id, tenant_id=default_tenant.id))
                 changed = True
 
     if changed:
@@ -1988,6 +3445,7 @@ def ensure_demo_paid_orders_and_reviews():
     if not demo_session:
         demo_session = Session(
             user_id=admin.id,
+            tenant_id=admin.tenant_id,
             status='closed',
             opened_at=datetime.utcnow() - timedelta(days=14),
             closed_at=datetime.utcnow() - timedelta(days=13),
@@ -1996,8 +3454,8 @@ def ensure_demo_paid_orders_and_reviews():
         db.session.add(demo_session)
         db.session.flush()
 
-    product_lookup = {p.name: p for p in Product.query.all()}
-    table_lookup = {t.number: t for t in Table.query.all()}
+    product_lookup = {p.name: p for p in apply_tenant_scope(Product.query, Product).all()}
+    table_lookup = {t.number: t for t in apply_tenant_scope(Table.query, Table).all()}
     now = datetime.utcnow()
     demo_orders = [
         {
@@ -2127,6 +3585,7 @@ def ensure_demo_paid_orders_and_reviews():
             table_id=table.id if table else None,
             session_id=demo_session.id,
             user_id=admin.id,
+            branch_id=admin.branch_id,
             status='paid',
             payment_method=spec['method'],
             total=total,
@@ -2162,6 +3621,25 @@ def ensure_demo_paid_orders_and_reviews():
         db.session.commit()
 
 def ensure_default_accounts():
+    """Create default user accounts. No session dependency."""
+    # Get or create Default Tenant (not dependent on session)
+    default_tenant = Tenant.query.filter_by(slug='default').first()
+    if not default_tenant:
+        default_tenant = Tenant(name='Default Tenant', slug='default')
+        db.session.add(default_tenant)
+        db.session.flush()
+    
+    # Get or create default branch for this tenant
+    default_branch = Branch.query.filter_by(tenant_id=default_tenant.id).first()
+    if not default_branch:
+        default_branch = Branch(
+            name='Main Branch',
+            tenant_id=default_tenant.id,
+            address=''
+        )
+        db.session.add(default_branch)
+        db.session.flush()
+    
     admin_email = 'admin@cafe.com'
     admin = User.query.filter_by(email=admin_email).first()
     if not admin:
@@ -2170,10 +3648,17 @@ def ensure_default_accounts():
             email=admin_email,
             password=generate_password_hash('password'),
             role='restaurant',
+            branch_id=default_branch.id,
+            tenant_id=default_tenant.id,
+            is_superadmin=True,
+            hourly_rate=0,
         )
         db.session.add(admin)
     else:
         admin.role = 'restaurant'
+        admin.branch_id = default_branch.id
+        admin.tenant_id = default_tenant.id
+        admin.is_superadmin = True
 
     customer_email = 'customer@cafe.com'
     customer = User.query.filter_by(email=customer_email).first()
@@ -2183,11 +3668,15 @@ def ensure_default_accounts():
             email=customer_email,
             password=generate_password_hash('Customer@1234', method='scrypt'),
             role='customer',
+            branch_id=default_branch.id,
+            tenant_id=default_tenant.id,
         )
         db.session.add(customer)
     else:
         customer.name = 'Customer'
         customer.role = 'customer'
+        customer.branch_id = default_branch.id
+        customer.tenant_id = default_tenant.id
     db.session.commit()
 
 with app.app_context():
@@ -2195,10 +3684,12 @@ with app.app_context():
     seed_data()
     ensure_payment_methods()
     ensure_order_table_schema()
+    ensure_branch_schema()
     ensure_default_accounts()
+    ensure_branch_schema()
     ensure_demo_catalog()
     ensure_demo_floors_and_tables()
-    ensure_demo_paid_orders_and_reviews()
+    # ensure_demo_paid_orders_and_reviews() - Commented out: depends on request context, call from endpoint instead
 
 if __name__ == '__main__':
     import os

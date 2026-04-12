@@ -1,459 +1,1069 @@
 {% extends "base.html" %}
 {% block title %}Secure Access — POS Cafe{% endblock %}
 {% block extra_head %}
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cabinet+Grotesk:wght@300;400;500;600;700;800;900&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link
+  href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cabinet+Grotesk:wght@300;400;500;600;700;800;900&family=DM+Mono:wght@300;400;500&display=swap"
+  rel="stylesheet">
 <style>
-/* ═══════════════════════════════════════════
+  /* ═══════════════════════════════════════════
    RESET & ROOT
 ═══════════════════════════════════════════ */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 
-:root {
-  --ink:    #f9fafb;
-  --ink2:   #ffffff;
-  --ink3:   #f3f4f6;
-  --ink4:   #e5e7eb;
-  --ember:  #714b67;
-  --ember2: #875a7b;
-  --ember3: #5c3d53;
-  --cream:  #111827;
-  --muted:  #4b5563;
-  --muted2: #6b7280;
-  --white:  #111827;
-  --border: rgba(0,0,0,0.1);
-  --border-e: rgba(113,75,103,0.18);
-}
+  :root {
+    --ink: #f9fafb;
+    --ink2: #ffffff;
+    --ink3: #f3f4f6;
+    --ink4: #e5e7eb;
+    --ember: #714b67;
+    --ember2: #875a7b;
+    --ember3: #5c3d53;
+    --cream: #111827;
+    --muted: #4b5563;
+    --muted2: #6b7280;
+    --white: #111827;
+    --border: rgba(0, 0, 0, 0.1);
+    --border-e: rgba(113, 75, 103, 0.18);
+  }
 
-body {
-  background: var(--ink);
-  color: var(--white);
-  font-family: 'Cabinet Grotesk', sans-serif;
-  min-height: 100vh;
-  overflow-x: hidden;
-  cursor: none;
-}
+  body {
+    background: var(--ink);
+    color: var(--white);
+    font-family: 'Cabinet Grotesk', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    cursor: none;
+  }
 
-/* ═══════════════════════════════════════════
+  /* ═══════════════════════════════════════════
    CUSTOM CURSOR
 ═══════════════════════════════════════════ */
-#a-cur { width:10px; height:10px; background:var(--ember); border-radius:50%; position:fixed; pointer-events:none; z-index:9999; transform:translate(-50%,-50%); transition:width .25s,height .25s; }
-#a-ring { width:36px; height:36px; border:1.5px solid rgba(113,75,103,.45); border-radius:50%; position:fixed; pointer-events:none; z-index:9998; transform:translate(-50%,-50%); transition:all .08s linear; }
-body.c-hover #a-cur { width:16px; height:16px; mix-blend-mode:difference; background:#fff; }
-body.c-hover #a-ring { width:48px; height:48px; border-color:rgba(113,75,103,.7); }
+  #a-cur {
+    width: 10px;
+    height: 10px;
+    background: var(--ember);
+    border-radius: 50%;
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%);
+    transition: width .25s, height .25s;
+  }
 
-/* ═══════════════════════════════════════════
+  #a-ring {
+    width: 36px;
+    height: 36px;
+    border: 1.5px solid rgba(113, 75, 103, .45);
+    border-radius: 50%;
+    position: fixed;
+    pointer-events: none;
+    z-index: 9998;
+    transform: translate(-50%, -50%);
+    transition: all .08s linear;
+  }
+
+  body.c-hover #a-cur {
+    width: 16px;
+    height: 16px;
+    mix-blend-mode: difference;
+    background: #fff;
+  }
+
+  body.c-hover #a-ring {
+    width: 48px;
+    height: 48px;
+    border-color: rgba(113, 75, 103, .7);
+  }
+
+  /* ═══════════════════════════════════════════
    GRAIN
 ═══════════════════════════════════════════ */
-body::after {
-  content:''; position:fixed; inset:0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='0.045'/%3E%3C/svg%3E");
-  pointer-events:none; z-index:997; opacity: 0; animation: grainShift 8s steps(10) infinite;
-}
-@keyframes grainShift {
-  0%{transform:translate(0,0)} 20%{transform:translate(-2%,-3%)}
-  40%{transform:translate(3%,1%)} 60%{transform:translate(-1%,3%)}
-  80%{transform:translate(2%,-2%)} 100%{transform:translate(0,0)}
-}
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='0.045'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 997;
+    opacity: 0;
+    animation: grainShift 8s steps(10) infinite;
+  }
 
-/* ═══════════════════════════════════════════
+  @keyframes grainShift {
+    0% {
+      transform: translate(0, 0)
+    }
+
+    20% {
+      transform: translate(-2%, -3%)
+    }
+
+    40% {
+      transform: translate(3%, 1%)
+    }
+
+    60% {
+      transform: translate(-1%, 3%)
+    }
+
+    80% {
+      transform: translate(2%, -2%)
+    }
+
+    100% {
+      transform: translate(0, 0)
+    }
+  }
+
+  /* ═══════════════════════════════════════════
    LAYOUT SHELL
 ═══════════════════════════════════════════ */
-.auth-shell {
-  min-height: 100vh;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-}
-@media(max-width: 960px) { .auth-shell { grid-template-columns: 1fr; } }
+  .auth-shell {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
 
-/* ═══════════════════════════════════════════
+  @media(max-width: 960px) {
+    .auth-shell {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* ═══════════════════════════════════════════
    LEFT PANEL — CINEMATIC
 ═══════════════════════════════════════════ */
-.left-panel {
-  position: relative;
-  overflow: hidden;
-  background: var(--ink2);
-  display: flex;
-  flex-direction: column;
-  padding: 48px;
-  min-height: 100vh;
-}
-@media(max-width: 960px) { .left-panel { display: none; } }
+  .left-panel {
+    position: relative;
+    overflow: hidden;
+    background: var(--ink2);
+    display: flex;
+    flex-direction: column;
+    padding: 48px;
+    min-height: 100vh;
+  }
 
-/* layered background */
-.left-panel::before {
-  content: '';
-  position: absolute; inset: 0;
-  background:
-    radial-gradient(ellipse at 0% 0%, rgba(113,75,103,.22) 0%, transparent 45%),
-    radial-gradient(ellipse at 100% 100%, rgba(113,75,103,.1) 0%, transparent 40%);
-  pointer-events: none; z-index: 0;
-}
-.lp-grid {
-  position: absolute; inset: 0;
-  background-image:
-    linear-gradient(rgba(113,75,103,.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(113,75,103,.05) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: radial-gradient(ellipse at 30% 50%, black 20%, transparent 70%);
-  pointer-events: none; z-index: 0;
-  animation: gridDrift 20s ease-in-out infinite alternate;
-}
-@keyframes gridDrift { from{transform:translate(0,0)} to{transform:translate(8px,12px)} }
+  @media(max-width: 960px) {
+    .left-panel {
+      display: none;
+    }
+  }
 
-/* orbs */
-.lp-orb1 {
-  position:absolute; width:400px; height:400px; border-radius:50%;
-  background: radial-gradient(circle, rgba(113,75,103,.16) 0%, transparent 70%);
-  top: -80px; left: -80px; pointer-events:none; z-index:0;
-  animation: orbFloat 10s ease-in-out infinite alternate;
-  filter: blur(40px);
-}
-.lp-orb2 {
-  position:absolute; width:300px; height:300px; border-radius:50%;
-  background: radial-gradient(circle, rgba(113,75,103,.1) 0%, transparent 70%);
-  bottom: 40px; right: -40px; pointer-events:none; z-index:0;
-  animation: orbFloat 14s ease-in-out infinite alternate-reverse;
-  filter: blur(40px);
-}
-@keyframes orbFloat { from{transform:translate(0,0)} to{transform:translate(20px,30px)} }
+  /* layered background */
+  .left-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 0% 0%, rgba(113, 75, 103, .22) 0%, transparent 45%),
+      radial-gradient(ellipse at 100% 100%, rgba(113, 75, 103, .1) 0%, transparent 40%);
+    pointer-events: none;
+    z-index: 0;
+  }
 
-/* left content */
-.lp-content { position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+  .lp-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(113, 75, 103, .05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(113, 75, 103, .05) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(ellipse at 30% 50%, black 20%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+    animation: gridDrift 20s ease-in-out infinite alternate;
+  }
 
-.lp-logo {
-  display: flex; align-items: center; gap: 12px;
-  text-decoration: none; cursor: none;
-}
-.lp-logo-mark {
-  width: 44px; height: 44px; border-radius: 12px;
-  background: linear-gradient(135deg, var(--ember), var(--ember3));
-  display: flex; align-items: center; justify-content: center;
-  font-size: 20px;
-  box-shadow: 0 8px 24px rgba(113,75,103,.4);
-}
-.lp-logo-text {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 26px; letter-spacing: .1em; color: var(--white);
-}
+  @keyframes gridDrift {
+    from {
+      transform: translate(0, 0)
+    }
 
-.lp-badge {
-  display: inline-flex; align-items: center; gap: 8px;
-  background: rgba(113,75,103,.1); border: 1px solid rgba(113,75,103,.22);
-  border-radius: 100px; padding: 5px 14px 5px 8px;
-  font-family: 'DM Mono', monospace; font-size: 11px;
-  color: var(--ember); letter-spacing: .08em; margin-top: 56px; margin-bottom: 28px;
-}
-.lp-badge-dot { width:6px; height:6px; border-radius:50%; background:var(--ember); animation: blink 1.8s ease-in-out infinite; }
-@keyframes blink { 0%,100%{opacity:1;box-shadow:0 0 6px var(--ember)} 50%{opacity:.3;box-shadow:none} }
+    to {
+      transform: translate(8px, 12px)
+    }
+  }
 
-.lp-headline {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: clamp(48px, 5.5vw, 72px);
-  line-height: .92; letter-spacing: .02em; color: var(--white);
-}
-.lp-headline em { color: var(--ember); font-style: normal; }
+  /* orbs */
+  .lp-orb1 {
+    position: absolute;
+    width: 400px;
+    height: 400px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(113, 75, 103, .16) 0%, transparent 70%);
+    top: -80px;
+    left: -80px;
+    pointer-events: none;
+    z-index: 0;
+    animation: orbFloat 10s ease-in-out infinite alternate;
+    filter: blur(40px);
+  }
 
-.lp-sub {
-  font-size: 15px; color: var(--muted); line-height: 1.7;
-  max-width: 340px; margin-top: 20px; font-weight: 400;
-}
+  .lp-orb2 {
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(113, 75, 103, .1) 0%, transparent 70%);
+    bottom: 40px;
+    right: -40px;
+    pointer-events: none;
+    z-index: 0;
+    animation: orbFloat 14s ease-in-out infinite alternate-reverse;
+    filter: blur(40px);
+  }
 
-.lp-cards { display: flex; flex-direction: column; gap: 12px; margin-top: 48px; }
-.lp-card {
-  background: rgba(0,0,0,.03);
-  border: 1px solid var(--border);
-  border-radius: 16px; padding: 20px 22px;
-  transition: border-color .3s, background .3s; cursor: none;
-  position: relative; overflow: hidden;
-}
-.lp-card::before {
-  content: ''; position: absolute; left: 0; top: 0; bottom: 0;
-  width: 3px; background: linear-gradient(to bottom, var(--ember), var(--ember3));
-  border-radius: 3px 0 0 3px; opacity: 0; transition: opacity .3s;
-}
-.lp-card:hover { border-color: var(--border-e); background: rgba(113,75,103,.04); }
-.lp-card:hover::before { opacity: 1; }
-.lp-card-tag {
-  font-family: 'DM Mono', monospace; font-size: 10px;
-  letter-spacing: .14em; color: var(--ember); text-transform: uppercase; margin-bottom: 6px;
-}
-.lp-card-text { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  @keyframes orbFloat {
+    from {
+      transform: translate(0, 0)
+    }
 
-.lp-footer {
-  display: flex; align-items: center; gap: 8px;
-  font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted2);
-  letter-spacing: .06em;
-}
-.lp-footer-dot { width:5px; height:5px; border-radius:50%; background:var(--ember); }
+    to {
+      transform: translate(20px, 30px)
+    }
+  }
 
-/* ═══════════════════════════════════════════
+  /* left content */
+  .lp-content {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .lp-logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    cursor: none;
+  }
+
+  .lp-logo-mark {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--ember), var(--ember3));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    box-shadow: 0 8px 24px rgba(113, 75, 103, .4);
+  }
+
+  .lp-logo-text {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 26px;
+    letter-spacing: .1em;
+    color: var(--white);
+  }
+
+  .lp-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(113, 75, 103, .1);
+    border: 1px solid rgba(113, 75, 103, .22);
+    border-radius: 100px;
+    padding: 5px 14px 5px 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--ember);
+    letter-spacing: .08em;
+    margin-top: 56px;
+    margin-bottom: 28px;
+  }
+
+  .lp-badge-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ember);
+    animation: blink 1.8s ease-in-out infinite;
+  }
+
+  @keyframes blink {
+
+    0%,
+    100% {
+      opacity: 1;
+      box-shadow: 0 0 6px var(--ember)
+    }
+
+    50% {
+      opacity: .3;
+      box-shadow: none
+    }
+  }
+
+  .lp-headline {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(48px, 5.5vw, 72px);
+    line-height: .92;
+    letter-spacing: .02em;
+    color: var(--white);
+  }
+
+  .lp-headline em {
+    color: var(--ember);
+    font-style: normal;
+  }
+
+  .lp-sub {
+    font-size: 15px;
+    color: var(--muted);
+    line-height: 1.7;
+    max-width: 340px;
+    margin-top: 20px;
+    font-weight: 400;
+  }
+
+  .lp-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 48px;
+  }
+
+  .lp-card {
+    background: rgba(0, 0, 0, .03);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px 22px;
+    transition: border-color .3s, background .3s;
+    cursor: none;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .lp-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(to bottom, var(--ember), var(--ember3));
+    border-radius: 3px 0 0 3px;
+    opacity: 0;
+    transition: opacity .3s;
+  }
+
+  .lp-card:hover {
+    border-color: var(--border-e);
+    background: rgba(113, 75, 103, .04);
+  }
+
+  .lp-card:hover::before {
+    opacity: 1;
+  }
+
+  .lp-card-tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .14em;
+    color: var(--ember);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .lp-card-text {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .lp-footer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted2);
+    letter-spacing: .06em;
+  }
+
+  .lp-footer-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--ember);
+  }
+
+  /* ═══════════════════════════════════════════
    RIGHT PANEL — FORM
 ═══════════════════════════════════════════ */
-.right-panel {
-  position: relative;
-  display: flex; align-items: center; justify-content: center;
-  padding: 40px 32px; min-height: 100vh;
-  background: var(--ink);
-}
-.right-panel::before {
-  content: ''; position: absolute; inset: 0;
-  background: radial-gradient(ellipse at 50% 0%, rgba(113,75,103,.07) 0%, transparent 55%);
-  pointer-events: none;
-}
+  .right-panel {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 32px;
+    min-height: 100vh;
+    background: var(--ink);
+  }
 
-.form-container {
-  width: 100%; max-width: 440px; position: relative; z-index: 1;
-  animation: formIn .7s cubic-bezier(.16,1,.3,1) both;
-}
-@keyframes formIn { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:none} }
+  .right-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(113, 75, 103, .07) 0%, transparent 55%);
+    pointer-events: none;
+  }
 
-/* mobile logo */
-.mobile-logo {
-  display: none; align-items: center; gap: 10px; margin-bottom: 32px; justify-content: center;
-}
-@media(max-width:960px) { .mobile-logo { display: flex; } }
-.mobile-logo-mark {
-  width:38px; height:38px; border-radius:10px;
-  background:linear-gradient(135deg,var(--ember),var(--ember3));
-  display:flex; align-items:center; justify-content:center; font-size:18px;
-}
-.mobile-logo-text { font-family:'Bebas Neue',sans-serif; font-size:22px; letter-spacing:.1em; }
+  .form-container {
+    width: 100%;
+    max-width: 440px;
+    position: relative;
+    z-index: 1;
+    animation: formIn .7s cubic-bezier(.16, 1, .3, 1) both;
+  }
 
-/* ─── TAB BAR ─── */
-.tab-bar {
-  display: flex; gap: 4px;
-  background: rgba(0,0,0,.03);
-  border: 1px solid var(--border);
-  border-radius: 14px; padding: 5px; margin-bottom: 24px;
-}
-.tab-btn {
-  flex: 1; padding: 10px 8px; border-radius: 10px;
-  font-family: 'Cabinet Grotesk', sans-serif;
-  font-size: 13px; font-weight: 700; letter-spacing: .02em;
-  cursor: none; border: none;
-  color: var(--muted); background: transparent;
-  transition: all .25s cubic-bezier(.16,1,.3,1);
-}
-.tab-btn.active {
-  background: linear-gradient(135deg, var(--ember), var(--ember3));
-  color: white; box-shadow: 0 4px 16px rgba(113,75,103,.4);
-}
-.tab-btn:hover:not(.active) { color: var(--white); background: rgba(0,0,0,.05); }
+  @keyframes formIn {
+    from {
+      opacity: 0;
+      transform: translateY(24px)
+    }
 
-/* ─── FORM CARD ─── */
-.form-card {
-  background: var(--ink2);
-  border: 1px solid var(--border);
-  border-radius: 24px; overflow: hidden;
-  box-shadow: 0 32px 80px rgba(0,0,0,.5), 0 0 0 1px rgba(113,75,103,.04) inset;
-}
+    to {
+      opacity: 1;
+      transform: none
+    }
+  }
 
-.form-card-head {
-  padding: 28px 32px 0;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 24px; margin-bottom: 0;
-}
-.form-card-body { padding: 28px 32px 32px; }
+  /* mobile logo */
+  .mobile-logo {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 32px;
+    justify-content: center;
+  }
 
-.form-eyebrow {
-  font-family: 'DM Mono', monospace; font-size: 10px;
-  letter-spacing: .18em; text-transform: uppercase; color: var(--ember);
-  margin-bottom: 10px;
-}
-.form-title {
-  font-family: 'Bebas Neue', sans-serif; font-size: 32px;
-  letter-spacing: .02em; line-height: 1; color: var(--white); margin-bottom: 8px;
-}
-.form-title em { color: var(--ember); font-style: normal; }
-.form-sub { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  @media(max-width:960px) {
+    .mobile-logo {
+      display: flex;
+    }
+  }
 
-/* ─── FIELD ─── */
-.field { margin-bottom: 16px; }
-.field-row { display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px; }
-.field label {
-  display: block; font-size: 11px; font-weight: 700;
-  letter-spacing: .1em; text-transform: uppercase;
-  color: var(--muted); margin-bottom: 8px;
-}
-.field-row label { margin-bottom: 0; }
-.forgot-link {
-  font-size: 12px; color: var(--ember); text-decoration: none;
-  transition: opacity .2s; cursor: none; font-weight: 600;
-}
-.forgot-link:hover { opacity: .7; }
+  .mobile-logo-mark {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--ember), var(--ember3));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
 
-.field input, .field select {
-  width: 100%;
-  background: rgba(0,0,0,.04);
-  border: 1px solid rgba(0,0,0,.09);
-  border-radius: 12px; padding: 13px 16px;
-  color: var(--white); font-size: 14px;
-  font-family: 'Cabinet Grotesk', sans-serif;
-  outline: none; cursor: none;
-  transition: border-color .2s, box-shadow .2s, background .2s;
-}
-.field input::placeholder { color: rgba(124,106,86,.6); }
-.field input:focus, .field select:focus {
-  border-color: rgba(113,75,103,.45);
-  box-shadow: 0 0 0 3px rgba(113,75,103,.1);
-  background: rgba(113,75,103,.03);
-}
-.field select { cursor: none; }
-.field select option { background: var(--ink3); }
+  .mobile-logo-text {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: .1em;
+  }
 
-/* pw wrap */
-.pw-wrap { position: relative; }
-.pw-wrap input { padding-right: 52px; }
-.pw-toggle {
-  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
-  background: rgba(0,0,0,.07); border: 1px solid rgba(0,0,0,.1);
-  border-radius: 8px; padding: 4px 10px;
-  font-size: 11px; font-weight: 600; color: var(--muted);
-  cursor: none; font-family: 'DM Mono', monospace; letter-spacing: .04em;
-  transition: all .2s;
-}
-.pw-toggle:hover { background: rgba(113,75,103,.12); border-color: rgba(113,75,103,.3); color: var(--ember); }
+  /* ─── TAB BAR ─── */
+  .tab-bar {
+    display: flex;
+    gap: 4px;
+    background: rgba(0, 0, 0, .03);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 5px;
+    margin-bottom: 24px;
+  }
 
-/* two-col */
-.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .tab-btn {
+    flex: 1;
+    padding: 10px 8px;
+    border-radius: 10px;
+    font-family: 'Cabinet Grotesk', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .02em;
+    cursor: none;
+    border: none;
+    color: var(--muted);
+    background: transparent;
+    transition: all .25s cubic-bezier(.16, 1, .3, 1);
+  }
 
-/* ─── STRENGTH METER ─── */
-.strength-wrap { margin-top: 10px; }
-.strength-bars { display: flex; gap: 5px; margin-bottom: 6px; }
-.strength-bar {
-  flex: 1; height: 4px; border-radius: 100px;
-  background: rgba(0,0,0,.07);
-  transition: background .3s;
-}
-.strength-bar.weak { background: #ef4444; }
-.strength-bar.fair { background: var(--ember); }
-.strength-bar.strong { background: #22c55e; }
-.strength-meta { display: flex; justify-content: space-between; align-items: center; }
-.strength-label { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; letter-spacing: .06em; }
-.strength-label.weak { color: #ef4444; }
-.strength-label.fair { color: var(--ember); }
-.strength-label.strong { color: #22c55e; }
+  .tab-btn.active {
+    background: linear-gradient(135deg, var(--ember), var(--ember3));
+    color: white;
+    box-shadow: 0 4px 16px rgba(113, 75, 103, .4);
+  }
 
-/* ─── POLICY CHECKLIST ─── */
-.policy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 12px; }
-.policy-row {
-  display: flex; align-items: center; gap: 7px;
-  font-size: 12px; color: var(--muted); font-weight: 500;
-  transition: color .25s;
-}
-.policy-row.ok { color: #22c55e; }
-.policy-dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: rgba(0,0,0,.15); flex-shrink: 0;
-  transition: background .25s;
-}
-.policy-row.ok .policy-dot { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,.4); }
+  .tab-btn:hover:not(.active) {
+    color: var(--white);
+    background: rgba(0, 0, 0, .05);
+  }
 
-/* ─── OTP BOXES ─── */
-.otp-grid { display: flex; gap: 8px; }
-.otp-box {
-  flex: 1; aspect-ratio: 1;
-  background: rgba(0,0,0,.04);
-  border: 1px solid rgba(0,0,0,.09);
-  border-radius: 12px;
-  text-align: center; font-size: 22px;
-  font-family: 'Bebas Neue', sans-serif; color: var(--ember);
-  outline: none; caret-color: var(--ember);
-  transition: border-color .2s, box-shadow .2s;
-}
-.otp-box:focus {
-  border-color: rgba(113,75,103,.5);
-  box-shadow: 0 0 0 3px rgba(113,75,103,.12);
-}
-.otp-box.filled { background: rgba(113,75,103,.05); border-color: rgba(113,75,103,.3); }
+  /* ─── FORM CARD ─── */
+  .form-card {
+    background: var(--ink2);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 32px 80px rgba(0, 0, 0, .5), 0 0 0 1px rgba(113, 75, 103, .04) inset;
+  }
 
-/* ─── DIVIDER ─── */
-.divider { display: flex; align-items: center; gap: 12px; margin: 20px 0; }
-.divider::before, .divider::after { content:''; flex:1; height:1px; background: var(--border); }
-.divider span { font-size: 11px; color: var(--muted2); letter-spacing: .08em; font-family: 'DM Mono', monospace; }
+  .form-card-head {
+    padding: 28px 32px 0;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 24px;
+    margin-bottom: 0;
+  }
 
-/* ─── BUTTONS ─── */
-.btn-primary {
-  width: 100%; padding: 14px; border-radius: 12px;
-  background: linear-gradient(135deg, var(--ember), var(--ember3));
-  color: white; font-size: 14px; font-weight: 700; letter-spacing: .04em;
-  border: none; cursor: none; font-family: 'Cabinet Grotesk', sans-serif;
-  box-shadow: 0 8px 28px rgba(113,75,103,.35), inset 0 1px 0 rgba(0,0,0,.12);
-  transition: all .25s; position: relative; overflow: hidden;
-}
-.btn-primary::after {
-  content: ''; position: absolute; inset: 0;
-  background: linear-gradient(135deg, rgba(0,0,0,.1), transparent);
-  opacity: 0; transition: opacity .2s;
-}
-.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 14px 44px rgba(113,75,103,.55); }
-.btn-primary:hover::after { opacity: 1; }
-.btn-primary:active { transform: none; }
-.btn-primary.loading { pointer-events: none; opacity: .7; }
+  .form-card-body {
+    padding: 28px 32px 32px;
+  }
 
-.btn-ghost {
-  padding: 14px; border-radius: 12px;
-  background: rgba(0,0,0,.04); border: 1px solid var(--border);
-  color: var(--muted); font-size: 14px; font-weight: 600;
-  cursor: none; font-family: 'Cabinet Grotesk', sans-serif; transition: all .2s;
-}
-.btn-ghost:hover { border-color: rgba(113,75,103,.3); color: var(--white); background: rgba(113,75,103,.05); }
+  .form-eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--ember);
+    margin-bottom: 10px;
+  }
 
-.btn-row { display: flex; gap: 10px; }
-.btn-row .btn-primary { flex: 1; }
-.btn-row .btn-ghost { flex: 0 0 auto; padding: 14px 20px; }
+  .form-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 32px;
+    letter-spacing: .02em;
+    line-height: 1;
+    color: var(--white);
+    margin-bottom: 8px;
+  }
 
-/* ─── SECURITY NOTE ─── */
-.security-note {
-  background: rgba(113,75,103,.05);
-  border: 1px solid rgba(113,75,103,.12);
-  border-radius: 12px; padding: 14px 16px; margin-top: 16px;
-  display: flex; gap: 12px; align-items: flex-start;
-}
-.security-note-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
-.security-note-text { font-size: 12px; color: var(--muted); line-height: 1.6; }
-.security-note-text strong { color: var(--muted); font-weight: 600; }
+  .form-title em {
+    color: var(--ember);
+    font-style: normal;
+  }
 
-/* ─── OTP STEP ─── */
-.otp-step {
-  display: none; padding-top: 20px;
-  border-top: 1px solid var(--border);
-  animation: stepIn .4s cubic-bezier(.16,1,.3,1) both;
-}
-.otp-step.visible { display: block; }
-@keyframes stepIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:none} }
+  .form-sub {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
 
-.otp-hint { font-size: 12px; color: var(--muted); text-align: center; margin-top: 10px; }
-.otp-hint a { color: var(--ember); cursor: none; text-decoration: none; }
-.otp-hint a:hover { text-decoration: underline; }
+  /* ─── FIELD ─── */
+  .field {
+    margin-bottom: 16px;
+  }
 
-/* ─── STEP DOTS ─── */
-.step-dots { display: flex; gap: 6px; align-items: center; margin-bottom: 20px; }
-.step-dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(0,0,0,.12); transition: all .3s; }
-.step-dot.done { background: #22c55e; }
-.step-dot.active { background: var(--ember); box-shadow: 0 0 8px rgba(113,75,103,.5); width: 20px; border-radius: 100px; }
+  .field-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
 
-/* ─── PANEL TRANSITION ─── */
-.form-panel { display: none; }
-.form-panel.active {
-  display: block;
-  animation: panelIn .35s cubic-bezier(.16,1,.3,1) both;
-}
-@keyframes panelIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+  .field label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
 
-/* ─── ALERT ─── */
-.alert {
-  border-radius: 10px; padding: 11px 14px;
-  font-size: 13px; display: flex; align-items: center; gap: 10px;
-  margin-bottom: 16px; display: none;
-}
-.alert.error { background: rgba(239,68,68,.08); border:1px solid rgba(239,68,68,.2); color: #fca5a5; }
-.alert.success { background: rgba(34,197,94,.07); border:1px solid rgba(34,197,94,.2); color: #86efac; }
-.alert.show { display: flex; animation: alertIn .3s ease both; }
-@keyframes alertIn { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:none} }
+  .field-row label {
+    margin-bottom: 0;
+  }
 
-/* ─── FOOTER NOTE ─── */
-.form-footer-note { text-align: center; font-size: 11px; color: var(--muted2); margin-top: 16px; font-family: 'DM Mono', monospace; letter-spacing: .04em; }
+  .forgot-link {
+    font-size: 12px;
+    color: var(--ember);
+    text-decoration: none;
+    transition: opacity .2s;
+    cursor: none;
+    font-weight: 600;
+  }
+
+  .forgot-link:hover {
+    opacity: .7;
+  }
+
+  .field input,
+  .field select {
+    width: 100%;
+    background: rgba(0, 0, 0, .04);
+    border: 1px solid rgba(0, 0, 0, .09);
+    border-radius: 12px;
+    padding: 13px 16px;
+    color: var(--white);
+    font-size: 14px;
+    font-family: 'Cabinet Grotesk', sans-serif;
+    outline: none;
+    cursor: none;
+    transition: border-color .2s, box-shadow .2s, background .2s;
+  }
+
+  .field input::placeholder {
+    color: rgba(124, 106, 86, .6);
+  }
+
+  .field input:focus,
+  .field select:focus {
+    border-color: rgba(113, 75, 103, .45);
+    box-shadow: 0 0 0 3px rgba(113, 75, 103, .1);
+    background: rgba(113, 75, 103, .03);
+  }
+
+  .field select {
+    cursor: none;
+  }
+
+  .field select option {
+    background: var(--ink3);
+  }
+
+  /* pw wrap */
+  .pw-wrap {
+    position: relative;
+  }
+
+  .pw-wrap input {
+    padding-right: 52px;
+  }
+
+  .pw-toggle {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, .07);
+    border: 1px solid rgba(0, 0, 0, .1);
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: none;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: .04em;
+    transition: all .2s;
+  }
+
+  .pw-toggle:hover {
+    background: rgba(113, 75, 103, .12);
+    border-color: rgba(113, 75, 103, .3);
+    color: var(--ember);
+  }
+
+  /* two-col */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  /* ─── STRENGTH METER ─── */
+  .strength-wrap {
+    margin-top: 10px;
+  }
+
+  .strength-bars {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 6px;
+  }
+
+  .strength-bar {
+    flex: 1;
+    height: 4px;
+    border-radius: 100px;
+    background: rgba(0, 0, 0, .07);
+    transition: background .3s;
+  }
+
+  .strength-bar.weak {
+    background: #ef4444;
+  }
+
+  .strength-bar.fair {
+    background: var(--ember);
+  }
+
+  .strength-bar.strong {
+    background: #22c55e;
+  }
+
+  .strength-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .strength-label {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    letter-spacing: .06em;
+  }
+
+  .strength-label.weak {
+    color: #ef4444;
+  }
+
+  .strength-label.fair {
+    color: var(--ember);
+  }
+
+  .strength-label.strong {
+    color: #22c55e;
+  }
+
+  /* ─── POLICY CHECKLIST ─── */
+  .policy-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 12px;
+  }
+
+  .policy-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 500;
+    transition: color .25s;
+  }
+
+  .policy-row.ok {
+    color: #22c55e;
+  }
+
+  .policy-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, .15);
+    flex-shrink: 0;
+    transition: background .25s;
+  }
+
+  .policy-row.ok .policy-dot {
+    background: #22c55e;
+    box-shadow: 0 0 6px rgba(34, 197, 94, .4);
+  }
+
+  /* ─── OTP BOXES ─── */
+  .otp-grid {
+    display: flex;
+    gap: 8px;
+  }
+
+  .otp-box {
+    flex: 1;
+    aspect-ratio: 1;
+    background: rgba(0, 0, 0, .04);
+    border: 1px solid rgba(0, 0, 0, .09);
+    border-radius: 12px;
+    text-align: center;
+    font-size: 22px;
+    font-family: 'Bebas Neue', sans-serif;
+    color: var(--ember);
+    outline: none;
+    caret-color: var(--ember);
+    transition: border-color .2s, box-shadow .2s;
+  }
+
+  .otp-box:focus {
+    border-color: rgba(113, 75, 103, .5);
+    box-shadow: 0 0 0 3px rgba(113, 75, 103, .12);
+  }
+
+  .otp-box.filled {
+    background: rgba(113, 75, 103, .05);
+    border-color: rgba(113, 75, 103, .3);
+  }
+
+  /* ─── DIVIDER ─── */
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 20px 0;
+  }
+
+  .divider::before,
+  .divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .divider span {
+    font-size: 11px;
+    color: var(--muted2);
+    letter-spacing: .08em;
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* ─── BUTTONS ─── */
+  .btn-primary {
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--ember), var(--ember3));
+    color: white;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    border: none;
+    cursor: none;
+    font-family: 'Cabinet Grotesk', sans-serif;
+    box-shadow: 0 8px 28px rgba(113, 75, 103, .35), inset 0 1px 0 rgba(0, 0, 0, .12);
+    transition: all .25s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-primary::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(0, 0, 0, .1), transparent);
+    opacity: 0;
+    transition: opacity .2s;
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 44px rgba(113, 75, 103, .55);
+  }
+
+  .btn-primary:hover::after {
+    opacity: 1;
+  }
+
+  .btn-primary:active {
+    transform: none;
+  }
+
+  .btn-primary.loading {
+    pointer-events: none;
+    opacity: .7;
+  }
+
+  .btn-ghost {
+    padding: 14px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, .04);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: none;
+    font-family: 'Cabinet Grotesk', sans-serif;
+    transition: all .2s;
+  }
+
+  .btn-ghost:hover {
+    border-color: rgba(113, 75, 103, .3);
+    color: var(--white);
+    background: rgba(113, 75, 103, .05);
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 10px;
+  }
+
+  .btn-row .btn-primary {
+    flex: 1;
+  }
+
+  .btn-row .btn-ghost {
+    flex: 0 0 auto;
+    padding: 14px 20px;
+  }
+
+  /* ─── SECURITY NOTE ─── */
+  .security-note {
+    background: rgba(113, 75, 103, .05);
+    border: 1px solid rgba(113, 75, 103, .12);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-top: 16px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .security-note-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .security-note-text {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .security-note-text strong {
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  /* ─── OTP STEP ─── */
+  .otp-step {
+    display: none;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    animation: stepIn .4s cubic-bezier(.16, 1, .3, 1) both;
+  }
+
+  .otp-step.visible {
+    display: block;
+  }
+
+  @keyframes stepIn {
+    from {
+      opacity: 0;
+      transform: translateY(12px)
+    }
+
+    to {
+      opacity: 1;
+      transform: none
+    }
+  }
+
+  .otp-hint {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 10px;
+  }
+
+  .otp-hint a {
+    color: var(--ember);
+    cursor: none;
+    text-decoration: none;
+  }
+
+  .otp-hint a:hover {
+    text-decoration: underline;
+  }
+
+  /* ─── STEP DOTS ─── */
+  .step-dots {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  .step-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, .12);
+    transition: all .3s;
+  }
+
+  .step-dot.done {
+    background: #22c55e;
+  }
+
+  .step-dot.active {
+    background: var(--ember);
+    box-shadow: 0 0 8px rgba(113, 75, 103, .5);
+    width: 20px;
+    border-radius: 100px;
+  }
+
+  /* ─── PANEL TRANSITION ─── */
+  .form-panel {
+    display: none;
+  }
+
+  .form-panel.active {
+    display: block;
+    animation: panelIn .35s cubic-bezier(.16, 1, .3, 1) both;
+  }
+
+  @keyframes panelIn {
+    from {
+      opacity: 0;
+      transform: translateY(8px)
+    }
+
+    to {
+      opacity: 1;
+      transform: none
+    }
+  }
+
+  /* ─── ALERT ─── */
+  .alert {
+    border-radius: 10px;
+    padding: 11px 14px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    display: none;
+  }
+
+  .alert.error {
+    background: rgba(239, 68, 68, .08);
+    border: 1px solid rgba(239, 68, 68, .2);
+    color: #fca5a5;
+  }
+
+  .alert.success {
+    background: rgba(34, 197, 94, .07);
+    border: 1px solid rgba(34, 197, 94, .2);
+    color: #86efac;
+  }
+
+  .alert.show {
+    display: flex;
+    animation: alertIn .3s ease both;
+  }
+
+  @keyframes alertIn {
+    from {
+      opacity: 0;
+      transform: translateY(-6px)
+    }
+
+    to {
+      opacity: 1;
+      transform: none
+    }
+  }
+
+  /* ─── FOOTER NOTE ─── */
+  .form-footer-note {
+    text-align: center;
+    font-size: 11px;
+    color: var(--muted2);
+    margin-top: 16px;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: .04em;
+  }
 </style>
 {% endblock %}
 
@@ -483,20 +1093,24 @@ body::after {
         <h1 class="lp-headline">
           Protect the<br>register with<br><em>smarter</em> access.
         </h1>
-        <p class="lp-sub">Strong passwords, OTP recovery, and role-based routing keep your cafe data secure — without slowing down service.</p>
+        <p class="lp-sub">Strong passwords, OTP recovery, and role-based routing keep your cafe data secure — without
+          slowing down service.</p>
 
         <div class="lp-cards">
           <div class="lp-card">
             <div class="lp-card-tag">🔑 Password Policy</div>
-            <div class="lp-card-text">12+ characters, mixed case, numbers, symbols — and no common weak passwords. Enforced on both client and server.</div>
+            <div class="lp-card-text">12+ characters, mixed case, numbers, symbols — and no common weak passwords.
+              Enforced on both client and server.</div>
           </div>
           <div class="lp-card">
             <div class="lp-card-tag">📧 OTP Recovery</div>
-            <div class="lp-card-text">Password resets are gated by email OTP verification. No security questions, no guesswork.</div>
+            <div class="lp-card-text">Password resets are gated by email OTP verification. No security questions, no
+              guesswork.</div>
           </div>
           <div class="lp-card">
             <div class="lp-card-tag">👤 Role-Based Access</div>
-            <div class="lp-card-text">Admin, POS operator, kitchen staff, and customers each get exactly the view they need — nothing more.</div>
+            <div class="lp-card-text">Admin, POS operator, kitchen staff, and customers each get exactly the view they
+              need — nothing more.</div>
           </div>
         </div>
       </div>
@@ -522,6 +1136,7 @@ body::after {
       <div class="tab-bar">
         <button class="tab-btn active" id="tab-login" onclick="switchTab('login')">Login</button>
         <button class="tab-btn" id="tab-signup" onclick="switchTab('signup')">Sign Up</button>
+        <button class="tab-btn" id="tab-register" onclick="switchTab('register')">Start Business</button>
         <button class="tab-btn" id="tab-reset" onclick="switchTab('reset')">Reset</button>
       </div>
 
@@ -549,16 +1164,34 @@ body::after {
                 <a href="#" class="forgot-link" onclick="switchTab('reset'); return false;">Forgot password?</a>
               </div>
               <div class="pw-wrap">
-                <input type="password" id="login-password" placeholder="••••••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+                <input type="password" id="login-password" placeholder="••••••••••••" autocomplete="current-password"
+                  onkeydown="if(event.key==='Enter')doLogin()">
                 <button type="button" class="pw-toggle" onclick="togglePassword('login-password', this)">Show</button>
               </div>
             </div>
             <button class="btn-primary" id="login-btn" onclick="doLogin()" style="margin-top:8px">
               Open Session →
             </button>
+
+            <!-- QUICK DEV LOGIN BUTTONS -->
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
+              <div
+                style="font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px;">
+                Quick Access (Dev)</div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+                <button class="btn-ghost" onclick="doQuickLogin('customer')" style="padding: 12px; font-size: 12px;">👤
+                  Customer</button>
+                <button class="btn-ghost" onclick="doQuickLogin('staff')" style="padding: 12px; font-size: 12px;">👨‍💼
+                  Staff</button>
+                <button class="btn-ghost" onclick="doQuickLogin('owner')" style="padding: 12px; font-size: 12px;">👑
+                  Owner</button>
+              </div>
+            </div>
+
             <div class="security-note">
               <span class="security-note-icon">🔒</span>
-              <span class="security-note-text"><strong>Secure session:</strong> Passwords are bcrypt-hashed. Sessions expire automatically after inactivity.</span>
+              <span class="security-note-text"><strong>Secure session:</strong> Passwords are bcrypt-hashed. Sessions
+                expire automatically after inactivity.</span>
             </div>
           </div>
         </div>
@@ -580,12 +1213,14 @@ body::after {
             </div>
             <div class="field">
               <label>Work email</label>
-              <input type="email" id="signup-email" placeholder="you@cafe.com" autocomplete="email" oninput="renderPasswordPolicy('signup')">
+              <input type="email" id="signup-email" placeholder="you@cafe.com" autocomplete="email"
+                oninput="renderPasswordPolicy('signup')">
             </div>
             <div class="field">
               <label>Password</label>
               <div class="pw-wrap">
-                <input type="password" id="signup-password" placeholder="Create a strong password" autocomplete="new-password" oninput="renderPasswordPolicy('signup')">
+                <input type="password" id="signup-password" placeholder="Create a strong password"
+                  autocomplete="new-password" oninput="renderPasswordPolicy('signup')">
                 <button type="button" class="pw-toggle" onclick="togglePassword('signup-password', this)">Show</button>
               </div>
               <!-- strength meter -->
@@ -598,7 +1233,8 @@ body::after {
                 </div>
                 <div class="strength-meta">
                   <span class="strength-label" id="su-strength-label">Enter a password</span>
-                  <span id="signup-meter-label" style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace"></span>
+                  <span id="signup-meter-label"
+                    style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace"></span>
                 </div>
               </div>
               <div class="policy-grid" id="signup-rules"></div>
@@ -610,11 +1246,81 @@ body::after {
                 <option value="customer">User / Customer</option>
                 <option value="restaurant">Restaurant Admin</option>
               </select>
-              <small style="color: var(--muted); font-size: 11px; margin-top: 6px; display: block;">Select "Staff" for POS terminal access or "User / Customer" for the customer view.</small>
+              <small style="color: var(--muted); font-size: 11px; margin-top: 6px; display: block;">Select "Staff" for
+                POS terminal access or "User / Customer" for the customer view.</small>
             </div>
             <button class="btn-primary" id="signup-btn" onclick="doSignup()" style="margin-top:4px">
               Create Account →
             </button>
+          </div>
+        </div>
+
+        <!-- ── REGISTER RESTAURANT ── -->
+        <div class="form-panel" id="form-register">
+          <div class="form-card-head">
+            <div class="form-eyebrow">New Business</div>
+            <div class="form-title">Start <em>selling.</em></div>
+            <div class="form-sub">Set up your restaurant and get instant access to manage orders, staff, and inventory.
+            </div>
+          </div>
+          <div class="form-card-body">
+            <div class="alert error" id="register-alert">
+              <span>⚠</span><span id="register-alert-msg">Please fill in all required fields.</span>
+            </div>
+
+            <div class="two-col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+              <div class="field" style="margin-bottom: 0;">
+                <label>Restaurant Name</label>
+                <input type="text" id="register-restaurant-name" placeholder="My Cafe" autocomplete="organization">
+              </div>
+              <div class="field" style="margin-bottom: 0;">
+                <label>Owner Name</label>
+                <input type="text" id="register-owner-name" placeholder="Your name" autocomplete="name">
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Email Address</label>
+              <input type="email" id="register-email" placeholder="owner@cafe.com" autocomplete="email"
+                oninput="renderPasswordPolicy('register')">
+            </div>
+
+            <div class="field">
+              <label>Password</label>
+              <div class="pw-wrap">
+                <input type="password" id="register-password" placeholder="Create a strong password"
+                  autocomplete="new-password" oninput="renderPasswordPolicy('register')">
+                <button type="button" class="pw-toggle"
+                  onclick="togglePassword('register-password', this)">Show</button>
+              </div>
+              <div class="strength-wrap">
+                <div class="strength-bars">
+                  <div class="strength-bar" id="reg-b1"></div>
+                  <div class="strength-bar" id="reg-b2"></div>
+                  <div class="strength-bar" id="reg-b3"></div>
+                  <div class="strength-bar" id="reg-b4"></div>
+                </div>
+                <div class="strength-meta">
+                  <span class="strength-label" id="reg-strength-label">Enter a password</span>
+                </div>
+              </div>
+              <div class="policy-grid" id="register-rules"></div>
+            </div>
+
+            <div class="field">
+              <label>Phone (Optional)</label>
+              <input type="tel" id="register-phone" placeholder="+91 12345 67890" autocomplete="tel">
+            </div>
+
+            <button class="btn-primary" id="register-btn" onclick="doRegisterRestaurant()" style="margin-top:8px">
+              Create Restaurant →
+            </button>
+
+            <div class="security-note">
+              <span class="security-note-icon">🔒</span>
+              <span class="security-note-text"><strong>Secure setup:</strong> You'll be automatically logged in as
+                owner. Invite staff members in settings after.</span>
+            </div>
           </div>
         </div>
 
@@ -644,7 +1350,8 @@ body::after {
             <div id="rst-step1">
               <div class="field">
                 <label>Email address</label>
-                <input type="email" id="reset-email" placeholder="you@cafe.com" autocomplete="email" oninput="syncResetEmail(); renderPasswordPolicy('reset')">
+                <input type="email" id="reset-email" placeholder="you@cafe.com" autocomplete="email"
+                  oninput="syncResetEmail(); renderPasswordPolicy('reset')">
               </div>
               <div class="btn-row">
                 <button class="btn-primary" id="send-otp-btn" onclick="requestResetOtp()">Send OTP →</button>
@@ -670,13 +1377,15 @@ body::after {
                   <input class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" id="otp4">
                   <input class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" id="otp5">
                 </div>
-                <p class="otp-hint">Didn't receive it? <a href="#" id="resend-link" onclick="resendOtp(event)">Resend</a> <span id="resend-timer"></span></p>
+                <p class="otp-hint">Didn't receive it? <a href="#" id="resend-link"
+                    onclick="resendOtp(event)">Resend</a> <span id="resend-timer"></span></p>
               </div>
 
               <div class="field">
                 <label>New password</label>
                 <div class="pw-wrap">
-                  <input type="password" id="reset-password" placeholder="Create a strong password" autocomplete="new-password" oninput="renderPasswordPolicy('reset')">
+                  <input type="password" id="reset-password" placeholder="Create a strong password"
+                    autocomplete="new-password" oninput="renderPasswordPolicy('reset')">
                   <button type="button" class="pw-toggle" onclick="togglePassword('reset-password', this)">Show</button>
                 </div>
                 <div class="strength-wrap">
@@ -695,7 +1404,8 @@ body::after {
 
               <div class="field">
                 <label>Confirm new password</label>
-                <input type="password" id="reset-confirm-password" placeholder="Re-enter password" autocomplete="new-password">
+                <input type="password" id="reset-confirm-password" placeholder="Re-enter password"
+                  autocomplete="new-password">
               </div>
 
               <button class="btn-primary" id="complete-reset-btn" onclick="completeReset()">
@@ -717,304 +1427,353 @@ body::after {
 
 {% block scripts %}
 <script>
-/* ══════════════════════════════════
-   CURSOR
-══════════════════════════════════ */
-const aC=document.getElementById('a-cur'),aR=document.getElementById('a-ring');
-let mx=0,my=0,rx=0,ry=0;
-document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;aC.style.left=mx+'px';aC.style.top=my+'px'});
-(function loop(){rx+=(mx-rx)*.1;ry+=(my-ry)*.1;aR.style.left=rx+'px';aR.style.top=ry+'px';requestAnimationFrame(loop)})();
-document.querySelectorAll('a,button,input,select,.lp-card').forEach(el=>{
-  el.addEventListener('mouseenter',()=>document.body.classList.add('c-hover'));
-  el.addEventListener('mouseleave',()=>document.body.classList.remove('c-hover'));
-});
-
-/* ══════════════════════════════════
-   TAB SWITCHER
-══════════════════════════════════ */
-function switchTab(tab) {
-  ['login','signup','reset'].forEach(t=>{
-    document.getElementById('form-'+t).classList.toggle('active', t===tab);
-    document.getElementById('tab-'+t).classList.toggle('active', t===tab);
-  });
-  clearAlerts();
-  if(tab==='signup') renderPasswordPolicy('signup');
-  if(tab==='reset') { renderPasswordPolicy('reset'); resetStepDots(1); }
-}
-
-function clearAlerts() {
-  document.querySelectorAll('.alert').forEach(a=>{a.classList.remove('show');});
-}
-
-function showAlert(id, msg, type='error') {
-  const el = document.getElementById(id);
-  const msgEl = document.getElementById(id+'-msg');
-  if(msgEl) msgEl.textContent = msg;
-  el.className = 'alert ' + type + ' show';
-}
-
-/* ══════════════════════════════════
-   STEP DOTS (RESET)
-══════════════════════════════════ */
-function resetStepDots(step) {
-  const d = ['rst-d1','rst-d2','rst-d3'];
-  d.forEach((id,i)=>{
-    const el = document.getElementById(id);
-    if(!el) return;
-    el.className = 'step-dot ' + (i+1 < step ? 'done' : i+1 === step ? 'active' : '');
-  });
-}
-
-/* ══════════════════════════════════
-   PASSWORD TOGGLE
-══════════════════════════════════ */
-function togglePassword(id, btn) {
-  const inp = document.getElementById(id);
-  const show = inp.type === 'password';
-  inp.type = show ? 'text' : 'password';
-  btn.textContent = show ? 'Hide' : 'Show';
-}
-
-/* ══════════════════════════════════
-   PASSWORD CHECKS
-══════════════════════════════════ */
-function getPasswordChecks(pw, email='') {
-  const local = (email||'').toLowerCase().split('@')[0] || '';
-  const lo = (pw||'').toLowerCase();
-  return [
-    { label:'12+ characters',      ok: pw.length >= 12 },
-    { label:'Lowercase letter',    ok: /[a-z]/.test(pw) },
-    { label:'Uppercase letter',    ok: /[A-Z]/.test(pw) },
-    { label:'Number',              ok: /\d/.test(pw) },
-    { label:'Symbol (!@#…)',       ok: /[^A-Za-z0-9]/.test(pw) },
-    { label:'No spaces',           ok: pw.length > 0 && !/\s/.test(pw) },
-    { label:'Not your email name', ok: !local || !lo.includes(local) },
-  ];
-}
-
-function renderPasswordPolicy(prefix) {
-  const pwEl = document.getElementById(prefix+'-password');
-  if(!pwEl) return;
-  const emailEl = document.getElementById(prefix+'-email');
-  const pw = pwEl.value || '';
-  const email = emailEl ? emailEl.value.trim() : '';
-  const checks = getPasswordChecks(pw, email);
-  const passed = checks.filter(c=>c.ok).length;
-  const total = checks.length;
-  const pct = Math.round((passed/total)*100);
-
-  /* bars */
-  const barIds = prefix==='signup'
-    ? ['su-b1','su-b2','su-b3','su-b4']
-    : ['rs-b1','rs-b2','rs-b3','rs-b4'];
-  const cls = passed <= 2 ? 'weak' : passed <= 4 ? 'fair' : 'strong';
-  barIds.forEach((id,i)=>{
-    const bar = document.getElementById(id);
-    if(!bar) return;
-    bar.className = 'strength-bar' + (pw && (i+1) <= Math.ceil(passed/total*4) ? ' '+cls : '');
+  /* ══════════════════════════════════
+     CURSOR
+  ══════════════════════════════════ */
+  const aC = document.getElementById('a-cur'), aR = document.getElementById('a-ring');
+  let mx = 0, my = 0, rx = 0, ry = 0;
+  document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; aC.style.left = mx + 'px'; aC.style.top = my + 'px' });
+  (function loop() { rx += (mx - rx) * .1; ry += (my - ry) * .1; aR.style.left = rx + 'px'; aR.style.top = ry + 'px'; requestAnimationFrame(loop) })();
+  document.querySelectorAll('a,button,input,select,.lp-card').forEach(el => {
+    el.addEventListener('mouseenter', () => document.body.classList.add('c-hover'));
+    el.addEventListener('mouseleave', () => document.body.classList.remove('c-hover'));
   });
 
-  /* label */
-  const sLabel = document.getElementById((prefix==='signup'?'su':'rs')+'-strength-label');
-  if(sLabel) {
-    sLabel.textContent = !pw ? 'Enter a password' : passed<=2?'Weak':passed<=4?'Fair':'Strong';
-    sLabel.className = 'strength-label' + (pw ? ' '+cls : '');
+  /* ══════════════════════════════════
+     TAB SWITCHER
+  ══════════════════════════════════ */
+  function switchTab(tab) {
+    ['login', 'signup', 'register', 'reset'].forEach(t => {
+      document.getElementById('form-' + t).classList.toggle('active', t === tab);
+      document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+    });
+    clearAlerts();
+    if (tab === 'signup') renderPasswordPolicy('signup');
+    if (tab === 'register') renderPasswordPolicy('register');
+    if (tab === 'reset') { renderPasswordPolicy('reset'); resetStepDots(1); }
   }
 
-  /* rules */
-  const rulesEl = document.getElementById(prefix+'-rules');
-  if(rulesEl) {
-    rulesEl.innerHTML = checks.map(c=>`
-      <div class="policy-row ${c.ok?'ok':''}">
+  function clearAlerts() {
+    document.querySelectorAll('.alert').forEach(a => { a.classList.remove('show'); });
+  }
+
+  function showAlert(id, msg, type = 'error') {
+    const el = document.getElementById(id);
+    const msgEl = document.getElementById(id + '-msg');
+    if (msgEl) msgEl.textContent = msg;
+    el.className = 'alert ' + type + ' show';
+  }
+
+  /* ══════════════════════════════════
+     STEP DOTS (RESET)
+  ══════════════════════════════════ */
+  function resetStepDots(step) {
+    const d = ['rst-d1', 'rst-d2', 'rst-d3'];
+    d.forEach((id, i) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.className = 'step-dot ' + (i + 1 < step ? 'done' : i + 1 === step ? 'active' : '');
+    });
+  }
+
+  /* ══════════════════════════════════
+     PASSWORD TOGGLE
+  ══════════════════════════════════ */
+  function togglePassword(id, btn) {
+    const inp = document.getElementById(id);
+    const show = inp.type === 'password';
+    inp.type = show ? 'text' : 'password';
+    btn.textContent = show ? 'Hide' : 'Show';
+  }
+
+  /* ══════════════════════════════════
+     PASSWORD CHECKS
+  ══════════════════════════════════ */
+  function getPasswordChecks(pw, email = '') {
+    const local = (email || '').toLowerCase().split('@')[0] || '';
+    const lo = (pw || '').toLowerCase();
+    return [
+      { label: '12+ characters', ok: pw.length >= 12 },
+      { label: 'Lowercase letter', ok: /[a-z]/.test(pw) },
+      { label: 'Uppercase letter', ok: /[A-Z]/.test(pw) },
+      { label: 'Number', ok: /\d/.test(pw) },
+      { label: 'Symbol (!@#…)', ok: /[^A-Za-z0-9]/.test(pw) },
+      { label: 'No spaces', ok: pw.length > 0 && !/\s/.test(pw) },
+      { label: 'Not your email name', ok: !local || !lo.includes(local) },
+    ];
+  }
+
+  function renderPasswordPolicy(prefix) {
+    const pwEl = document.getElementById(prefix + '-password');
+    if (!pwEl) return;
+    const emailEl = document.getElementById(prefix + '-email');
+    const pw = pwEl.value || '';
+    const email = emailEl ? emailEl.value.trim() : '';
+    const checks = getPasswordChecks(pw, email);
+    const passed = checks.filter(c => c.ok).length;
+    const total = checks.length;
+    const pct = Math.round((passed / total) * 100);
+
+    /* bars */
+    const barIds = prefix === 'signup'
+      ? ['su-b1', 'su-b2', 'su-b3', 'su-b4']
+      : ['rs-b1', 'rs-b2', 'rs-b3', 'rs-b4'];
+    const cls = passed <= 2 ? 'weak' : passed <= 4 ? 'fair' : 'strong';
+    barIds.forEach((id, i) => {
+      const bar = document.getElementById(id);
+      if (!bar) return;
+      bar.className = 'strength-bar' + (pw && (i + 1) <= Math.ceil(passed / total * 4) ? ' ' + cls : '');
+    });
+
+    /* label */
+    const sLabel = document.getElementById((prefix === 'signup' ? 'su' : 'rs') + '-strength-label');
+    if (sLabel) {
+      sLabel.textContent = !pw ? 'Enter a password' : passed <= 2 ? 'Weak' : passed <= 4 ? 'Fair' : 'Strong';
+      sLabel.className = 'strength-label' + (pw ? ' ' + cls : '');
+    }
+
+    /* rules */
+    const rulesEl = document.getElementById(prefix + '-rules');
+    if (rulesEl) {
+      rulesEl.innerHTML = checks.map(c => `
+      <div class="policy-row ${c.ok ? 'ok' : ''}">
         <span class="policy-dot"></span>
         <span>${c.label}</span>
       </div>`).join('');
-  }
-}
-
-/* ══════════════════════════════════
-   OTP BOXES
-══════════════════════════════════ */
-const otpBoxes = [0,1,2,3,4,5].map(i=>document.getElementById('otp'+i));
-otpBoxes.forEach((box,i)=>{
-  if(!box) return;
-  box.addEventListener('input',()=>{
-    box.value = box.value.replace(/\D/g,'');
-    box.classList.toggle('filled', !!box.value);
-    if(box.value && i < 5) otpBoxes[i+1].focus();
-  });
-  box.addEventListener('keydown',e=>{
-    if(e.key==='Backspace' && !box.value && i>0) otpBoxes[i-1].focus();
-  });
-  box.addEventListener('paste',e=>{
-    e.preventDefault();
-    const paste = e.clipboardData.getData('text').replace(/\D/g,'').slice(0,6);
-    paste.split('').forEach((c,j)=>{ if(otpBoxes[j]){otpBoxes[j].value=c;otpBoxes[j].classList.add('filled');} });
-    const last = Math.min(paste.length, 5);
-    if(otpBoxes[last]) otpBoxes[last].focus();
-  });
-});
-
-function getOtp() { return otpBoxes.map(b=>b?b.value:'').join(''); }
-
-/* ══════════════════════════════════
-   RESEND TIMER
-══════════════════════════════════ */
-let resendInterval = null;
-function startResendTimer(secs=60) {
-  const link = document.getElementById('resend-link');
-  const timer = document.getElementById('resend-timer');
-  if(link) { link.style.pointerEvents='none'; link.style.opacity='.4'; }
-  let t = secs;
-  if(resendInterval) clearInterval(resendInterval);
-  resendInterval = setInterval(()=>{
-    if(timer) timer.textContent = `(${t}s)`;
-    t--;
-    if(t < 0) {
-      clearInterval(resendInterval);
-      if(timer) timer.textContent = '';
-      if(link) { link.style.pointerEvents=''; link.style.opacity='1'; }
     }
-  }, 1000);
-}
+  }
 
-function resendOtp(e) {
-  e.preventDefault();
-  requestResetOtp(true);
-}
+  /* ══════════════════════════════════
+     OTP BOXES
+  ══════════════════════════════════ */
+  const otpBoxes = [0, 1, 2, 3, 4, 5].map(i => document.getElementById('otp' + i));
+  otpBoxes.forEach((box, i) => {
+    if (!box) return;
+    box.addEventListener('input', () => {
+      box.value = box.value.replace(/\D/g, '');
+      box.classList.toggle('filled', !!box.value);
+      if (box.value && i < 5) otpBoxes[i + 1].focus();
+    });
+    box.addEventListener('keydown', e => {
+      if (e.key === 'Backspace' && !box.value && i > 0) otpBoxes[i - 1].focus();
+    });
+    box.addEventListener('paste', e => {
+      e.preventDefault();
+      const paste = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+      paste.split('').forEach((c, j) => { if (otpBoxes[j]) { otpBoxes[j].value = c; otpBoxes[j].classList.add('filled'); } });
+      const last = Math.min(paste.length, 5);
+      if (otpBoxes[last]) otpBoxes[last].focus();
+    });
+  });
 
-/* ══════════════════════════════════
-   RESET EMAIL SYNC
-══════════════════════════════════ */
-let resetEmailValue = '';
-function syncResetEmail() {
-  resetEmailValue = document.getElementById('reset-email').value.trim();
-}
+  function getOtp() { return otpBoxes.map(b => b ? b.value : '').join(''); }
 
-/* ══════════════════════════════════
-   LOADING STATE
-══════════════════════════════════ */
-function setLoading(btnId, loading) {
-  const btn = document.getElementById(btnId);
-  if(!btn) return;
-  btn.classList.toggle('loading', loading);
-  btn.textContent = loading ? 'Please wait…' : btn.dataset.label || btn.textContent;
-}
+  /* ══════════════════════════════════
+     RESEND TIMER
+  ══════════════════════════════════ */
+  let resendInterval = null;
+  function startResendTimer(secs = 60) {
+    const link = document.getElementById('resend-link');
+    const timer = document.getElementById('resend-timer');
+    if (link) { link.style.pointerEvents = 'none'; link.style.opacity = '.4'; }
+    let t = secs;
+    if (resendInterval) clearInterval(resendInterval);
+    resendInterval = setInterval(() => {
+      if (timer) timer.textContent = `(${t}s)`;
+      t--;
+      if (t < 0) {
+        clearInterval(resendInterval);
+        if (timer) timer.textContent = '';
+        if (link) { link.style.pointerEvents = ''; link.style.opacity = '1'; }
+      }
+    }, 1000);
+  }
 
-/* ══════════════════════════════════
-   API HELPER (from base.html)
-══════════════════════════════════ */
-async function api(url, method='GET', body=null) {
-  try {
-    const opts = { method, headers:{'Content-Type':'application/json'} };
-    if(body) opts.body = JSON.stringify(body);
-    const res = await fetch(url, opts);
-    return await res.json();
-  } catch(e) { return { error: 'Network error. Please try again.' }; }
-}
+  function resendOtp(e) {
+    e.preventDefault();
+    requestResetOtp(true);
+  }
 
-function homeForRole(role) {
-  if (role === 'restaurant') return '/backend';
-  if (role === 'customer') return '/customer';
-  return '/pos';
-}
+  /* ══════════════════════════════════
+     RESET EMAIL SYNC
+  ══════════════════════════════════ */
+  let resetEmailValue = '';
+  function syncResetEmail() {
+    resetEmailValue = document.getElementById('reset-email').value.trim();
+  }
 
-/* ══════════════════════════════════
-   LOGIN
-══════════════════════════════════ */
-async function doLogin() {
-  clearAlerts();
-  const email = document.getElementById('login-email').value.trim();
-  const pw = document.getElementById('login-password').value;
-  if(!email || !pw) return showAlert('login-alert', 'Please enter your email and password.');
-  setLoading('login-btn', true);
-  const r = await api('/api/login', 'POST', { email, password: pw });
-  setLoading('login-btn', false);
-  if(r.error) return showAlert('login-alert', r.error);
-  showAlert('login-alert', 'Welcome back, '+r.name+'!', 'success');
-  setTimeout(()=> location.href = homeForRole(r.role), 700);
-}
+  /* ══════════════════════════════════
+     LOADING STATE
+  ══════════════════════════════════ */
+  function setLoading(btnId, loading) {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    btn.classList.toggle('loading', loading);
+    btn.textContent = loading ? 'Please wait…' : btn.dataset.label || btn.textContent;
+  }
 
-/* ══════════════════════════════════
-   SIGNUP
-══════════════════════════════════ */
-async function doSignup() {
-  clearAlerts();
-  const name = document.getElementById('signup-name').value.trim();
-  const email = document.getElementById('signup-email').value.trim();
-  const pw = document.getElementById('signup-password').value;
-  const role = document.getElementById('signup-role').value;
-  if(!name||!email||!pw) return showAlert('signup-alert','Please fill in all fields.');
-  const checks = getPasswordChecks(pw, email);
-  if(checks.some(c=>!c.ok)) return showAlert('signup-alert','Strengthen your password — all checks must pass.');
-  setLoading('signup-btn', true);
-  const r = await api('/api/signup', 'POST', { name, email, password: pw, role });
-  setLoading('signup-btn', false);
-  if(r.error) return showAlert('signup-alert', r.error);
-  showAlert('signup-alert', 'Account created! Redirecting…', 'success');
-  setTimeout(()=> location.href = homeForRole(r.role), 700);
-}
+  /* ══════════════════════════════════
+     API HELPER (from base.html)
+  ══════════════════════════════════ */
+  async function api(url, method = 'GET', body = null) {
+    try {
+      const opts = { method, headers: { 'Content-Type': 'application/json' } };
+      if (body) opts.body = JSON.stringify(body);
+      const res = await fetch(url, opts);
+      return await res.json();
+    } catch (e) { return { error: 'Network error. Please try again.' }; }
+  }
 
-/* ══════════════════════════════════
-   RESET — SEND OTP
-══════════════════════════════════ */
-async function requestResetOtp(isResend=false) {
-  clearAlerts();
-  const email = document.getElementById('reset-email').value.trim();
-  if(!email) return showAlert('reset-alert','Enter your email address first.');
-  setLoading('send-otp-btn', true);
-  const r = await api('/api/password-reset/request', 'POST', { email });
-  setLoading('send-otp-btn', false);
-  if(r.error) return showAlert('reset-alert', r.error);
+  function homeForRole(role) {
+    if (role === 'restaurant') return '/backend';
+    if (role === 'customer') return '/customer';
+    return '/pos';
+  }
 
-  showAlert('reset-success', r.message || 'OTP sent to your email.', 'success');
+  /* ══════════════════════════════════
+     LOGIN
+  ══════════════════════════════════ */
+  async function doLogin() {
+    clearAlerts();
+    const email = document.getElementById('login-email').value.trim();
+    const pw = document.getElementById('login-password').value;
+    if (!email || !pw) return showAlert('login-alert', 'Please enter your email and password.');
+    setLoading('login-btn', true);
+    const r = await api('/api/login', 'POST', { email, password: pw });
+    setLoading('login-btn', false);
+    if (r.error) return showAlert('login-alert', r.error);
+    showAlert('login-alert', 'Welcome back, ' + r.name + '!', 'success');
+    setTimeout(() => location.href = homeForRole(r.role), 700);
+  }
 
-  /* show OTP step */
-  const step2 = document.getElementById('reset-step-2');
-  step2.classList.add('visible');
-  resetStepDots(2);
-  startResendTimer(60);
-  otpBoxes[0] && otpBoxes[0].focus();
-}
+  /* ══════════════════════════════════
+     QUICK LOGIN (for dev/testing)
+  ══════════════════════════════════ */
+  async function doQuickLogin(role) {
+    clearAlerts();
+    const r = await api('/api/quick-login', 'POST', { role });
+    if (r.error) return showAlert('login-alert', r.error);
+    showAlert('login-alert', 'Welcome, ' + r.name + '!', 'success');
+    setTimeout(() => location.href = r.home || '/', 700);
+  }
 
-/* ══════════════════════════════════
-   RESET — COMPLETE
-══════════════════════════════════ */
-async function completeReset() {
-  clearAlerts();
-  const email = document.getElementById('reset-email').value.trim();
-  const otp = getOtp();
-  const pw = document.getElementById('reset-password').value;
-  const cpw = document.getElementById('reset-confirm-password').value;
+  /* ══════════════════════════════════
+     SIGNUP
+  ══════════════════════════════════ */
+  async function doSignup() {
+    clearAlerts();
+    const name = document.getElementById('signup-name').value.trim();
+    const email = document.getElementById('signup-email').value.trim();
+    const pw = document.getElementById('signup-password').value;
+    const role = document.getElementById('signup-role').value;
+    if (!name || !email || !pw) return showAlert('signup-alert', 'Please fill in all fields.');
+    const checks = getPasswordChecks(pw, email);
+    if (checks.some(c => !c.ok)) return showAlert('signup-alert', 'Strengthen your password — all checks must pass.');
+    setLoading('signup-btn', true);
+    const r = await api('/api/signup', 'POST', { name, email, password: pw, role });
+    setLoading('signup-btn', false);
+    if (r.error) return showAlert('signup-alert', r.error);
+    showAlert('signup-alert', 'Account created! Redirecting…', 'success');
+    setTimeout(() => location.href = homeForRole(r.role), 700);
+  }
 
-  if(!otp || otp.length < 6) return showAlert('reset-alert','Enter the 6-digit OTP.');
-  if(!pw || !cpw) return showAlert('reset-alert','Fill in your new password fields.');
-  if(pw !== cpw) return showAlert('reset-alert','Passwords do not match.');
+  /* ══════════════════════════════════
+     REGISTER RESTAURANT (NEW BUSINESS)
+  ══════════════════════════════════ */
+  async function doRegisterRestaurant() {
+    clearAlerts();
+    const restaurantName = document.getElementById('register-restaurant-name').value.trim();
+    const ownerName = document.getElementById('register-owner-name').value.trim();
+    const email = document.getElementById('register-email').value.trim();
+    const pw = document.getElementById('register-password').value;
+    const phone = document.getElementById('register-phone').value.trim();
 
-  const checks = getPasswordChecks(pw, email);
-  if(checks.some(c=>!c.ok)) return showAlert('reset-alert','Password does not meet all requirements.');
+    if (!restaurantName || !ownerName || !email || !pw) {
+      return showAlert('register-alert', 'Please fill in all required fields.');
+    }
 
-  setLoading('complete-reset-btn', true);
-  const r = await api('/api/password-reset/complete', 'POST', { email, otp, password:pw, confirm_password:cpw });
-  setLoading('complete-reset-btn', false);
-  if(r.error) return showAlert('reset-alert', r.error);
+    const checks = getPasswordChecks(pw, email);
+    if (checks.some(c => !c.ok)) {
+      return showAlert('register-alert', 'Strengthen your password — all checks must pass.');
+    }
 
-  resetStepDots(3);
-  showAlert('reset-success', 'Password updated! Redirecting to login…', 'success');
-  setTimeout(()=>{ switchTab('login'); }, 1200);
-}
+    setLoading('register-btn', true);
+    const r = await api('/api/register-restaurant', 'POST', {
+      restaurant_name: restaurantName,
+      name: ownerName,
+      email: email,
+      password: pw,
+      phone: phone
+    });
+    setLoading('register-btn', false);
 
-/* ══════════════════════════════════
-   INIT
-══════════════════════════════════ */
-document.addEventListener('DOMContentLoaded', ()=>{
-  switchTab('login');
-  renderPasswordPolicy('signup');
-  renderPasswordPolicy('reset');
+    if (r.error) return showAlert('register-alert', r.error);
 
-  /* pre-fill tab from hash */
-  const hash = location.hash.replace('#','');
-  if(['login','signup','reset'].includes(hash)) switchTab(hash);
-});
+    showAlert('register-alert', 'Restaurant created! Logging you in…', 'success');
+    setTimeout(() => location.href = '/dashboard', 1500);
+  }
+
+  /* ══════════════════════════════════
+     RESET — SEND OTP
+  ══════════════════════════════════ */
+  async function requestResetOtp(isResend = false) {
+    clearAlerts();
+    const email = document.getElementById('reset-email').value.trim();
+    if (!email) return showAlert('reset-alert', 'Enter your email address first.');
+    setLoading('send-otp-btn', true);
+    const r = await api('/api/password-reset/request', 'POST', { email });
+    setLoading('send-otp-btn', false);
+    if (r.error) return showAlert('reset-alert', r.error);
+
+    showAlert('reset-success', r.message || 'OTP sent to your email.', 'success');
+
+    /* show OTP step */
+    const step2 = document.getElementById('reset-step-2');
+    step2.classList.add('visible');
+    resetStepDots(2);
+    startResendTimer(60);
+    otpBoxes[0] && otpBoxes[0].focus();
+  }
+
+  /* ══════════════════════════════════
+     RESET — COMPLETE
+  ══════════════════════════════════ */
+  async function completeReset() {
+    clearAlerts();
+    const email = document.getElementById('reset-email').value.trim();
+    const otp = getOtp();
+    const pw = document.getElementById('reset-password').value;
+    const cpw = document.getElementById('reset-confirm-password').value;
+
+    if (!otp || otp.length < 6) return showAlert('reset-alert', 'Enter the 6-digit OTP.');
+    if (!pw || !cpw) return showAlert('reset-alert', 'Fill in your new password fields.');
+    if (pw !== cpw) return showAlert('reset-alert', 'Passwords do not match.');
+
+    const checks = getPasswordChecks(pw, email);
+    if (checks.some(c => !c.ok)) return showAlert('reset-alert', 'Password does not meet all requirements.');
+
+    setLoading('complete-reset-btn', true);
+    const r = await api('/api/password-reset/complete', 'POST', { email, otp, password: pw, confirm_password: cpw });
+    setLoading('complete-reset-btn', false);
+    if (r.error) return showAlert('reset-alert', r.error);
+
+    resetStepDots(3);
+    showAlert('reset-success', 'Password updated! Redirecting to login…', 'success');
+    setTimeout(() => { switchTab('login'); }, 1200);
+  }
+
+  /* ══════════════════════════════════
+     INIT
+  ══════════════════════════════════ */
+  document.addEventListener('DOMContentLoaded', () => {
+    switchTab('login');
+    renderPasswordPolicy('signup');
+    renderPasswordPolicy('register');
+    renderPasswordPolicy('reset');
+
+    /* pre-fill tab from hash */
+    const hash = location.hash.replace('#', '');
+    if (['login', 'signup', 'register', 'reset'].includes(hash)) switchTab(hash);
+  });
 </script>
 {% endblock %}

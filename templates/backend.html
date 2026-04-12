@@ -44,7 +44,11 @@
       <button class="tab-btn active py-4 text-sm font-medium" onclick="switchTab('products',this)">Products</button>
       <button class="tab-btn py-4 text-sm font-medium text-gray-500" onclick="switchTab('floors',this)">Floors &amp; Tables</button>
       <button class="tab-btn py-4 text-sm font-medium text-gray-500" onclick="switchTab('payments',this)">Payment Methods</button>
+      <button class="tab-btn py-4 text-sm font-medium text-gray-500" onclick="switchTab('inventory',this)">Inventory</button>
+      <button class="tab-btn py-4 text-sm font-medium text-gray-500" onclick="switchTab('recipes',this)">Recipes</button>
+      <button class="tab-btn py-4 text-sm font-medium text-gray-500" onclick="switchTab('reports',this)">Reports</button>
       <button class="tab-btn py-4 text-sm font-medium text-gray-500" onclick="switchTab('reviews',this)">Reviews</button>
+      <button class="tab-btn py-4 text-sm font-medium text-gray-500" onclick="switchTab('settings',this)">Settings</button>
     </div>
 
     <div class="flex-1 overflow-auto p-6">
@@ -92,6 +96,77 @@
         <div id="pay-methods-list" class="space-y-4 max-w-xl"></div>
       </div>
 
+      <!-- INVENTORY TAB -->
+      <div id="tab-inventory" class="tab-content">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="font-display text-xl font-700">Kitchen Inventory</h2>
+          <button onclick="openInventoryModal()" class="btn-primary px-4 py-2 rounded-xl text-white text-sm font-medium">+ Add Item</button>
+        </div>
+        <div class="card overflow-hidden">
+          <table class="w-full">
+            <thead><tr class="border-b border-border">
+              <th class="text-left px-4 py-3 text-xs text-gray-500 uppercase tracking-wider">Item Name</th>
+              <th class="text-left px-4 py-3 text-xs text-gray-500 uppercase tracking-wider">Unit</th>
+              <th class="text-left px-4 py-3 text-xs text-gray-500 uppercase tracking-wider">Current Stock</th>
+              <th class="text-left px-4 py-3 text-xs text-gray-500 uppercase tracking-wider">Status</th>
+              <th class="text-center px-4 py-3 text-xs text-gray-500 uppercase tracking-wider">Actions</th>
+            </tr></thead>
+            <tbody id="inventory-table"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- RECIPES TAB -->
+      <div id="tab-recipes" class="tab-content">
+        <div class="mb-6">
+          <h2 class="font-display text-xl font-700">Recipe Management</h2>
+          <p class="text-gray-500 text-sm">Link products to ingredients for automatic stock deduction</p>
+        </div>
+        <div class="grid gap-6 md:grid-cols-2">
+           <div class="card p-5">
+              <label class="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Select Product</label>
+              <select id="recipe-product-select" onchange="loadRecipeForProduct(this.value)" class="w-full p-2.5 rounded-xl border border-border bg-black/20 text-white mb-4"></select>
+              <div id="recipe-items-container" class="space-y-3"></div>
+              <button onclick="addRecipeRow()" class="mt-4 text-xs text-brand-500 font-bold hover:underline">+ Add Ingredient to Recipe</button>
+           </div>
+           <div class="flex flex-col justify-end">
+              <button onclick="saveRecipe()" class="btn-primary py-3 rounded-xl text-sm font-bold">Save Recipe Mapping</button>
+           </div>
+        </div>
+      </div>
+
+      <!-- REPORTS TAB -->
+      <div id="tab-reports" class="tab-content">
+        <div class="mb-6">
+          <h2 class="font-display text-xl font-700">Business Performance</h2>
+          <p class="text-gray-500 text-sm">Analyze sales, stock costs, and item profitability</p>
+        </div>
+        <div class="grid gap-4 md:grid-cols-3 mb-6">
+            <div class="card p-5 bg-brand-500/5 border-brand-500/20">
+                <div class="text-xs text-gray-500 uppercase mb-1">Total Sales</div>
+                <div id="rep-total-sales" class="text-2xl font-800 text-white">₹0</div>
+            </div>
+            <div class="card p-5">
+                <div class="text-xs text-gray-500 uppercase mb-1">Est. Profit</div>
+                <div id="rep-est-profit" class="text-2xl font-800 text-emerald-400">₹0</div>
+            </div>
+            <div class="card p-5">
+                <div class="text-xs text-gray-500 uppercase mb-1">Stock Wastage</div>
+                <div id="rep-wastage" class="text-2xl font-800 text-red-400">₹0</div>
+            </div>
+        </div>
+        
+        <div class="card p-5 mb-6">
+            <h3 class="text-xs text-gray-500 uppercase mb-4">Item-wise Profitability</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead><tr class="text-left border-b border-border/50"><th class="pb-2">Product</th><th class="pb-2">Revenue</th><th class="pb-2">COGS (Stock Cost)</th><th class="pb-2">Margin</th></tr></thead>
+                    <tbody id="rep-item-table"></tbody>
+                </table>
+            </div>
+        </div>
+      </div>
+
       <!-- REVIEWS TAB -->
       <div id="tab-reviews" class="tab-content">
         <div class="flex items-start justify-between gap-4 mb-6">
@@ -105,6 +180,55 @@
         <div id="reviews-list" class="space-y-4 max-w-4xl"></div>
         <div id="reviews-empty" class="hidden card p-8 text-center text-gray-500" style="border-radius:16px">
           No customer reviews yet.
+        </div>
+      </div>
+
+      <!-- SETTINGS TAB -->
+      <div id="tab-settings" class="tab-content">
+        <div class="mb-6">
+          <h2 class="font-display text-xl font-700 mb-1">Cafe Settings</h2>
+          <p class="text-gray-500 text-sm">Configure your store branding and billing details</p>
+        </div>
+        <div class="card p-6 max-w-2xl" style="border-radius:20px">
+          <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+               <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Shop Name</label><input id="s-name" placeholder="POS Cafe"></div>
+               <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Phone</label><input id="s-phone" placeholder="823 823 7115"></div>
+            </div>
+            <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Address</label><textarea id="s-address" rows="2" placeholder="Store address"></textarea></div>
+            <div class="grid grid-cols-2 gap-4">
+               <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">GST NO</label><input id="s-gst" placeholder="24AUYPT3234D1ZD"></div>
+               <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">FSSAI NO</label><input id="s-fssai" placeholder="10721026001025"></div>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Default Tax Rate (%)</label>
+              <input id="s-tax-rate" type="number" step="0.1" placeholder="5.0">
+              <p class="text-[10px] text-gray-500 mt-1">This is the global tax (Service tax) added to the whole bill total.</p>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Bill Footer Note</label>
+              <input id="s-footer" placeholder="Thanks. Visit Again!!!">
+            </div>
+            
+            <div class="border-t border-border pt-4 mt-4">
+               <h3 class="text-sm font-bold text-white mb-3">Loyalty Program</h3>
+               <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Points per ₹100 spent</label>
+                    <input id="s-loyalty-ratio" type="number" step="0.1" placeholder="10.0">
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">1 Point Value (₹)</label>
+                    <input id="s-point-value" type="number" step="0.1" placeholder="0.5">
+                  </div>
+               </div>
+               <p class="text-[10px] text-gray-500 mt-2">Example: 10 points per 100 means 1 point per 10 spent. Redemption value is the discount weight of 1 point.</p>
+            </div>
+            
+            <div class="pt-4">
+              <button onclick="saveSettings()" class="btn-primary w-full py-3 rounded-xl text-white font-medium">Save Settings</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -141,6 +265,49 @@
           <span class="toggle-slider"></span>
         </label>
         <span class="text-sm text-gray-400">Active</span>
+      </div>
+      <div>
+        <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Multi-Tax Configuration</label>
+        <input id="p-tax-config" placeholder="CGST:2.5, SGST:2.5" class="text-sm">
+        <p class="text-[10px] text-gray-500 mt-1">Format: Name:Rate, Name:Rate (e.g. CGST:2.5, SGST:2.5)</p>
+      </div>
+
+      <!-- Inventory Item Modal -->
+      <div id="inventory-modal" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-50" onclick="if(event.target===this)closeInventoryModal()">
+          <div class="card p-8 w-full max-w-sm" style="border-radius:20px">
+              <h3 id="inv-modal-title" class="font-display text-xl font-700 mb-6">Add Inventory Item</h3>
+              <input type="hidden" id="inv-edit-id" value="">
+              <div class="space-y-4">
+                  <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1 block">Name</label><input id="inv-name" placeholder="Milk (Litre)"></div>
+                  <div class="grid grid-cols-2 gap-3">
+                      <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1 block">Unit</label><input id="inv-unit" placeholder="Litre"></div>
+                      <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1 block">Min Alert</label><input id="inv-threshold" type="number" placeholder="2.0"></div>
+                  </div>
+                  <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1 block">Initial Stock</label><input id="inv-stock" type="number" placeholder="10.0"></div>
+                  <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1 block">Cost per unit (₹)</label><input id="inv-cost" type="number" placeholder="60.0"></div>
+              </div>
+              <div class="flex gap-3 mt-6">
+                  <button onclick="closeInventoryModal()" class="btn-ghost flex-1 py-2 rounded-xl text-sm">Cancel</button>
+                  <button onclick="saveInventoryItem()" class="btn-primary flex-1 py-2 rounded-xl text-white text-sm">Save Item</button>
+              </div>
+          </div>
+      </div>
+
+      <!-- Stock Adjust Modal -->
+      <div id="stock-adjust-modal" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-50">
+          <div class="card p-8 w-full max-w-sm" style="border-radius:20px">
+              <h3 class="font-display text-xl font-700 mb-6">Adjust Stock</h3>
+              <input type="hidden" id="adj-item-id">
+              <div class="space-y-4">
+                  <div id="adj-item-name" class="font-bold text-brand-500"></div>
+                  <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1 block">Adjustment (+ or -)</label><input id="adj-qty" type="number" placeholder="e.g. 5 or -2"></div>
+                  <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1 block">Reason/Note</label><input id="adj-note" placeholder="Purchase, Spillage, etc."></div>
+              </div>
+              <div class="flex gap-3 mt-6">
+                  <button onclick="document.getElementById('stock-adjust-modal').classList.add('hidden')" class="btn-ghost flex-1 py-2 rounded-xl text-sm">Cancel</button>
+                  <button onclick="submitStockAdj()" class="btn-primary flex-1 py-2 rounded-xl text-white text-sm">Update Stock</button>
+              </div>
+          </div>
       </div>
     </div>
     <div class="flex gap-3 mt-6">
@@ -197,12 +364,55 @@
 let allProducts=[], allCats=[], allFloors=[], allPayments=[], allReviews=[];
 
 async function init() {
-  const [pd, fl, pm, rv] = await Promise.all([api('/api/products/all'), api('/api/floors'), api('/api/payment-methods'), api('/api/reviews')]);
+  const [pd, fl, pm, rv, st, inv, rec] = await Promise.all([
+    api('/api/products/all'), 
+    api('/api/floors'), 
+    api('/api/payment-methods'), 
+    api('/api/reviews'),
+    api('/api/cafe-settings'),
+    api('/api/inventory'),
+    api('/api/recipes')
+  ]);
   if (pd.error || fl.error || pm.error) return;
   allProducts=pd.products; allCats=pd.categories; allFloors=fl; allPayments=pm;
+  allInventory=inv||[]; allRecipes=rec||[];
   if (!rv.error) allReviews = rv;
   renderProductsTable(); renderFloors(); renderPayments();
-  renderReviews();
+  renderReviews(); renderInventory();
+  if (!st.error) fillSettings(st);
+  
+  // Fill recipe product select
+  const sel = document.getElementById('recipe-product-select');
+  sel.innerHTML = '<option value="">-- Choose Product --</option>' + allProducts.map(p => `<option value="${p.id}">${escHtml(p.name)}</option>`).join('');
+}
+
+function fillSettings(st) {
+  document.getElementById('s-name').value = st.name || '';
+  document.getElementById('s-phone').value = st.phone || '';
+  document.getElementById('s-address').value = st.address || '';
+  document.getElementById('s-gst').value = st.gst_no || '';
+  document.getElementById('s-fssai').value = st.fssai_no || '';
+  document.getElementById('s-tax-rate').value = st.tax_rate || 5.0;
+  document.getElementById('s-footer').value = st.footer_note || '';
+  document.getElementById('s-loyalty-ratio').value = st.loyalty_points_per_100 || 10.0;
+  document.getElementById('s-point-value').value = st.points_redemption_value || 0.5;
+}
+
+async function saveSettings() {
+  const d = {
+    name: document.getElementById('s-name').value.trim(),
+    phone: document.getElementById('s-phone').value.trim(),
+    address: document.getElementById('s-address').value.trim(),
+    gst_no: document.getElementById('s-gst').value.trim(),
+    fssai_no: document.getElementById('s-fssai').value.trim(),
+    tax_rate: document.getElementById('s-tax-rate').value,
+    footer_note: document.getElementById('s-footer').value.trim(),
+    loyalty_points_per_100: document.getElementById('s-loyalty-ratio').value,
+    points_redemption_value: document.getElementById('s-point-value').value
+  };
+  const r = await api('/api/cafe-settings', 'POST', d);
+  if (r.ok) toast('Settings saved successfully!');
+  else toast(r.error || 'Failed to save settings', 'error');
 }
 
 function switchTab(name, btn) {
@@ -267,6 +477,7 @@ function openProductModal() {
   document.getElementById('p-category').value = '';
   document.getElementById('p-unit').value = '';
   document.getElementById('p-desc').value = '';
+  document.getElementById('p-tax-config').value = '';
   document.getElementById('p-active').checked = true;
   clearProductImage();
   document.getElementById('product-modal-title').textContent = 'Add Product';
@@ -309,6 +520,13 @@ function editProduct(id) {
   document.getElementById('p-unit').value = p.unit || 'pcs';
   document.getElementById('p-desc').value = p.description || '';
   document.getElementById('p-active').checked = p.active;
+  // Load tax config
+  let taxStr = '';
+  try {
+    const config = JSON.parse(p.tax_config_json || '{}');
+    taxStr = Object.entries(config).map(([k,v]) => `${k}:${v}`).join(', ');
+  } catch(e) {}
+  document.getElementById('p-tax-config').value = taxStr;
   // Load existing image
   clearProductImage();
   if (p.image_b64) {
@@ -337,8 +555,18 @@ async function saveProduct() {
     unit: document.getElementById('p-unit').value.trim() || 'pcs',
     description: document.getElementById('p-desc').value.trim(),
     active: document.getElementById('p-active').checked,
-    image_b64: currentImageB64 || ''
+    image_b64: currentImageB64 || '',
+    tax_config: {}
   };
+  
+  // Parse tax config string
+  const taxStr = document.getElementById('p-tax-config').value.trim();
+  if (taxStr) {
+    taxStr.split(',').forEach(part => {
+      const [k, v] = part.split(':').map(s => s.trim());
+      if (k && v) d.tax_config[k] = parseFloat(v);
+    });
+  }
   if (!d.name || !d.price) return toast('Name and price are required', 'error');
 
   let r;
@@ -539,6 +767,192 @@ function renderReviews() {
       <div class="mt-3 text-xs text-gray-500">Bill total: ₹${Number(r.total || 0).toFixed(0)}</div>
     </div>
   `).join('');
+}
+
+/* ─── Inventory & Recipes ───────────────────────── */
+let allInventory = [], allRecipes = [];
+
+function renderInventory() {
+    const tbody = document.getElementById('inventory-table');
+    tbody.innerHTML = allInventory.map(i => {
+        const isLow = i.current_stock <= i.min_threshold;
+        return `
+        <tr class="product-row border-b border-border/50">
+            <td class="px-4 py-3 text-sm font-medium">${escHtml(i.name)}</td>
+            <td class="px-4 py-3 text-sm text-gray-400">${escHtml(i.unit)}</td>
+            <td class="px-4 py-3 text-sm ${isLow ? 'text-red-400 font-bold' : 'text-emerald-400'}">${i.current_stock.toFixed(2)}</td>
+            <td class="px-4 py-3">
+                <span class="tag ${isLow ? 'bg-red-900/40 text-red-400' : 'bg-green-900/40 text-green-400'}">
+                    ${isLow ? 'Low Stock' : 'In Stock'}
+                </span>
+            </td>
+            <td class="px-4 py-3 text-center">
+                <div class="flex gap-2 justify-center">
+                    <button onclick="openStockAdjustModal(${i.id})" class="text-xs px-2 py-1 rounded bg-orange-600/10 text-orange-400">Audit</button>
+                    <button onclick="deleteInventoryItem(${i.id})" class="text-xs px-2 py-1 rounded bg-red-600/10 text-red-400">Delete</button>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function openInventoryModal() {
+    document.getElementById('inv-edit-id').value = '';
+    document.getElementById('inv-name').value = '';
+    document.getElementById('inv-unit').value = '';
+    document.getElementById('inv-threshold').value = '';
+    document.getElementById('inv-stock').value = '';
+    document.getElementById('inv-cost').value = '';
+    document.getElementById('inventory-modal').classList.remove('hidden');
+}
+
+function closeInventoryModal() { document.getElementById('inventory-modal').classList.add('hidden'); }
+
+async function saveInventoryItem() {
+    const d = {
+        name: document.getElementById('inv-name').value.trim(),
+        unit: document.getElementById('inv-unit').value.trim(),
+        min_threshold: document.getElementById('inv-threshold').value,
+        current_stock: document.getElementById('inv-stock').value || 0,
+        unit_cost: document.getElementById('inv-cost').value || 0
+    };
+    if(!d.name) return toast('Name required', 'error');
+    const r = await api('/api/inventory', 'POST', d);
+    if(r.ok) {
+        toast('Item added!');
+        closeInventoryModal();
+        allInventory = await api('/api/inventory');
+        renderInventory();
+    }
+}
+
+function openStockAdjustModal(id) {
+    const i = allInventory.find(x => x.id === id);
+    if(!i) return;
+    document.getElementById('adj-item-id').value = id;
+    document.getElementById('adj-item-name').textContent = i.name;
+    document.getElementById('adj-qty').value = '';
+    document.getElementById('adj-note').value = '';
+    document.getElementById('stock-adjust-modal').classList.remove('hidden');
+}
+
+async function submitStockAdj() {
+    const id = document.getElementById('adj-item-id').value;
+    const d = {
+        stock_adjustment: document.getElementById('adj-qty').value,
+        note: document.getElementById('adj-note').value.trim()
+    };
+    if(!d.stock_adjustment) return toast('Value required', 'error');
+    const r = await api('/api/inventory/' + id, 'PUT', d);
+    if(r.ok) {
+        toast('Stock adjusted!');
+        document.getElementById('stock-adjust-modal').classList.add('hidden');
+        allInventory = await api('/api/inventory');
+        renderInventory();
+    }
+}
+
+// Recipes
+let currentRecipeItems = [];
+function loadRecipeForProduct(pid) {
+    if(!pid) {
+        document.getElementById('recipe-items-container').innerHTML = '';
+        return;
+    }
+    currentRecipeItems = allRecipes.filter(r => r.product_id == pid);
+    renderRecipeItems();
+}
+
+function renderRecipeItems() {
+    const cont = document.getElementById('recipe-items-container');
+    cont.innerHTML = currentRecipeItems.map((ri, idx) => `
+        <div class="flex gap-2 items-center">
+            <select onchange="updateRecipeItem(${idx}, 'inventory_item_id', this.value)" class="flex-1 p-2 rounded bg-white/5 border border-border text-sm">
+                <option value="">-- Ingredient --</option>
+                ${allInventory.map(i => `<option value="${i.id}" ${i.id == ri.inventory_item_id ? 'selected' : ''}>${escHtml(i.name)} (${i.unit})</option>`).join('')}
+            </select>
+            <input type="number" placeholder="Qty" value="${ri.quantity}" onchange="updateRecipeItem(${idx}, 'quantity', this.value)" class="w-20 p-2 rounded bg-white/5 border border-border text-sm">
+            <button onclick="removeRecipeItem(${idx})" class="text-red-500">✕</button>
+        </div>
+    `).join('');
+}
+
+function addRecipeRow() {
+    currentRecipeItems.push({ inventory_item_id: '', quantity: 1 });
+    renderRecipeItems();
+}
+
+function updateRecipeItem(idx, key, val) {
+    currentRecipeItems[idx][key] = val;
+}
+
+function removeRecipeItem(idx) {
+    currentRecipeItems.splice(idx, 1);
+    renderRecipeItems();
+}
+
+async function saveRecipe() {
+    const pid = document.getElementById('recipe-product-select').value;
+    if(!pid) return toast('Select a product first', 'error');
+    const items = currentRecipeItems.filter(i => i.inventory_item_id && i.quantity > 0);
+    const r = await api('/api/recipes', 'POST', { product_id: pid, items });
+    if(r.ok) {
+        toast('Recipe saved!');
+        allRecipes = await api('/api/recipes');
+    }
+}
+
+/* ─── Reports ───────────────────────────────────── */
+async function loadReports() {
+    // Basic aggregation logic
+    const [orders, inv] = await Promise.all([
+        api('/api/orders/all'), // Assuming this exists or building it
+        api('/api/inventory')
+    ]);
+    
+    let totalSales = 0;
+    orders.forEach(o => { if(o.status === 'paid') totalSales += o.total; });
+    document.getElementById('rep-total-sales').textContent = '₹' + totalSales.toLocaleString();
+    
+    // Profit per item (Very basic simulation)
+    const tbody = document.getElementById('rep-item-table');
+    tbody.innerHTML = allProducts.map(p => {
+        const rev = orders.filter(o => o.status === 'paid').reduce((sum, o) => {
+            const item = (o.items||[]).find(i => i.product_id === p.id);
+            return sum + (item ? item.price * item.qty : 0);
+        }, 0);
+        
+        // Calculate COGS from recipe
+        const pRecipes = allRecipes.filter(r => r.product_id === p.id);
+        let cogsPerUnit = 0;
+        pRecipes.forEach(r => {
+            const ing = allInventory.find(i => i.id === r.inventory_item_id);
+            if(ing) cogsPerUnit += (ing.unit_cost * r.quantity);
+        });
+        
+        const count = orders.filter(o => o.status === 'paid').reduce((sum, o) => {
+             const item = (o.items||[]).find(i => i.product_id === p.id);
+             return sum + (item ? item.qty : 0);
+        }, 0);
+        
+        const totalCogs = cogsPerUnit * count;
+        const margin = rev > 0 ? (((rev - totalCogs) / rev) * 100).toFixed(0) + '%' : '0%';
+        
+        return `
+        <tr class="border-b border-border/30">
+            <td class="py-2">${escHtml(p.name)}</td>
+            <td class="py-2 text-gray-300">₹${rev.toFixed(0)}</td>
+            <td class="py-2 text-gray-500">₹${totalCogs.toFixed(0)}</td>
+            <td class="py-2 ${rev - totalCogs > 0 ? 'text-emerald-400' : 'text-red-400'} font-bold">${margin}</td>
+        </tr>`;
+    }).join('');
+}
+
+// In switchTab, if tab is reports, load data
+const originalSwitchTab = switchTab;
+window.switchTab = (tabId, btn) => {
+    originalSwitchTab(tabId, btn);
+    if(tabId === 'reports') loadReports();
 }
 
 async function logout() {

@@ -154,11 +154,13 @@
       max-height: 100vh;
       transition: transform 0.3s ease;
       transform: translateX(-100%);
-      box-shadow: 2px 0 12px rgba(0,0,0,0.4);
+      box-shadow: 2px 0 12px rgba(0, 0, 0, 0.4);
     }
+
     .sidebar.open {
       transform: translateX(0);
     }
+
     #main-content {
       width: 100%;
     }
@@ -178,7 +180,9 @@
   }
 
   @media (max-width: 1024px) {
-    .mobile-menu-btn { display: flex; }
+    .mobile-menu-btn {
+      display: flex;
+    }
   }
 
   /* Responsive grid for tables */
@@ -227,7 +231,8 @@
     #view-order {
       flex-direction: column !important;
     }
-    #view-order > div:last-child {
+
+    #view-order>div:last-child {
       width: 100% !important;
       min-width: auto !important;
       border-right: none !important;
@@ -246,6 +251,7 @@
     #cat-pills {
       gap: 6px;
     }
+
     .cat-pill {
       padding: 6px 12px !important;
       font-size: 11px !important;
@@ -257,6 +263,7 @@
     #view-payment {
       padding: 12px !important;
     }
+
     .card {
       max-height: calc(100vh - 100px) !important;
     }
@@ -278,6 +285,7 @@
       padding: 12px 8px !important;
       min-height: 48px;
     }
+
     .table-card {
       padding: 16px 8px !important;
       min-height: 48px;
@@ -344,14 +352,15 @@
   <div class="sidebar bg-card border-r border-border flex flex-col" id="sidebar" style="background:#111">
     <div class="p-5 border-b border-border">
       <div class="flex items-center gap-3">
-        <div class="w-9 h-9 brand-gradient rounded-xl flex items-center justify-center flex-shrink-0">
+        <div class="w-9 h-9 brand-gradient rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden"
+          id="pos-logo">
           <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
               d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
           </svg>
         </div>
         <div>
-          <div class="font-display font-700 text-sm text-white">POS Cafe</div>
+          <div class="font-display font-700 text-sm text-white" id="pos-cafe-name">POS Cafe</div>
           <div class="text-xs text-gray-500">{{ user_name }}</div>
         </div>
       </div>
@@ -380,10 +389,20 @@
       <a onclick="showView('reservations')"
         class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer text-sm" id="nav-reservations">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
         Reservations
-        <span id="pos-pending-badge" class="hidden ml-auto text-xs font-800 bg-orange-500 text-white rounded-full px-1.5 py-0.5" style="min-width:18px;text-align:center;"></span>
+        <span id="pos-pending-badge"
+          class="hidden ml-auto text-xs font-800 bg-orange-500 text-white rounded-full px-1.5 py-0.5"
+          style="min-width:18px;text-align:center;"></span>
+      </a>
+      <a onclick="showView('history')"
+        class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer text-sm" id="nav-history">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg> Order History
       </a>
       <hr class="border-border my-2">
       {% if user_role == 'restaurant' %}
@@ -440,7 +459,14 @@
     <div id="view-floor" class="flex-1 overflow-auto p-6">
       <div class="flex items-center justify-between mb-6">
         <h2 class="font-display text-xl font-700">Floor Plan</h2>
-        <div id="floor-tabs" class="flex gap-2"></div>
+        <div class="flex gap-2">
+          <button onclick="startTakeaway()"
+            class="btn-ghost px-4 py-2 rounded-xl text-sm border border-border">Takeaway</button>
+          <button onclick="startOnlineOrder()"
+            class="btn-ghost px-4 py-2 rounded-xl text-sm border border-emerald-500/30 text-emerald-400">Add Online
+            Order (Zomato/Swiggy)</button>
+          <div id="floor-tabs" class="flex gap-2"></div>
+        </div>
       </div>
       <div id="tables-grid" class="grid grid-cols-3 gap-4"
         style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))"></div>
@@ -475,11 +501,26 @@
           <div id="order-type-toggle">
             <button id="btn-take" class="order-type-btn w-full" onclick="setOrderType()">🛵 Takeaway</button>
           </div>
-          <!-- Customer name (shown only for takeaway) -->
-          <div id="takeaway-name-wrap" class="hidden">
-            <input type="text" id="takeaway-customer-name" placeholder="Customer name (optional)"
+
+          <!-- Customer CRM -->
+          <div id="customer-crm-wrap" class="space-y-2 mt-2">
+            <div class="relative">
+              <input type="text" id="customer-phone" placeholder="Customer Phone" maxlength="15"
+                class="text-xs w-full px-3 py-2 bg-gray-900 border border-border rounded-lg text-white pr-8"
+                oninput="checkCustomerPhone(this.value)" />
+              <div id="crm-status-icon" class="absolute right-2 top-1.5 text-gray-500 hidden">
+                <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                  </path>
+                </svg>
+              </div>
+            </div>
+            <input type="text" id="customer-name" placeholder="Customer Name (optional)"
               class="text-xs w-full px-3 py-2 bg-gray-900 border border-border rounded-lg text-white" />
           </div>
+
         </div>
         <div id="cart-items" class="flex-1 overflow-auto p-4 space-y-2"></div>
         <div class="p-4 border-t border-border space-y-3">
@@ -530,20 +571,51 @@
           <h2 class="font-display text-xl font-700">📅 Reservations</h2>
           <p class="text-sm text-gray-500">Manage booking requests &amp; seat parties</p>
         </div>
-        <button onclick="loadPosReservations()" class="btn-ghost px-3 py-1.5 rounded-lg text-xs flex items-center gap-2">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        <button onclick="loadPosReservations()"
+          class="btn-ghost px-3 py-1.5 rounded-lg text-xs flex items-center gap-2">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
           Refresh
         </button>
       </div>
       <!-- Filter pills -->
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
-        <button class="pos-res-filter active" data-f="all" onclick="filterPosRes('all',this)" style="padding:6px 16px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #333;background:#f97316;color:#fff;transition:all .2s;">All</button>
-        <button class="pos-res-filter" data-f="pending" onclick="filterPosRes('pending',this)" style="padding:6px 16px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #333;background:transparent;color:#888;transition:all .2s;">🟡 Pending</button>
-        <button class="pos-res-filter" data-f="confirmed" onclick="filterPosRes('confirmed',this)" style="padding:6px 16px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #333;background:transparent;color:#888;transition:all .2s;">🟢 Confirmed</button>
-        <button class="pos-res-filter" data-f="seated" onclick="filterPosRes('seated',this)" style="padding:6px 16px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #333;background:transparent;color:#888;transition:all .2s;">🟣 Seated</button>
+        <button class="pos-res-filter active" data-f="all" onclick="filterPosRes('all',this)"
+          style="padding:6px 16px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #333;background:#f97316;color:#fff;transition:all .2s;">All</button>
+        <button class="pos-res-filter" data-f="pending" onclick="filterPosRes('pending',this)"
+          style="padding:6px 16px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #333;background:transparent;color:#888;transition:all .2s;">🟡
+          Pending</button>
+        <button class="pos-res-filter" data-f="confirmed" onclick="filterPosRes('confirmed',this)"
+          style="padding:6px 16px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #333;background:transparent;color:#888;transition:all .2s;">🟢
+          Confirmed</button>
+        <button class="pos-res-filter" data-f="seated" onclick="filterPosRes('seated',this)"
+          style="padding:6px 16px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #333;background:transparent;color:#888;transition:all .2s;">🟣
+          Seated</button>
       </div>
-      <div id="pos-res-grid" class="grid gap-4" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr));align-content:start;"></div>
+      <div id="pos-res-grid" class="grid gap-4"
+        style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr));align-content:start;"></div>
       <div id="pos-res-empty" class="hidden text-center py-20 text-gray-500">No reservations found.</div>
+    </div>
+
+    <!-- ═══ ORDER HISTORY VIEW ═══ -->
+    <div id="view-history" class="hidden flex-1 overflow-auto p-6">
+      <div class="flex items-center justify-between mb-5">
+        <div>
+          <h2 class="font-display text-xl font-700">Order History</h2>
+          <p class="text-sm text-gray-500">Recent completed orders</p>
+        </div>
+        <button onclick="loadOrderHistory()" class="btn-ghost px-3 py-1.5 rounded-lg text-xs flex items-center gap-2">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Refresh
+        </button>
+      </div>
+      <div id="history-grid" class="space-y-3"></div>
+      <div id="history-empty" class="hidden text-center py-20 text-gray-500">No completed orders yet.</div>
     </div>
 
     <!-- ═══ PAYMENT VIEW ═══ -->
@@ -557,13 +629,13 @@
         </button>
         <div class="card p-5 sm:p-6" style="border-radius:20px; max-height:calc(100vh - 7rem); overflow-y:auto;">
           <h2 class="font-display text-xl sm:text-2xl font-700 mb-2">Payment</h2>
-          <div class="text-xs text-gray-500 uppercase tracking-wider mb-2">Bill <span id="pay-order-num"
+          <div class="text-xs text-gray-500 uppercase tracking-wider mb-4">Bill <span id="pay-order-num"
               class="text-white normal-case ml-2"></span></div>
-          <div class="text-3xl sm:text-4xl font-display font-800 text-brand-500 mb-6 sm:mb-8">
-            <span id="pay-subtotal">₹0</span>
-            <span class="text-base sm:text-lg text-gray-500 ml-2">+ <span id="pay-tip-show">₹0</span> tip</span>
+
+          <div class="mb-6 p-4 rounded-2xl bg-brand-500/10 border border-brand-500/20 text-center">
+            <div class="text-xs text-brand-500 uppercase tracking-wider font-700 mb-1">Total to collect</div>
+            <div id="pay-total" class="text-4xl sm:text-5xl font-display font-800 text-white">₹0</div>
           </div>
-          <div id="pay-total" style="display:none">₹0</div>
           <div id="bill-summary" class="mb-5 p-3 sm:p-4 rounded-xl border border-border bg-black/20 text-sm"></div>
           <p class="text-xs text-gray-500 uppercase tracking-wider mb-3">Add a Tip</p>
           <div class="grid grid-cols-4 gap-2 mb-5">
@@ -585,6 +657,18 @@
             oninput="setCustomTip()">
           <p class="text-xs text-gray-500 uppercase tracking-wider mb-3">Select Method</p>
           <div id="pay-methods" class="grid grid-cols-1 sm:grid-cols-3 gap-2"></div>
+          <div id="cash-payment-panel" class="hidden mt-4 rounded-xl border border-border bg-black/20 p-4">
+            <div class="text-xs text-gray-500 uppercase tracking-wider mb-3">Cash Details</div>
+            <label for="cash-received" class="block text-sm text-gray-400 mb-2">Cash received from customer</label>
+            <input type="number" id="cash-received" min="0" step="0.01" placeholder="Enter received amount"
+              class="text-sm w-full mb-3 px-3 py-2 bg-gray-800 rounded-lg border border-border text-white"
+              oninput="handleCashReceivedInput()">
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-400">Change to return</span>
+              <span id="cash-change" class="font-medium text-white">₹0</span>
+            </div>
+            <p id="cash-payment-help" class="mt-2 text-xs text-gray-500">Enter how much cash the customer gave.</p>
+          </div>
           <button onclick="validatePayment()" class="btn-primary w-full py-3 rounded-xl text-white font-medium mt-5">
             Validate Payment →
           </button>
@@ -623,7 +707,9 @@
         </div>
         <h2 class="font-display text-3xl font-800 text-white mb-2">Payment Done!</h2>
         <p class="text-gray-500 mb-2" id="confirm-amount"></p>
-        <p class="text-xs text-gray-600">Tap anywhere to continue</p>
+        <button id="btn-print-bill" class="btn-primary mt-4 py-3 px-6 rounded-xl font-medium"
+          style="background:#f97316;color:white;width:100%" onclick="printLastBill(event)">🖨 Print Bill</button>
+        <p class="text-xs text-gray-600 mt-4">Tap anywhere to continue</p>
         <div id="confirm-review-card" class="card mt-8 p-5 text-left hidden"
           style="border-radius:18px;max-width:420px;margin-left:auto;margin-right:auto"
           onclick="event.stopPropagation()"></div>
@@ -638,6 +724,36 @@
   let floors = [], products = [], bills = [], currentTable = null, currentOrder = null, currentBill = null, selectedMethod = null, cart = [], sessionId = null, currentTip = 0, activeFloorId = null;
   let lastPaidOrder = null, confirmReviewRating = 0, confirmReviewSubmitted = false;
   let isTakeaway = false;
+  let lookupTimeout = null;
+
+
+  async function checkCustomerPhone(phone) {
+    if (phone.length < 10) return;
+    clearTimeout(lookupTimeout);
+    const icon = document.getElementById('crm-status-icon');
+    icon.classList.remove('hidden');
+    lookupTimeout = setTimeout(async () => {
+      try {
+        const r = await api('/api/customer/lookup?phone=' + encodeURIComponent(phone));
+        if (r && r.found && r.name) {
+          const nameEl = document.getElementById('customer-name');
+          nameEl.value = r.name;
+          // toast('Found: ' + r.name, 'success');
+        }
+      } catch (e) { }
+      icon.classList.add('hidden');
+    }, 500);
+  }
+
+  function printLastBill(e) {
+    e.stopPropagation();
+    if (lastPaidOrder && lastPaidOrder.id) {
+      const printWindow = window.open('/receipt/' + lastPaidOrder.id, '_blank', 'width=400,height=600');
+      if (printWindow) {
+        printWindow.onload = () => { setTimeout(() => printWindow.print(), 500); };
+      }
+    }
+  }
 
   function setOrderType() {
     isTakeaway = !isTakeaway;
@@ -649,7 +765,7 @@
     } else {
       btn.className = 'order-type-btn w-full';
     }
-    document.getElementById('takeaway-name-wrap').classList.toggle('hidden', !isTakeaway);
+    // global crm enabled
   }
 
   function toggleMobileMenu() {
@@ -731,21 +847,42 @@
     // Always start fresh when opening a table so a previous sent order
     // cannot leak into the next ticket for the same table.
     currentOrder = null;
-    currentBill = null;
     cart = [];
     document.getElementById('cart-order-num').textContent = '';
-    // Check existing order
-    const r = await api('/api/orders/table/' + id);
-    if (r.order && r.order.status === 'draft') {
-      currentOrder = r.order;
-      cart = r.order.items.map(i => ({ product_id: i.product_id, name: i.name, price: i.price, qty: i.qty }));
-      document.getElementById('cart-order-num').textContent = '#' + r.order.order_number;
-    } else {
-      currentOrder = null; cart = [];
-      document.getElementById('cart-order-num').textContent = '';
-    }
     const billResp = await api('/api/bills/table/' + id);
     currentBill = billResp.bill || null;
+    renderCart();
+    showView('order');
+  }
+
+  function startTakeaway() {
+    isTakeaway = true;
+    currentTable = null;
+    currentOrder = null;
+    cart = [];
+    document.getElementById('order-table-label').textContent = '🛵 Takeaway Order';
+    document.getElementById('cart-order-num').textContent = '';
+    const btn = document.getElementById('btn-take');
+    if (btn) {
+      btn.className = 'order-type-btn w-full active-take';
+      btn.textContent = '🛵 Takeaway';
+    }
+    renderCart();
+    showView('order');
+  }
+
+  function startOnlineOrder() {
+    isTakeaway = true;
+    currentTable = null;
+    currentOrder = null;
+    cart = [];
+    document.getElementById('order-table-label').textContent = '📱 Online Order (Zomato/Swiggy)';
+    document.getElementById('cart-order-num').textContent = '';
+    const btn = document.getElementById('btn-take');
+    if (btn) {
+      btn.className = 'order-type-btn w-full active-take';
+      btn.textContent = '📱 Online Order';
+    }
     renderCart();
     showView('order');
   }
@@ -868,7 +1005,8 @@
 
   async function createOrUpdateOrder() {
     if (!cart.length) { toast('Add items first', 'error'); return null; }
-    const customerName = (document.getElementById('takeaway-customer-name')?.value || '').trim();
+    const customerName = (document.getElementById('customer-name')?.value || '').trim();
+    const customerPhone = (document.getElementById('customer-phone')?.value || '').trim();
     const items = cart.map(i => ({ product_id: i.product_id, name: i.name, price: i.price, qty: i.qty, notes: i.notes || '' }));
     if (currentOrder && currentOrder.status === 'draft') {
       currentOrder.items = items.map(i => ({ ...i }));
@@ -879,6 +1017,7 @@
       table_id: isTakeaway ? null : currentTable?.id,
       takeaway: isTakeaway,
       customer_name: customerName,
+      customer_phone: customerPhone,
       items
     };
     const r = await api('/api/orders', 'POST', payload);
@@ -947,17 +1086,39 @@
   }
 
   function buildBillSummary(order) {
-    const subtotal = getPayableSubtotal(order);
+    const isSent = order.sent_to_kitchen_at || order.status === 'sent' || order.status === 'paid';
+    const subtotal = order.subtotal || 0;
     const items = (order.items || []).map(i => `
     <div class="flex justify-between gap-4 py-1">
       <span class="text-gray-300">${i.name} × ${i.qty}</span>
-      <span class="text-brand-500">₹${(i.price * i.qty).toFixed(0)}</span>
+      <span class="text-brand-500">₹${(i.price * i.qty).toFixed(2)}</span>
     </div>
   `).join('');
+
+    let taxHtml = '';
+    if (order.tax_breakdown) {
+      for (const [label, amt] of Object.entries(order.tax_breakdown)) {
+        taxHtml += `
+          <div class="flex justify-between gap-4 py-1">
+            <span class="text-gray-400">${label}</span>
+            <span class="text-white">₹${amt.toFixed(2)}</span>
+          </div>`;
+      }
+    }
+
+    if (order.round_off) {
+      taxHtml += `
+        <div class="flex justify-between gap-4 py-1">
+          <span class="text-gray-400 italic">Round off</span>
+          <span class="text-white">₹${order.round_off.toFixed(2)}</span>
+        </div>`;
+    }
+
     return {
       items,
       subtotal,
-      totalWithTip: subtotal + currentTip,
+      taxHtml,
+      total: order.total || 0,
     };
   }
 
@@ -967,9 +1128,73 @@
     return sentToKitchen ? itemsTotal : 0;
   }
 
+  function getPaymentTotal() {
+    const order = currentBill || currentOrder || { total: 0 };
+    return (order.total || 0) + currentTip;
+  }
+
+  function formatCurrency(amount, decimals = 2) {
+    return '₹' + Number(amount || 0).toFixed(decimals);
+  }
+
+  function refreshPaymentTotals() {
+    const order = currentBill || currentOrder || { total: 0, subtotal: 0 };
+    const baseTotal = order.total || 0;
+    const totalWithTip = baseTotal + currentTip;
+
+    document.getElementById('pay-total').textContent = formatCurrency(totalWithTip, 0); // Rounded Grand Total
+
+    // Update Tip in summary if it exists
+    const tipShow = document.getElementById('pay-tip-show');
+    const tipSec = document.getElementById('pay-tip-section');
+    if (tipShow && tipSec) {
+      tipShow.textContent = formatCurrency(currentTip, 2);
+      tipSec.classList.toggle('hidden', currentTip <= 0);
+    }
+
+    if (selectedMethod) {
+      selectedMethod.amount = totalWithTip;
+    }
+    updateCashPaymentUI();
+  }
+
+  function updateCashPaymentUI() {
+    const cashPanel = document.getElementById('cash-payment-panel');
+    const cashInput = document.getElementById('cash-received');
+    const changeEl = document.getElementById('cash-change');
+    const helpEl = document.getElementById('cash-payment-help');
+    const isCash = selectedMethod?.type === 'cash';
+    cashPanel.classList.toggle('hidden', !isCash);
+    if (!isCash) return;
+
+    const total = getPaymentTotal();
+    const received = parseFloat(cashInput.value);
+    if (!Number.isFinite(received)) {
+      changeEl.textContent = formatCurrency(0);
+      helpEl.textContent = `Collect ${formatCurrency(total)} from the customer.`;
+      helpEl.className = 'mt-2 text-xs text-gray-500';
+      return;
+    }
+
+    const change = received - total;
+    changeEl.textContent = formatCurrency(Math.max(0, change));
+    if (change < 0) {
+      helpEl.textContent = `Customer still needs to pay ${formatCurrency(Math.abs(change))}.`;
+      helpEl.className = 'mt-2 text-xs text-red-400';
+    } else {
+      helpEl.textContent = `Return ${formatCurrency(change)} to the customer.`;
+      helpEl.className = 'mt-2 text-xs text-emerald-400';
+    }
+  }
+
+  function handleCashReceivedInput() {
+    updateCashPaymentUI();
+  }
+
   async function populatePaymentView(order) {
     const bill = buildBillSummary(order);
     currentTip = order.tip || 0;
+    selectedMethod = null;
     const isNotSentToKitchen = !order.sent_to_kitchen_at && order.status !== 'sent';
     document.getElementById('pay-order-num').textContent = '#' + order.order_number;
     document.getElementById('bill-summary').innerHTML = `
@@ -981,14 +1206,19 @@
     <div class="mt-3 space-y-1">${bill.items}</div>
     <div class="flex justify-between gap-4 py-1 border-t border-border/60 mt-3 pt-3">
       <span class="text-gray-400">Subtotal</span>
-      <span class="text-white">₹${bill.subtotal.toFixed(0)}</span>
+      <span class="text-white">₹${bill.subtotal.toFixed(2)}</span>
+    </div>
+    <div class="mt-1 space-y-1">${bill.taxHtml}</div>
+    <div id="pay-tip-section" class="flex justify-between gap-4 py-1 mt-1 border-t border-border/30 pt-1 hidden">
+      <span class="text-gray-400 italic">Tip</span>
+      <span id="pay-tip-show" class="text-emerald-400">₹0.00</span>
     </div>
   `;
-    document.getElementById('pay-subtotal').textContent = '₹' + bill.subtotal.toFixed(0);
-    document.getElementById('pay-tip-show').textContent = '₹' + currentTip.toFixed(0);
     document.getElementById('custom-tip').value = '';
+    document.getElementById('cash-received').value = '';
     document.querySelectorAll('.tip-btn').forEach(b => b.classList.remove('active'));
     document.querySelector('[data-tip="0"]').classList.add('active');
+    refreshPaymentTotals();
     const methods = await api('/api/payment-methods');
     const el = document.getElementById('pay-methods');
     el.innerHTML = methods.filter(m => m.enabled).map(m => `
@@ -1008,26 +1238,27 @@
     } else {
       currentTip = (subtotal * percentage) / 100;
     }
-    document.getElementById('pay-tip-show').textContent = '₹' + currentTip.toFixed(0);
     document.getElementById('custom-tip').value = '';
     document.querySelectorAll('.tip-btn').forEach(b => b.classList.remove('active'));
     event.target.classList.add('active');
+    refreshPaymentTotals();
   }
 
   function setCustomTip() {
     const custom = parseFloat(document.getElementById('custom-tip').value) || 0;
     currentTip = Math.max(0, custom);
-    document.getElementById('pay-tip-show').textContent = '₹' + currentTip.toFixed(0);
     document.querySelectorAll('.tip-btn').forEach(b => b.classList.remove('active'));
+    refreshPaymentTotals();
   }
 
   function selectMethod(type, upiId, name, amount) {
-    const totalWithTip = amount + currentTip;
+    const totalWithTip = getPaymentTotal();
     selectedMethod = { type, upiId, name, amount: totalWithTip };
     document.querySelectorAll('.pay-method').forEach(el => el.classList.remove('selected'));
     document.getElementById('pm-' + type)?.classList.add('selected');
+    updateCashPaymentUI();
     if (type === 'upi' || type === 'qrorupi' || (name || '').toLowerCase().includes('qr')) {
-      document.getElementById('qr-amount').textContent = '₹' + totalWithTip.toFixed(0);
+      document.getElementById('qr-amount').textContent = formatCurrency(totalWithTip);
       document.getElementById('qr-upi-id').textContent = upiId || 'Scan this QR code with any UPI app';
       document.getElementById('qr-img').src = "{{ url_for('qr_image') }}";
       showView('qr');
@@ -1101,6 +1332,16 @@
       await completePayment(selectedMethod.type || 'cash');
       return;
     }
+    if (selectedMethod.type === 'cash') {
+      const received = parseFloat(document.getElementById('cash-received').value);
+      const total = getPaymentTotal();
+      if (!Number.isFinite(received)) {
+        return toast('Enter how much cash the customer gave', 'error');
+      }
+      if (received < total) {
+        return toast('Received cash is less than total bill', 'error');
+      }
+    }
     if (selectedMethod.type === 'razorpay') {
       await openRazorpayCheckout();
       return;
@@ -1121,9 +1362,14 @@
     const paidOrder = currentOrder ? { id: currentOrder.id, order_number: currentOrder.order_number, table: currentTable ? currentTable.number : (currentOrder.table || 'Takeaway') } : null;
     const r = await api('/api/orders/' + currentOrder.id + '/pay', 'POST', { method, tip: currentTip });
     if (r.ok) {
-      const total = getPayableSubtotal(currentOrder || { items: cart, status: 'draft' });
-      const totalWithTip = (total + currentTip).toFixed(0);
-      document.getElementById('confirm-amount').textContent = '₹' + totalWithTip + ' via ' + (method === 'cash' ? 'Cash' : method === 'upi' ? 'UPI' : method === 'razorpay' ? 'Razorpay' : 'Card');
+      const totalWithTip = getPaymentTotal();
+      let confirmText = formatCurrency(totalWithTip) + ' via ' + (method === 'cash' ? 'Cash' : method === 'upi' ? 'UPI' : method === 'razorpay' ? 'Razorpay' : 'Card');
+      if (method === 'cash') {
+        const received = parseFloat(document.getElementById('cash-received').value) || 0;
+        const change = Math.max(0, received - totalWithTip);
+        confirmText += ` • Received ${formatCurrency(received)} • Return ${formatCurrency(change)}`;
+      }
+      document.getElementById('confirm-amount').textContent = confirmText;
       lastPaidOrder = paidOrder;
       confirmReviewRating = 0;
       confirmReviewSubmitted = false;
@@ -1138,22 +1384,25 @@
   // ─── Views ────────────────────────────────────────────────
   function showView(v) {
     closeMobileMenu();
-    ['floor', 'order', 'bills', 'reservations', 'payment', 'qr', 'confirm'].forEach(n => {
-      document.getElementById('view-' + n).classList.toggle('hidden', n !== v);
-      if (n !== 'floor' && n !== 'order' && n !== 'bills' && n !== 'reservations') document.getElementById('view-' + n).classList.toggle('flex', n === v);
+    ['floor', 'order', 'bills', 'reservations', 'history', 'payment', 'qr', 'confirm'].forEach(n => {
+      const el = document.getElementById('view-' + n);
+      if (el) el.classList.toggle('hidden', n !== v);
+      if (el && n !== 'floor' && n !== 'order' && n !== 'bills' && n !== 'reservations' && n !== 'history') el.classList.toggle('flex', n === v);
     });
     document.getElementById('view-floor').style.display = v === 'floor' ? 'block' : 'none';
     document.getElementById('view-order').style.display = v === 'order' ? 'flex' : 'none';
     document.getElementById('view-bills').style.display = v === 'bills' ? 'block' : 'none';
     document.getElementById('view-reservations').style.display = v === 'reservations' ? 'block' : 'none';
-    const labels = { floor: 'Floor View', order: 'Order Screen', bills: 'Bills', reservations: 'Reservations', payment: 'Payment', qr: 'UPI QR', confirm: 'Confirmed' };
+    document.getElementById('view-history').style.display = v === 'history' ? 'block' : 'none';
+    const labels = { floor: 'Floor View', order: 'Order Screen', bills: 'Bills', reservations: 'Reservations', history: 'Order History', payment: 'Payment', qr: 'UPI QR', confirm: 'Confirmed' };
     document.getElementById('breadcrumb').textContent = labels[v] || v;
-    ['floor', 'order', 'bills', 'reservations'].forEach(n => {
+    ['floor', 'order', 'bills', 'reservations', 'history'].forEach(n => {
       const el = document.getElementById('nav-' + n);
       if (el) el.classList.toggle('active', n === v);
     });
     if (v === 'confirm') renderConfirmReview();
     if (v === 'reservations') loadPosReservations();
+    if (v === 'history') loadOrderHistory();
   }
 
   function renderConfirmReview() {
@@ -1175,12 +1424,15 @@
     }
     el.innerHTML = `
     <div class="text-xs text-gray-500 uppercase tracking-wider mb-2">Customer Review</div>
-    <div class="text-sm text-gray-400 mb-3">This will appear on the dashboard for order #${lastPaidOrder.order_number}.</div>
+    <div class="text-sm text-gray-400 mb-3">Rate the experience for order #${lastPaidOrder.order_number}.</div>
     <div class="flex gap-2 mb-3" id="confirm-review-stars">
       ${[1, 2, 3, 4, 5].map(n => `<button type="button" class="star-btn ${confirmReviewRating >= n ? 'selected' : ''}" onclick="setConfirmReviewRating(${n})" data-rating="${n}">⭐</button>`).join('')}
     </div>
     <textarea id="confirm-review-comment" class="review-input" placeholder="Add a comment (optional)" maxlength="500"></textarea>
-    <button class="review-submit" onclick="submitConfirmReview()">Submit Review</button>
+    <div class="flex gap-3">
+        <button class="review-submit flex-1" onclick="submitConfirmReview()">Submit Review</button>
+        <button class="btn-ghost flex-1 py-3 rounded-xl text-sm" onclick="showView('floor')">Skip / Done</button>
+    </div>
   `;
   }
 
@@ -1215,8 +1467,11 @@
     const grid = document.getElementById('bills-grid');
     const empty = document.getElementById('bills-empty');
     if (!grid || !empty) return;
-    const visibleBills = [...bills];
-    if (currentBill && !visibleBills.some(b => b.id === currentBill.id)) {
+
+    // EXCLUDE PAID BILLS
+    const visibleBills = bills.filter(b => b.status !== 'paid');
+
+    if (currentBill && currentBill.status !== 'paid' && !visibleBills.some(b => b.id === currentBill.id)) {
       visibleBills.unshift(currentBill);
     }
     visibleBills.sort((a, b) => {
@@ -1238,9 +1493,11 @@
       const sentToKitchen = Boolean(b.sent_to_kitchen_at || b.status === 'sent');
       const preview = (b.items || []).slice(0, 3).map(i => `<div class="text-xs text-gray-400">${i.name} × ${i.qty}</div>`).join('');
       // Build WhatsApp message
-      const waItems = (b.items||[]).map(i => `${i.name} \u00d7${i.qty} \u2014 \u20b9${(i.price*i.qty).toFixed(0)}`).join('%0A');
+      const waItems = (b.items || []).map(i => `${i.name} \u00d7${i.qty} \u2014 \u20b9${(i.price * i.qty).toFixed(2)}`).join('%0A');
       const waTotal = b.total ? b.total.toFixed(0) : '0';
+      const waPhone = b.customer_phone ? b.customer_phone.replace(/\D/g, '') : '';
       const waMsg = encodeURIComponent(`\uD83E\uDDFE POS Cafe \u2014 Bill\nOrder: ${b.order_number} | Table ${b.table}\n\u2014\u2014\u2014\u2014\u2014\n`) + waItems + encodeURIComponent(`\n\u2014\u2014\u2014\u2014\u2014\nTotal: \u20b9${waTotal}\nThank you! \uD83D\uDE0A`);
+      const waUrl = waPhone ? `https://wa.me/${waPhone}?text=${waMsg}` : `https://api.whatsapp.com/send?text=${waMsg}`;
       return `
       <div class="card p-4 rounded-2xl ${isCurrent ? 'ring-2 ring-brand-500/70 bg-brand-500/5' : ''}">
         <div class="flex items-start justify-between gap-3 mb-3">
@@ -1333,7 +1590,7 @@
     el.innerHTML = `<span style="font-size:26px;">\uD83D\uDD14</span><div><div style="font-weight:700;color:#fff;font-size:15px;">Waiter Requested</div><div style="font-size:12px;color:#f97316;margin-top:2px;">${msg}</div></div><button onclick="this.parentElement.remove()" style="margin-left:auto;background:transparent;border:none;color:#888;font-size:18px;cursor:pointer;padding:0 4px;">&times;</button>`;
     el.onclick = (e) => { if (e.target !== el.querySelector('button')) el.remove(); };
     document.body.appendChild(el);
-    setTimeout(() => { if (el.parentNode) el.style.opacity='0'; setTimeout(() => el.remove(), 300); }, 10000);
+    setTimeout(() => { if (el.parentNode) el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 10000);
     toast(msg, 'error');
   });
 
@@ -1373,11 +1630,11 @@
     if (!list.length) { grid.innerHTML = ''; empty.classList.remove('hidden'); return; }
     empty.classList.add('hidden');
     const sc = {
-      pending:   { bg:'rgba(251,191,36,0.08)',   col:'#fbbf24', border:'rgba(251,191,36,0.3)' },
-      confirmed: { bg:'rgba(34,197,94,0.08)',    col:'#22c55e', border:'rgba(34,197,94,0.3)' },
-      seated:    { bg:'rgba(99,102,241,0.08)',   col:'#818cf8', border:'rgba(99,102,241,0.3)' },
-      completed: { bg:'rgba(100,116,139,0.08)',  col:'#64748b', border:'rgba(100,116,139,0.3)' },
-      cancelled: { bg:'rgba(239,68,68,0.06)',    col:'#ef4444', border:'rgba(239,68,68,0.2)' },
+      pending: { bg: 'rgba(251,191,36,0.08)', col: '#fbbf24', border: 'rgba(251,191,36,0.3)' },
+      confirmed: { bg: 'rgba(34,197,94,0.08)', col: '#22c55e', border: 'rgba(34,197,94,0.3)' },
+      seated: { bg: 'rgba(99,102,241,0.08)', col: '#818cf8', border: 'rgba(99,102,241,0.3)' },
+      completed: { bg: 'rgba(100,116,139,0.08)', col: '#64748b', border: 'rgba(100,116,139,0.3)' },
+      cancelled: { bg: 'rgba(239,68,68,0.06)', col: '#ef4444', border: 'rgba(239,68,68,0.2)' },
     };
     grid.innerHTML = list.map(r => {
       const c = sc[r.status] || sc.pending;
@@ -1386,8 +1643,8 @@
       const preHtml = r.items && r.items.length
         ? `<div style="margin-top:10px;padding:10px;background:#0d0d0d;border-radius:8px;font-size:12px;">
             <div style="color:#f97316;font-weight:600;margin-bottom:6px;">\uD83D\uDED2 Pre-Order</div>
-            ${r.items.map(i => `<div style="display:flex;justify-content:space-between;color:#999;">${i.product_name} <span>\u00d7${i.qty} \u2014 \u20b9${(i.qty*i.price).toFixed(0)}</span></div>`).join('')}
-            <div style="border-top:1px solid #222;margin-top:6px;padding-top:6px;font-weight:700;color:#f97316;display:flex;justify-content:space-between;"><span>Total</span><span>\u20b9${r.items.reduce((s,i)=>s+i.qty*i.price,0).toFixed(0)}</span></div>
+            ${r.items.map(i => `<div style="display:flex;justify-content:space-between;color:#999;">${i.product_name} <span>\u00d7${i.qty} \u2014 \u20b9${(i.qty * i.price).toFixed(0)}</span></div>`).join('')}
+            <div style="border-top:1px solid #222;margin-top:6px;padding-top:6px;font-weight:700;color:#f97316;display:flex;justify-content:space-between;"><span>Total</span><span>\u20b9${r.items.reduce((s, i) => s + i.qty * i.price, 0).toFixed(0)}</span></div>
           </div>` : '';
       return `
       <div class="card" style="border:1px solid ${c.border};background:${c.bg};border-radius:16px;padding:18px;">
@@ -1401,7 +1658,7 @@
               ${r.notes ? `&middot; <em style="color:#777;">${r.notes}</em>` : ''}
             </div>
           </div>
-          <span style="flex-shrink:0;padding:4px 12px;border-radius:8px;font-size:11px;font-weight:700;background:${c.bg};color:${c.col};border:1px solid ${c.border};">${r.status.charAt(0).toUpperCase()+r.status.slice(1)}</span>
+          <span style="flex-shrink:0;padding:4px 12px;border-radius:8px;font-size:11px;font-weight:700;background:${c.bg};color:${c.col};border:1px solid ${c.border};">${r.status.charAt(0).toUpperCase() + r.status.slice(1)}</span>
         </div>
         ${preHtml}
         ${r.status !== 'cancelled' ? `
@@ -1445,6 +1702,60 @@
   // Auto-refresh pending badge every 30s
   loadPosReservations();
   setInterval(loadPosReservations, 30000);
+
+  // ─── Order History ────────────────────────────────────────
+  async function loadOrderHistory() {
+    const grid = document.getElementById('history-grid');
+    const empty = document.getElementById('history-empty');
+    grid.innerHTML = '<div class="text-center py-8 text-gray-500">Loading...</div>';
+    const orders = await api('/api/orders/history');
+    if (!orders || orders.error || !orders.length) {
+      grid.innerHTML = '';
+      empty.classList.remove('hidden');
+      return;
+    }
+    empty.classList.add('hidden');
+    grid.innerHTML = orders.map(o => {
+      const date = new Date(o.created_at);
+      const timeStr = date.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const itemsSummary = o.items.map(i => `${i.name} x${i.qty}`).join(', ');
+      const methodIcon = o.payment_method === 'cash' ? '💵' : o.payment_method === 'upi' ? '📱' : '💳';
+      return `<div class="card p-4 rounded-xl">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-3">
+            <span class="text-xs font-700 text-brand-500">${o.order_number}</span>
+            <span class="text-xs text-gray-500">${timeStr}</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs">${methodIcon}</span>
+            <span class="font-700 text-sm">₹${Number(o.total).toFixed(0)}</span>
+            ${o.tip > 0 ? `<span class="text-xs text-green-400">+₹${o.tip} tip</span>` : ''}
+          </div>
+        </div>
+        <div class="text-xs text-gray-500">
+          <span class="text-gray-400">${o.table === 'Takeaway' ? '🛵 Takeaway' : '🪑 Table ' + o.table}</span>
+          ${o.customer_name ? ' · ' + o.customer_name : ''}
+        </div>
+        <div class="text-xs text-gray-600 mt-1 truncate">${itemsSummary}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // ─── Load Cafe Branding ─────────────────────────────────
+  async function loadPosCafeBranding() {
+    try {
+      const data = await api('/api/cafe-settings');
+      if (data && data.name) {
+        const nameEl = document.getElementById('pos-cafe-name');
+        if (nameEl) nameEl.textContent = data.name;
+      }
+      if (data && data.logo_b64) {
+        const logoEl = document.getElementById('pos-logo');
+        if (logoEl) logoEl.innerHTML = `<img src="${data.logo_b64}" alt="Logo" style="width:100%;height:100%;object-fit:cover;">`;
+      }
+    } catch (e) { }
+  }
+  loadPosCafeBranding();
 
   init();
 </script>
