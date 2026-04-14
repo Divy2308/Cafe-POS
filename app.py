@@ -1563,178 +1563,215 @@ def process_loyalty_earning(order):
 @app.route('/api/orders', methods=['POST'])
 @staff_required
 def create_order():
-    d = request.json
-    s = Session.query.filter_by(user_id=session['user_id'], status='open').first()
-    if not s:
-        return jsonify({'error':'No open session'}), 400
-    branch_id = get_active_branch_id()
-    tenant_id = get_current_tenant_id()
-    settings = CafeSettings.query.filter_by(tenant_id=tenant_id).first()
-    global_tax_rate = settings.tax_rate if settings else 0.0
+    try:
+        d = request.json or {}
+        tid = get_current_tenant_id()
+        if not tid:
+            return jsonify({'error': 'Unauthorized or session expired'}), 401
+        
+        # Validate request data
+        if 'items' not in d or not isinstance(d['items'], list):
+            return jsonify({'error': 'Invalid request: missing or invalid items array'}), 400
+        if not d['items']:
+            return jsonify({'error': 'Invalid request: items array cannot be empty'}), 400
+        
+        uid = session.get('user_id')
+        s = Session.query.filter_by(user_id=uid, status='open').first() if uid else None
+        if not s:
+            return jsonify({'error':'No open session. Please open register first.'}), 400
+            
+        branch_id = session.get('active_branch_id')
+        settings = CafeSettings.query.filter_by(tenant_id=tid).first()
+        global_tax_rate = settings.tax_rate if settings else 0.0
 
-    subtotal = 0
-    total_item_tax = 0
-    total_qty = 0
-    tax_breakdown = {} # Label -> total amount
+        subtotal = 0
+        total_item_tax = 0
+        total_qty = 0
+        tax_breakdown = {} # Label -> total amount
 
-    order_items_data = []
+        order_items_data = []
 
-    for item in d['items']:
-        prod = Product.query.get(item['product_id'])
-        item_price = float(item['price'])
-        qty = int(item['qty'])
-        item_subtotal = item_price * qty
-        subtotal += item_subtotal
-        total_qty += qty
-
-        # Item-level taxes
-        tax_config = {}
-        if prod and prod.tax_config_json:
+        for item in d['items']:
+            # Validate item
+            if not isinstance(item, dict) or 'product_id' not in item or 'price' not in item or 'qty' not in item:
+                return jsonify({'error': 'Invalid item: missing product_id, price, or qty'}), 400
+            
             try:
-                tax_config = json.loads(prod.tax_config_json)
-            except: pass
+                prod = Product.query.get(item['product_id'])
+                item_price = float(item['price'])
+                qty = int(item['qty'])
+                if qty <= 0:
+                    return jsonify({'error': 'Invalid item: qty must be greater than 0'}), 400
+            except (ValueError, TypeError):
+                return jsonify({'error': 'Invalid item: price or qty must be numeric'}), 400
+            
+            item_subtotal = item_price * qty
+            subtotal += item_subtotal
+            total_qty += qty
+
+            # Item-level taxes
+            tax_config = {}
+            if prod and prod.tax_config_json:
+                try:
+                    tax_config = json.loads(prod.tax_config_json)
+                except: pass
+            
+            # If no custom config, fallback to product.tax if > 0
+            if not tax_config and prod and prod.tax > 0:
+                tax_config = {"Tax": prod.tax}
+            
+            item_tax_total = 0
+            item_tax_details = {}
+            for tax_label, rate in tax_config.items():
+                t_amt = round(item_subtotal * (float(rate) / 100), 2)
+                item_tax_total += t_amt
+                item_tax_details[tax_label] = t_amt
+                tax_breakdown[tax_label] = tax_breakdown.get(tax_label, 0) + t_amt
+            
+            total_item_tax += item_tax_total
+            order_items_data.append({
+                'product_id': item['product_id'],
+                'name': item['name'],
+                'qty': qty,
+                'price': item_price,
+                'notes': item.get('notes', ''),
+                'tax_rate': sum(float(r) for r in tax_config.values()),
+                'tax_amount': item_tax_total,
+                'tax_info_json': json.dumps(item_tax_details)
+            })
+
+        # Second layer: Global Tax
+        intermediate_total = subtotal + total_item_tax
+        global_tax_amount = round(intermediate_total * (global_tax_rate / 100), 2)
+        if global_tax_rate > 0:
+            tax_breakdown['Service Tax'] = tax_breakdown.get('Service Tax', 0) + global_tax_amount
+
+        raw_total = intermediate_total + global_tax_amount
+        final_total = round(raw_total)
+        round_off = round(final_total - raw_total, 2)
+
+        table_id = d.get('table_id')  # None for takeaway
+        is_takeaway = d.get('takeaway', False) or not table_id
+        customer_name = d.get('customer_name', '').strip()
+        customer_phone = d.get('customer_phone', '').strip()
         
-        # If no custom config, fallback to product.tax if > 0
-        if not tax_config and prod and prod.tax > 0:
-            tax_config = {"Tax": prod.tax}
-        
-        item_tax_total = 0
-        item_tax_details = {}
-        for tax_label, rate in tax_config.items():
-            t_amt = round(item_subtotal * (float(rate) / 100), 2)
-            item_tax_total += t_amt
-            item_tax_details[tax_label] = t_amt
-            tax_breakdown[tax_label] = tax_breakdown.get(tax_label, 0) + t_amt
-        
-        total_item_tax += item_tax_total
-        order_items_data.append({
-            'product_id': item['product_id'],
-            'name': item['name'],
-            'qty': qty,
-            'price': item_price,
-            'notes': item.get('notes', ''),
-            'tax_rate': sum(float(r) for r in tax_config.values()),
-            'tax_amount': item_tax_total,
-            'tax_info_json': json.dumps(item_tax_details)
-        })
-
-    # Second layer: Global Tax
-    intermediate_total = subtotal + total_item_tax
-    global_tax_amount = round(intermediate_total * (global_tax_rate / 100), 2)
-    if global_tax_rate > 0:
-        tax_breakdown['Service Tax'] = tax_breakdown.get('Service Tax', 0) + global_tax_amount
-
-    raw_total = intermediate_total + global_tax_amount
-    final_total = round(raw_total)
-    round_off = round(final_total - raw_total, 2)
-
-    table_id = d.get('table_id')  # None for takeaway
-    is_takeaway = d.get('takeaway', False) or not table_id
-    customer_name = d.get('customer_name', '').strip()
-    customer_phone = d.get('customer_phone', '').strip()
-    
-    customer_id = None
-    if customer_phone:
-        c = Customer.query.filter_by(tenant_id=tenant_id, phone=customer_phone).first()
-        if not c:
-            c = Customer(phone=customer_phone, name=customer_name, tenant_id=tenant_id)
-            db.session.add(c)
-            db.session.flush()
-        else:
-            if customer_name and c.name != customer_name:
-                c.name = customer_name
-        customer_id = c.id
-        customer_name = c.name
-
-    o = None
-    if table_id and not is_takeaway:
-        o = (
-            Order.query
-            .filter_by(session_id=s.id, table_id=table_id, branch_id=branch_id)
-            .filter(Order.status.in_(['draft', 'sent']))
-            .order_by(Order.created_at.desc())
-            .first()
-        )
-
-    if o:
-        for item_data in order_items_data:
-            oi = OrderItem(
-                order_id=o.id,
-                product_id=item_data['product_id'],
-                product_name=item_data['name'],
-                qty=item_data['qty'],
-                price=item_data['price'],
-                notes=item_data['notes'],
-                tax_rate=item_data['tax_rate'],
-                tax_amount=item_data['tax_amount'],
-                tax_info_json=item_data['tax_info_json']
-            )
-            db.session.add(oi)
-        o.subtotal = (o.subtotal or 0) + subtotal
-        o.tax_amount = (o.tax_amount or 0) + total_item_tax
-        o.total = (o.total or 0) + final_total
-        o.round_off = (o.round_off or 0) + round_off
-        o.total_qty = (o.total_qty or 0) + total_qty
-        
-        # Merge tax breakdown
-        try:
-            old_breakdown = json.loads(o.tax_breakdown_json or '{}')
-        except: old_breakdown = {}
-        for k, v in tax_breakdown.items():
-            old_breakdown[k] = old_breakdown.get(k, 0) + v
-        o.tax_breakdown_json = json.dumps(old_breakdown)
-        if customer_id:
-            o.customer_id = customer_id
-            o.customer_phone = customer_phone
-            o.customer_name = customer_name
-        if table_id:
-            t = Table.query.get(table_id)
-            if t:
-                t.status = 'occupied'
-        order_num = o.order_number
-    else:
-        count = Order.query.count() + 1
-        order_num = f"ORD-{count:04d}"
-        o = Order(
-            order_number=order_num,
-            table_id=table_id if not is_takeaway else None,
-            session_id=s.id,
-            user_id=session['user_id'],
-            subtotal=subtotal,
-            tax_amount=total_item_tax,
-            tax_breakdown_json=json.dumps(tax_breakdown),
-            round_off=round_off,
-            total_qty=total_qty,
-            total=final_total,
-            branch_id=branch_id,
-            tenant_id=get_current_tenant_id(),
-        )
-        if customer_name:
-            o.customer_name = customer_name
+        customer_id = None
         if customer_phone:
-            o.customer_phone = customer_phone
-            o.customer_id = customer_id
-        db.session.add(o)
-        db.session.flush()
-        for item_data in order_items_data:
-            oi = OrderItem(
-                order_id=o.id,
-                product_id=item_data['product_id'],
-                product_name=item_data['name'],
-                qty=item_data['qty'],
-                price=item_data['price'],
-                notes=item_data['notes'],
-                tax_rate=item_data['tax_rate'],
-                tax_amount=item_data['tax_amount'],
-                tax_info_json=item_data['tax_info_json']
-            )
-            db.session.add(oi)
+            c = Customer.query.filter_by(tenant_id=tid, phone=customer_phone).first()
+            if not c:
+                c = Customer(phone=customer_phone, name=customer_name, tenant_id=tid)
+                db.session.add(c)
+                db.session.flush()
+            else:
+                if customer_name and c.name != customer_name:
+                    c.name = customer_name
+            customer_id = c.id
+            customer_name = c.name
+
+        o = None
         if table_id and not is_takeaway:
-            t = Table.query.get(table_id)
-            if t:
-                t.status = 'occupied'
-    db.session.commit()
-    return jsonify({'ok':True,'id':o.id,'order_number':order_num})
+            o = (
+                Order.query
+                .filter_by(session_id=s.id, table_id=table_id, branch_id=branch_id)
+                .filter(Order.status.in_(['draft', 'sent']))
+                .order_by(Order.created_at.desc())
+                .first()
+            )
+
+        if o:
+            for item_data in order_items_data:
+                oi = OrderItem(
+                    order_id=o.id,
+                    product_id=item_data['product_id'],
+                    product_name=item_data['name'],
+                    qty=item_data['qty'],
+                    price=item_data['price'],
+                    notes=item_data['notes'],
+                    tax_rate=item_data['tax_rate'],
+                    tax_amount=item_data['tax_amount'],
+                    tax_info_json=item_data['tax_info_json']
+                )
+                db.session.add(oi)
+            o.subtotal = (o.subtotal or 0) + subtotal
+            o.tax_amount = (o.tax_amount or 0) + total_item_tax
+            o.total = (o.total or 0) + final_total
+            o.round_off = (o.round_off or 0) + round_off
+            o.total_qty = (o.total_qty or 0) + total_qty
+            
+            # Merge tax breakdown
+            try:
+                old_breakdown = json.loads(o.tax_breakdown_json or '{}')
+            except: old_breakdown = {}
+            for k, v in tax_breakdown.items():
+                old_breakdown[k] = old_breakdown.get(k, 0) + v
+            o.tax_breakdown_json = json.dumps(old_breakdown)
+            if customer_id:
+                o.customer_id = customer_id
+                o.customer_phone = customer_phone
+                o.customer_name = customer_name
+            if table_id:
+                t = Table.query.get(table_id)
+                if t:
+                    t.status = 'occupied'
+            order_num = o.order_number
+        else:
+            count = Order.query.count() + 1
+            order_num = f"ORD-{count:04d}"
+            o = Order(
+                order_number=order_num,
+                table_id=table_id if not is_takeaway else None,
+                session_id=s.id,
+                user_id=session['user_id'],
+                subtotal=subtotal,
+                tax_amount=total_item_tax,
+                tax_breakdown_json=json.dumps(tax_breakdown),
+                round_off=round_off,
+                total_qty=total_qty,
+                total=final_total,
+                branch_id=branch_id,
+                tenant_id=get_current_tenant_id(),
+            )
+            if customer_name:
+                o.customer_name = customer_name
+            if customer_phone:
+                o.customer_phone = customer_phone
+                o.customer_id = customer_id
+            db.session.add(o)
+            db.session.flush()
+            for item_data in order_items_data:
+                oi = OrderItem(
+                    order_id=o.id,
+                    product_id=item_data['product_id'],
+                    product_name=item_data['name'],
+                    qty=item_data['qty'],
+                    price=item_data['price'],
+                    notes=item_data['notes'],
+                    tax_rate=item_data['tax_rate'],
+                    tax_amount=item_data['tax_amount'],
+                    tax_info_json=item_data['tax_info_json']
+                )
+                db.session.add(oi)
+            if table_id and not is_takeaway:
+                t = Table.query.get(table_id)
+                if t:
+                    t.status = 'occupied'
+        
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': f'Database error: {str(e)}'}), 500
+        
+        if not o or not o.id:
+            return jsonify({'error': 'Failed to create order'}), 500
+        
+        return jsonify({'ok':True,'id':o.id,'order_number':order_num})
+    
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 def serialize_bill(order):
     subtotal = sum(i.qty * i.price for i in order.items)
@@ -3042,28 +3079,36 @@ def save_product_recipe():
 # ─── API: Cafe Settings ─────────────────────────────────
 @app.route('/api/cafe-settings', methods=['GET'])
 def get_cafe_settings():
-    tid = get_current_tenant_id()
-    settings = CafeSettings.query.filter_by(tenant_id=tid).first() if tid else None
-    if not settings:
-        settings = CafeSettings(tenant_id=tid)
-        db.session.add(settings)
-        db.session.commit()
-    
-    return jsonify({
-        'name': settings.name,
-        'phone': settings.phone,
-        'email': settings.email,
-        'address': settings.address,
-        'logo_b64': settings.logo_b64 or '',
-        'open_time': settings.open_time,
-        'close_time': settings.close_time,
-        'tax_rate': settings.tax_rate,
-        'gst_no': settings.gst_no or '',
-        'fssai_no': settings.fssai_no or '',
-        'footer_note': settings.footer_note or '',
-        'loyalty_points_per_100': settings.loyalty_points_per_100,
-        'points_redemption_value': settings.points_redemption_value
-    })
+    try:
+        tid = get_current_tenant_id()
+        if not tid:
+            # Fallback for logo/name if not logged in or session lost
+            return jsonify({'name': 'POS Cafe', 'logo_b64': ''})
+            
+        settings = CafeSettings.query.filter_by(tenant_id=tid).first()
+        if not settings:
+            settings = CafeSettings(tenant_id=tid, name='POS Cafe')
+            db.session.add(settings)
+            db.session.commit()
+        
+        return jsonify({
+            'name': settings.name,
+            'phone': settings.phone,
+            'email': settings.email,
+            'address': settings.address,
+            'logo_b64': settings.logo_b64 or '',
+            'open_time': getattr(settings, 'open_time', None),
+            'close_time': getattr(settings, 'close_time', None),
+            'tax_rate': getattr(settings, 'tax_rate', 0.0),
+            'gst_no': getattr(settings, 'gst_no', ''),
+            'fssai_no': getattr(settings, 'fssai_no', ''),
+            'footer_note': getattr(settings, 'footer_note', ''),
+            'loyalty_points_per_100': getattr(settings, 'loyalty_points_per_100', 0),
+            'points_redemption_value': getattr(settings, 'points_redemption_value', 0)
+        })
+    except Exception as e:
+        app.logger.error(f"Error in get_cafe_settings: {e}")
+        return jsonify({'name': 'POS Cafe', 'logo_b64': ''})
 
 @app.route('/api/cafe-settings', methods=['POST'])
 @admin_required

@@ -21,6 +21,9 @@
       <button onclick="switchTab('attendance', this)" class="nav-link w-full text-left px-4 py-3 rounded-lg transition-all flex items-center gap-3">
         <span>⏱️</span><span>Attendance</span>
       </button>
+      <button onclick="switchTab('inventory', this)" class="nav-link w-full text-left px-4 py-3 rounded-lg transition-all flex items-center gap-3">
+        <span>📦</span><span>Inventory</span>
+      </button>
       <button onclick="switchTab('compare', this)" class="nav-link w-full text-left px-4 py-3 rounded-lg transition-all flex items-center gap-3">
         <span>🏪</span><span>Compare Branches</span>
       </button>
@@ -134,6 +137,34 @@
             </thead>
             <tbody id="attendanceTable">
               <tr><td colspan="7" class="py-8 text-center text-gray-500">Loading attendance...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="inventory-tab" class="tab-content hidden">
+        <div class="flex items-center justify-between mb-5">
+          <div>
+            <h2 class="text-2xl font-bold">Inventory Management</h2>
+            <p class="text-sm text-gray-500 mt-1">Manage inventory items, stock levels, and thresholds.</p>
+          </div>
+          <button onclick="openAddInventoryModal()" class="btn-primary px-4 py-2 rounded-lg text-white font-semibold">+ Add Item</button>
+        </div>
+
+        <div class="card p-6 overflow-x-auto">
+          <table class="w-full">
+            <thead>
+              <tr class="border-b border-border">
+                <th class="text-left py-3 px-4 text-gray-500 font-semibold">Item Name</th>
+                <th class="text-left py-3 px-4 text-gray-500 font-semibold">Unit</th>
+                <th class="text-left py-3 px-4 text-gray-500 font-semibold">Current Stock</th>
+                <th class="text-left py-3 px-4 text-gray-500 font-semibold">Min Threshold</th>
+                <th class="text-left py-3 px-4 text-gray-500 font-semibold">Unit Cost</th>
+                <th class="text-left py-3 px-4 text-gray-500 font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="inventoryTable">
+              <tr><td colspan="6" class="py-8 text-center text-gray-500">Loading inventory...</td></tr>
             </tbody>
           </table>
         </div>
@@ -277,6 +308,40 @@
     </div>
   </div>
 </div>
+
+<div id="inventoryModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
+  <div class="card p-8 max-w-lg w-full mx-4">
+    <h2 class="text-2xl font-bold mb-6" id="inventoryModalTitle">Add Inventory Item</h2>
+    <input type="hidden" id="editInventoryId">
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm text-gray-500 mb-2">Item Name</label>
+        <input type="text" id="inventoryName">
+      </div>
+      <div>
+        <label class="block text-sm text-gray-500 mb-2">Unit (e.g., kg, liters, pieces)</label>
+        <input type="text" id="inventoryUnit" placeholder="e.g., kg">
+      </div>
+      <div>
+        <label class="block text-sm text-gray-500 mb-2">Current Stock</label>
+        <input type="number" id="inventoryStock" min="0" step="0.01" placeholder="0.00">
+      </div>
+      <div>
+        <label class="block text-sm text-gray-500 mb-2">Minimum Threshold</label>
+        <input type="number" id="inventoryMinThreshold" min="0" step="0.01" placeholder="0.00">
+      </div>
+      <div>
+        <label class="block text-sm text-gray-500 mb-2">Unit Cost</label>
+        <input type="number" id="inventoryUnitCost" min="0" step="0.01" placeholder="0.00">
+      </div>
+    </div>
+    <div class="flex gap-3 mt-6">
+      <button onclick="closeInventoryModal()" class="flex-1 btn-ghost py-2 rounded-lg font-semibold">Cancel</button>
+      <button onclick="saveInventoryItem()" class="flex-1 btn-primary py-2 rounded-lg text-white font-semibold" id="inventoryModalSaveBtn">Add Item</button>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -301,6 +366,7 @@ function switchTab(tab, button) {
   const titles = {
     users: ['Staff Management', 'Manage staff, rates, and branch assignments.'],
     attendance: ['Attendance & Payroll', 'Review clock-in/out pairs and adjust missed clock-outs.'],
+    inventory: ['Inventory Management', 'Manage inventory items, stock levels, and thresholds.'],
     compare: ['Compare Branches', 'Compare order volume, revenue, and top sellers.'],
     settings: ['Cafe Settings', 'Update shared cafe information.'],
   };
@@ -309,6 +375,7 @@ function switchTab(tab, button) {
 
   if (tab === 'users') loadStaff();
   if (tab === 'attendance') loadAttendanceReport();
+  if (tab === 'inventory') loadInventory();
   if (tab === 'compare') loadBranchComparison();
 }
 
@@ -506,6 +573,126 @@ async function createBranch() {
   await loadBranchComparison();
 }
 
+function openAddInventoryModal() {
+  document.getElementById('editInventoryId').value = '';
+  document.getElementById('inventoryName').value = '';
+  document.getElementById('inventoryUnit').value = 'unit';
+  document.getElementById('inventoryStock').value = '0';
+  document.getElementById('inventoryMinThreshold').value = '0';
+  document.getElementById('inventoryUnitCost').value = '0';
+  document.getElementById('inventoryModalTitle').textContent = 'Add Inventory Item';
+  document.getElementById('inventoryModalSaveBtn').textContent = 'Add Item';
+  document.getElementById('inventoryModal').classList.remove('hidden');
+}
+
+function closeInventoryModal() {
+  document.getElementById('inventoryModal').classList.add('hidden');
+}
+
+async function saveInventoryItem() {
+  const editId = document.getElementById('editInventoryId').value;
+  const payload = {
+    name: document.getElementById('inventoryName').value.trim(),
+    unit: document.getElementById('inventoryUnit').value.trim(),
+    current_stock: parseFloat(document.getElementById('inventoryStock').value || '0'),
+    min_threshold: parseFloat(document.getElementById('inventoryMinThreshold').value || '0'),
+    unit_cost: parseFloat(document.getElementById('inventoryUnitCost').value || '0'),
+  };
+  
+  if (!payload.name) {
+    toast('Item name is required', 'error');
+    return;
+  }
+  
+  if (!payload.unit) {
+    toast('Unit is required', 'error');
+    return;
+  }
+  
+  if (editId) {
+    // Update existing item
+    const result = await api(`/api/inventory/${editId}`, 'PUT', payload);
+    if (result.error) {
+      toast(result.error, 'error');
+      return;
+    }
+    toast('Inventory item updated', 'success');
+  } else {
+    // Add new item
+    const result = await api('/api/inventory', 'POST', payload);
+    if (result.error) {
+      toast(result.error, 'error');
+      return;
+    }
+    toast('Inventory item added', 'success');
+  }
+  
+  closeInventoryModal();
+  await loadInventory();
+}
+
+async function loadInventory() {
+  const items = await api('/api/inventory');
+  const tbody = document.getElementById('inventoryTable');
+  
+  if (items.error) {
+    tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-red-400">${items.error}</td></tr>`;
+    return;
+  }
+  
+  if (!items.length) {
+    inventoryItems = [];
+    tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-gray-500">No inventory items found. Add one to get started.</td></tr>';
+    return;
+  }
+  
+  inventoryItems = items;
+  tbody.innerHTML = items.map(item => {
+    const stockStatus = item.current_stock <= item.min_threshold ? 'text-red-400' : 'text-green-400';
+    return `
+      <tr class="border-b border-border">
+        <td class="py-4 px-4 font-semibold">${item.name}</td>
+        <td class="py-4 px-4 text-gray-500">${item.unit}</td>
+        <td class="py-4 px-4 ${stockStatus}">${item.current_stock}</td>
+        <td class="py-4 px-4 text-gray-500">${item.min_threshold}</td>
+        <td class="py-4 px-4">${formatMoney(item.unit_cost)}</td>
+        <td class="py-4 px-4">
+          <button onclick="editInventory(${item.id})" class="text-brand-400 hover:text-brand-300 text-sm mr-3">Edit</button>
+          <button onclick="deleteInventory(${item.id})" class="text-red-400 hover:text-red-300 text-sm">Delete</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+let inventoryItems = [];
+
+async function editInventory(itemId) {
+  const item = inventoryItems.find(i => i.id === itemId);
+  if (!item) return;
+  
+  document.getElementById('editInventoryId').value = item.id;
+  document.getElementById('inventoryName').value = item.name;
+  document.getElementById('inventoryUnit').value = item.unit;
+  document.getElementById('inventoryStock').value = item.current_stock;
+  document.getElementById('inventoryMinThreshold').value = item.min_threshold;
+  document.getElementById('inventoryUnitCost').value = item.unit_cost;
+  document.getElementById('inventoryModalTitle').textContent = 'Edit Inventory Item';
+  document.getElementById('inventoryModalSaveBtn').textContent = 'Update Item';
+  document.getElementById('inventoryModal').classList.remove('hidden');
+}
+
+async function deleteInventory(itemId) {
+  if (!confirm('Delete this inventory item?')) return;
+  const result = await api(`/api/inventory/${itemId}`, 'DELETE');
+  if (result.error) {
+    toast(result.error, 'error');
+    return;
+  }
+  toast('Inventory item deleted', 'success');
+  await loadInventory();
+}
+
 async function loadAttendanceReport() {
   const staffId = document.getElementById('attendanceStaffFilter').value;
   const startDate = document.getElementById('attendanceStartDate').value;
@@ -644,7 +831,7 @@ function goToPOS() {
 
 document.addEventListener('DOMContentLoaded', async () => {
   await loadBranches();
-  await Promise.all([loadCafeSettings(), loadStaff(), loadAttendanceReport(), loadBranchComparison()]);
+  await Promise.all([loadCafeSettings(), loadStaff(), loadInventory(), loadAttendanceReport(), loadBranchComparison()]);
 });
 </script>
 {% endblock %}

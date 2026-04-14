@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom styles below */
+:root {
+  --bg: #0a0a0a;
+  --text: #f0f0f0;
+  --muted: #9ca3af;
+  --card: #1a1a1a;
+  --card-2: #111111;
+  --border: #2a2a2a;
+  --input-bg: #1a1a1a;
+  --input-border: #2a2a2a;
+  --ghost-bg: rgba(255,255,255,0.06);
+  --ghost-border: rgba(255,255,255,0.1);
+  --toast-bg: #1a1a1a;
+}
+
+body[data-theme="light"] {
+  --bg: #f4f1ea;
+  --text: #1f2937;
+  --muted: #6b7280;
+  --card: #ffffff;
+  --card-2: #f8fafc;
+  --border: #e5e7eb;
+  --input-bg: #ffffff;
+  --input-border: #d1d5db;
+  --ghost-bg: rgba(15,23,42,0.04);
+  --ghost-border: rgba(15,23,42,0.08);
+  --toast-bg: #ffffff;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.brand-gradient {
+  background: linear-gradient(135deg, #f97316, #ea580c);
+}
+
+.glass {
+  background: rgba(255,255,255,0.04);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.nav-link {
+  transition: all 0.2s;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.nav-link:hover {
+  background: rgba(249, 115, 22, 0.12);
+  color: #f97316;
+}
+
+.nav-link:active {
+  background: rgba(249, 115, 22, 0.25);
+  transform: scale(0.98);
+}

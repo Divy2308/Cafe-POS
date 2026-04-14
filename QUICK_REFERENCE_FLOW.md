@@ -1,0 +1,482 @@
+# POS CAFE - QUICK REFERENCE FLOW CHART
+
+## 🚀 SYSTEM ENTRY POINT
+
+```
+                    ┌─────────────────────┐
+                    │   Visit Website     │
+                    │      (Root: /)      │
+                    └──────────┬──────────┘
+                               │
+                    ┌──────────┴──────────┐
+                    │                     │
+            ┌───────▼────────┐   ┌───────▼────────┐
+            │ New User?      │   │ Existing User? │
+            │ Click: Get     │   │ Click: Login   │
+            │ Started        │   │                │
+            └───────┬────────┘   └───────┬────────┘
+                    │                     │
+            ┌───────▼┴─────────────────┬──────┐
+            │      /auth Page          │      │
+            │  (Authentication Hub)    │      │
+            └───────┬─────────────────┬┘      │
+                    │                 │       │
+       ┌────────────┴──┐   ┌─────────┴─┐   ┌─┴────────────┐
+       │   Sign Up      │   │   Login    │   │ Password     │
+       │   (New Acct)   │   │ (Existing) │   │ Reset?       │
+       └────────────┬──┘   └──────┬────┘   └──────┬───────┘
+                    │              │               │
+                    │   ┌──────────┴────┐         │
+                    │   │ System checks │         │
+                    │   │ user role:    │         │
+                    │   │               │──→ Email sent
+                    │   │               │   + Reset code
+                    │   │               │   + Validate &
+                    │   │               │     set new pwd
+                    │   └───────┬───────┘
+                    │           │
+     ┌──────────────┴──┬────────┴─────┬─────────────┬──────────────┐
+     │                 │              │             │              │
+  ┌──▼──┐          ┌──▼──┐       ┌───▼──┐      ┌──▼──┐        ┌──▼────┐
+  │CUST │          │CASHI│       │KITCHE│      │MGMT │        │OWNER  │
+  │OMER │          │ER   │       │R     │      │     │        │/ADMIN │
+  └──┬──┘          └──┬──┘       └───┬──┘      └──┬──┘        └──┬────┘
+     │                │              │            │              │
+  ┌──▼───────────┐ ┌──▼──────────┐ ┌──▼────────┐ │         ┌────▼─────────┐
+  │/customer OR  │ │   /pos       │ │ /kitchen  │ │         │  /dashboard  │
+  │/table/<id>/  │ │              │ │           │ │         │              │
+  │order         │ │ Table View   │ │ Order     │ │         │ Analytics    │
+  │              │ │              │ │ Queue     │ │         │ + 4 More     │
+  └──┬───────────┘ └──┬──────────┘ └───┬──────┘ │         │ Tabs         │
+    │                │                  │       │         └────┬─────────┘
+    │         ┌──────▼────────┐         │       │              │
+    │         │ Table (Click) │         │       │         ┌────▼─────────────┐
+    │         └──────┬────────┘         │       │         │ 1️⃣ Analytics     │
+    │                │         ┌────────┴───┐   ┌─────┐   │ 2️⃣ Staff Mgmt    │
+    │                │         │ New Order  │───┘     │   │ 3️⃣ Attendance    │
+    │                │         │ Form       │     Send │   │ 4️⃣ Branches      │
+    │                │         └─────┬──────┘     to   │   │ 5️⃣ Settings      │
+    │                │               │         Kitchen │   └──────┬──────────┘
+    │                │         ┌─────▼──────┐        │          │
+    │                │         │Add Items   │        │          │
+    │                │         │+ Qty       │        │          │
+    │                └────┬────┴─────┬──────┘        │          │
+    │                     │          │               │          │
+    │              ┌──────▼──────────▼──┐              │   ┌─────▼─────┐
+    │              │ KITCHEN ORDER QUEUE│              │   │Export CSV │
+    │              ├────────────────────┤──────────┘   │   │View Charts│
+    │              │ Status: Pending    │              │   │Staff List │
+    │              │ Timer: XX mins     │              │   │Attendance │
+    │              │ Items: [...]       │              │   │Settings   │
+    │              └──────┬─────────────┘              │   δεν└─────┬─────┘
+    │                     │                            │         │
+    │              ┌──────▼──────────────┐            │    ┌────▼─────┐
+    │              │ Mark Complete      │            │    │ Real-Time │
+    │              │ Ready for Pickup   │            │    │ Updates   │
+    │              └──────┬─────────────┘            │    └──────┬────┘
+    │                     │                            │         │
+    │         ┌───────────┴──┬────────────────┐      │     Updates
+    │         │              │                │      │     reflected
+    │         │    ┌─────────▼────────────┐  │      │     across
+    │         │    │ Cashier/POS Updated  │  │      │     all users
+    │         │    │ Sees: Order ready    │  │      │     (SocketIO)
+    │         │    └──────────┬───────────┘  │      │
+    │         │               │              │      │
+    │  ┌──────▼────────────────▼───────┐    │      │
+    │  │   Payment Processing          │    │      │
+    │  ├───────────────────────────────┤    │      │
+    │  │ Options:                       │────┘      │
+    │  │ 1️⃣ Cash (manual entry)        │           │
+    │  │ 2️⃣ UPI (scan QR)             │           │
+    │  │ 3️⃣ Card (Razorpay)           │           │
+    │  │                               │           │
+    │  │ → Poll payment status         │           │
+    │  │ → Auto-complete on success    │           │
+    │  │ → Handle failures             │           │
+    │  └───────┬─────────────────────┘            │
+    │          │                                   │
+    │  ┌──────▼────────────────────────┐         │
+    │  │ Receipt Generated             │         │
+    │  ├────────────────────────────────┤        │
+    │  │ • Item breakdown               │        │
+    │  │ • Tax calculation              │        │
+    │  │ • Total amount                 │        │
+    │  │ • Payment method               │        │
+    │  │ • Timestamp                    │        │
+    │  │ Print / Email / Digital        │        │
+    │  └───────┬────────────────────────┘        │
+    │          │                                 │
+    │  ┌──────▼───────────────┐                 │
+    │  │ Order Completed ✓    │                 │
+    │  │ Table Cleared        │                 │
+    │  └──────────────────────┘                 │
+    │                                            │
+    └────────────────────────────────────────────┘
+```
+
+---
+
+## 📋 DETAILED CUSTOMER JOURNEY
+
+```
+Customer Scans QR Code
+        ↓
+    /table/<id>/order
+        ↓
+┌─────────────────────┐
+│   VIEW MENU         │
+│ - Categories        │
+│ - Item details      │
+│ - Prices + tax      │
+│ - Images            │
+└─────────────────────┘
+        ↓
+┌─────────────────────┐
+│   BUILD CART        │
+│ Add item → Set qty  │
+│ Add special notes   │
+│ See subtotal + tax  │
+└─────────────────────┘
+        ↓
+┌─────────────────────┐
+│  PLACE ORDER        │
+│ Submit with table ID│
+│                     │
+│ Confirmation: ✓     │
+│ Order ID: #12345    │
+└─────────────────────┘
+        ↓
+      Sent To:
+  ┌────┴──────┬────────────────┐
+  │            │                │
+┌─▼─────────┐ │          ┌──────▼──────┐
+│ POS System│ │          │ Kitchen     │
+│ Table: 5  │ │          │ Queue       │
+│ Order: #5 │ │          │ Pending: 3m │
+└───────────┘ │          └─────────────┘
+  │            │
+  │     ┌──────▼───────┐
+  │     │  Track Status│
+  │     │  (Real-Time) │
+  │     │              │
+  │     │ Pending ────┐│
+  │     │ Cooking ───┐││
+  │     │ Ready  ──┐│││
+  │     │          │││
+  │     └──────┬───┘││
+  │            │    ││ UPDATES LIVE
+  │            IN 2-3│ (No refresh)
+  │            MINS  
+  │            │
+  └──────┬─────▼──────────────┐
+         │                    │
+    ┌────▼────────┐   ┌─────▼────────┐
+    │   Optional  │   │   View       │
+    │   Receipt   │   │   Digital    │
+    │   Digital   │   │   Receipt    │
+    │   Download  │   │   Print      │
+    └─────────────┘   └──────────────┘
+```
+
+---
+
+## 🍳 DETAILED KITCHEN STAFF JOURNEY
+
+```
+Login with "Kitchen" Role
+        ↓
+    /kitchen Page
+        ↓
+┌──────────────────────────────┐
+│   KITCHEN DISPLAY SYSTEM     │
+│  ───────────────────────────│
+│  • Order Queue (LIFO)         │
+│  • Timer for each order       │
+│  • Table #, Items, Notes      │
+│  • Status: Pending/Progress   │
+└──────────────────────────────┘
+        ↓
+  Order Arrives
+  (Audio Alert!)
+        ↓
+  ┌─────────────────┐
+  │ NEW ORDER CARD  │
+  ├─────────────────┤
+  │ Table: 5        │
+  │ Items:          │
+  │ ☐ Cappuccino x2 │
+  │ ☐ Pastry x1     │
+  │ ☐ Sandwich x1   │
+  │ Special: Extra  │
+  │ foam on coffee  │
+  │                 │
+  │ ⏱️ Time: 0:32 m │
+  └────────┬────────┘
+           │
+    Click "Start"
+           │
+    ┌──────▼────────┐
+    │ IN PROGRESS   │
+    │ ☑ Cappuccino  │
+    │ ☐ Pastry      │
+    │ ☐ Sandwich    │
+    └──────┬────────┘
+           │
+    As items ready,
+    check them off
+           │
+    All items ☑
+           │
+    ┌──────▼────────┐
+    │ MARK READY    │
+    │ Table: 5      │
+    │ Ready! (Btn)  │
+    └──────┬────────┘
+           │
+    Order sent to POS
+    Cashier notified
+    (Real-time update)
+           │
+    Cashier sees:
+    "Table 5: Ready"
+           │
+    Customer notified:
+    "Order ready!"
+           │
+    Order Served
+    Mark Complete
+           │
+    ┌──────▼────────────┐
+    │ REMOVED FROM      │
+    │ QUEUE ✓           │
+    └───────────────────┘
+```
+
+---
+
+## 💰 DETAILED PAYMENT FLOW
+
+```
+Order Complete in Kitchen
+        ↓
+Cashier Clicks "PAY"
+        ↓
+┌────────────────────────────────┐
+│   PAYMENT METHOD SELECT        │
+├────────────────────────────────┤
+│ 1️⃣ CASH  [Enter amount]         │
+│ 2️⃣ UPI   [Show QR]            │
+│ 3️⃣ CARD  [Razorpay]           │
+└────────┬───────────┬───────────┘
+         │           │
+    ┌────▼──┐    ┌───▼────────────────┐
+    │  CASH │    │   UPI / CARD        │
+    │       │    │                     │
+    │Amount │    │ ┌─────────────────┐ │
+    │entered│    │ │ Create Payment  │ │
+    │Auto   │    │ │ Order ID        │ │
+    │calc   │    │ │ Show QR Code    │ │
+    │change │    │ │                 │ │
+    │       │    │ │ Customer Scans  │ │
+    │ ✓Paid │    │ │ + Completes     │ │
+    │Marked │    │ │                 │ │
+    │       │    │ │ Poll Status:    │ │
+    │       │    │ │ Every 2 secs    │ │
+    │       │    │ │                 │ │
+    │       │    │ │ On Success:     │ │
+    │       │    │ │ ✓ Paid          │ │
+    │       │    │ │                 │ │
+    │       │    │ │ On Timeout:     │ │
+    │       │    │ │ ⚠ Check manually│ │
+    │       │    │ └─────────────────┘ │
+    │       │    │                     │
+    │       │    └───┬──────────────────┘
+    │       │        │
+    └───┬───┘        │
+        │            │
+        └────┬───────┘
+             │
+        ┌────▼──────────────┐
+        │  RECEIPT GEN      │
+        ├───────────────────┤
+        │ Items + Qty       │
+        │ Subtotal          │
+        │ Tax               │
+        │ Total: ₹ 450.50   │
+        │                   │
+        │ Payment: CASH     │
+        │ Date/Time         │
+        │                   │
+        │ [Print] [Email]   │
+        │ [Digital]         │
+        └────┬──────────────┘
+             │
+        ┌────▼──────────────┐
+        │ ORDER COMPLETE ✓  │
+        │ Table Cleared     │
+        │ Ready for next    │
+        │ customer          │
+        └───────────────────┘
+```
+
+---
+
+## 📊 OWNER ANALYTICS DASHBOARD FLOW
+
+```
+Owner/Admin Login
+        ↓
+    /dashboard
+        ↓
+┌──────────────────────────────────────────┐
+│       ANALYTICS (DEFAULT TAB)            │
+├──────────────────────────────────────────┤
+│ [TODAY] [WEEK] [MONTH]  [EXPORT CSV]    │
+└──────────────────────────────────────────┘
+        ↓
+┌────────────────────────────────────────────┐
+│ METRICS CARDS (Top Section)                │
+├────────────────────────────────────────────┤
+│                                            │
+│ ┌──────────┐  ┌──────────┐  ┌──────────┐ │
+│ │  SALES   │  │ ORDERS   │  │  AVG     │ │
+│ │ ₹15,450  │  │    42    │  │ ₹367.86  │ │
+│ └──────────┘  └──────────┘  └──────────┘ │
+│                                            │
+└────────────────────────────────────────────┘
+        ↓
+┌────────────────────────────────────────────┐
+│ CHARTS (Middle Section)                    │
+├────────────────────────────────────────────┤
+│                                            │
+│ ┌──────────────────┐  ┌────────────────┐ │
+│ │ Payment Methods  │  │ Top Products   │ │
+│ │ Pie Chart:       │  │                │ │
+│ │                  │  │ 1️⃣ Cappuccino │ │
+│ │ Cash: 45% (45%%) │  │ 2️⃣ Pastry     │ │
+│ │ UPI:  35% (UPI)  │  │ 3️⃣ Sandwich   │ │
+│ │ Card: 20% (CC)   │  │ 4️⃣ Espresso   │ │
+│ │                  │  │ 5️⃣ Croissant  │ │
+│ └──────────────────┘  └────────────────┘ │
+│                                            │
+└────────────────────────────────────────────┘
+        ↓
+┌────────────────────────────────────────────┐
+│ PAYMENT BREAKDOWN (Detailed Cards)         │
+├────────────────────────────────────────────┤
+│                                            │
+│ ┌─────────┐  ┌─────────┐  ┌─────────┐   │
+│ │  CASH   │  │   UPI   │  │  CARD   │   │
+│ │ ₹6,953  │  │ ₹5,408  │  │ ₹3,089  │   │
+│ │ 18 txn  │  │ 15 txn  │  │ 9 txn   │   │
+│ └─────────┘  └─────────┘  └─────────┘   │
+│                                            │
+└────────────────────────────────────────────┘
+        ↓
+┌────────────────────────────────────────────┐
+│ CUSTOMER REVIEWS (Latest)                  │
+├────────────────────────────────────────────┤
+│ ⭐⭐⭐⭐⭐ "Excellent coffee!" - Order #42 │
+│ ⭐⭐⭐⭐  "Good, bit slow" - Order #41    │
+│ ⭐⭐⭐⭐⭐ "Amazing pastries" - Order #40  │
+│ [RELOAD BUTTON]                            │
+└────────────────────────────────────────────┘
+
+─────────────────────────────────────────────
+
+Navigate to Other Tabs:
+│
+├─→ [STAFF] - Add/Edit/Remove staff
+│   • Staff list table
+│   • + Add Staff modal
+│   • Edit/Delete actions
+│
+├─→ [ATTENDANCE] - Track hours & pay
+│   • Clock in/out times
+│   • Hours worked
+│   • Hourly rate × hours
+│   • Export for payroll
+│
+├─→ [BRANCHES] - Multi-location comparison
+│   • Date range filter
+│   • Compare branch performance
+│   • Sales, orders, top products
+│
+└─→ [SETTINGS] - Cafe configuration
+    • Logo upload
+    • Cafe name/details
+    • Operating hours
+    • Tax rate
+    • Save changes
+```
+
+---
+
+## 🎯 QUICK STATUS REFERENCE
+
+### Order Statuses
+```
+Customer Life Cycle:
+  Pending → In Kitchen → Ready → Served → Completed
+
+POS Table Status:
+  ⚪ Empty      (No orders)
+  🔵 Occupied   (Has active orders)
+  🟢 Ready Pay  (Order complete, awaiting payment)
+  🟡 In Kitchen (Order sent to kitchen)
+```
+
+### User Roles & Access
+```
+┌────────────┬──────────┬───────┬────────┬────────┐
+│ Feature    │ Customer │ Staff │ Kitchen│ Owner  │
+├────────────┼──────────┼───────┼────────┼────────┤
+│ Self-Order │    ✅    │  ❌   │   ❌   │   ❌   │
+│ POS Table  │    ❌    │  ✅   │   ❌   │   ✅   │
+│ Payments   │    ❌    │  ✅   │   ❌   │   ✅   │
+│ Kitchen    │    ❌    │  ❌   │   ✅   │   ✅   │
+│ Analytics  │    ❌    │  ❌   │   ❌   │   ✅   │
+│ Staff Mgmt │    ❌    │  ❌   │   ❌   │   ✅   │
+│ Attendance │    ❌    │  ❌   │   ❌   │   ✅   │
+│ Settings   │    ❌    │  ❌   │   ❌   │   ✅   │
+└────────────┴──────────┴───────┴────────┴────────┘
+```
+
+---
+
+## 📱 Device Layouts
+
+```
+Desktop (≥1024px)        Tablet (768-1024px)      Mobile (<768px)
+┌──────────────────┐    ┌──────────────────┐    ┌──────────────┐
+│ SIDEBAR   CONTENT │    │ Hamburger        │    │ Full Width   │
+│ Nav       with    │    │ Toggle           │    │ Content Area │
+│ Links     main    │    │                  │    │              │
+│ ────────  data    │    │ Main Content     │    │ BOTTOM NAV   │
+│           & tabs  │    │ (full width)     │    │              │
+│           ────    │    │                  │    │ 5 Quick      │
+│           Details │    │ Responsive       │    │ Access:      │
+│                   │    │ Tables/Grids     │    │ • Analytics  │
+│                   │    │                  │    │ • Staff      │
+│                   │    │ Touch-optimized  │    │ • Attendance │
+│                   │    │ buttons          │    │ • Settings   │
+│                   │    │                  │    │ • More...    │
+└──────────────────┘    └──────────────────┘    └──────────────┘
+```
+
+---
+
+## 🔑 KEY WORKFLOWS AT A GLANCE
+
+### Workflow 1: From Menu to Paid Order (5 minutes)
+Customer → Order → Kitchen → Cashier → Payment → Receipt ✓
+
+### Workflow 2: From Staff Login to Manage Cafe (Daily)
+Login → Dashboard → Check Analytics → Manage Staff → Review Settings ✓
+
+### Workflow 3: From Kitchen Staff Start Shift to End (8 hours)
+Login → Kitchen Queue → Receive Orders → Prepare → Mark Ready → No orders? → Logout ✓
+
+---
+
+**Created:** April 2026 | **Format:** Quick Reference Guide

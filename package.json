@@ -1,0 +1,18 @@
+{
+  "name": "pos-cafe",
+  "version": "1.0.0",
+  "description": "Point of Sale system for cafe",
+  "scripts": {
+    "build": "tailwindcss -i ./static/input.css -o ./static/output.css",
+    "watch": "tailwindcss -i ./static/input.css -o ./static/output.css --watch",
+    "build:prod": "NODE_ENV=production tailwindcss -i ./static/input.css -o ./static/output.css --minify"
+  },
+  "keywords": ["pos", "cafe"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "tailwindcss": "^3.4.1",
+    "postcss": "^8.4.31",
+    "autoprefixer": "^10.4.16"
+  }
+}

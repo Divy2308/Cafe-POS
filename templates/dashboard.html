@@ -3,82 +3,196 @@
 {% block extra_head %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
-  .stat-card {
-    transition: transform .2s;
-  }
-
-  .stat-card:hover {
-    transform: translateY(-2px);
-  }
+  .stat-card { transition: transform .2s; }
+  .stat-card:hover { transform: translateY(-2px); }
 
   .period-btn {
     transition: all .2s;
     min-height: 44px;
+    padding: 10px 16px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
   }
-
-  .period-btn.active {
-    background: rgba(249, 115, 22, 0.15);
-    color: #f97316;
-    border-color: rgba(249, 115, 22, 0.3);
-  }
+  .period-btn:active { transform: scale(.96); }
+  .period-btn:focus-visible { outline: 2px solid rgba(249,115,22,.4); outline-offset: 2px; }
+  .period-btn.active { background: rgba(249,115,22,.15); color: #f97316; border-color: rgba(249,115,22,.3); }
 
   .dash-nav-btn {
     transition: all .2s;
+    min-height: 44px;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  .dash-nav-btn:active { transform: scale(.96); }
+  .dash-nav-btn:focus-visible { outline: 2px solid rgba(249,115,22,.3); outline-offset: 2px; }
+  .dash-nav-btn.active { background: rgba(249,115,22,.12); color: #f97316; }
+  .dash-nav-btn:hover:not(.active) { background: rgba(255,255,255,.04); }
+
+  /* ── BOTTOM NAV (mobile only) ── */
+  .bottom-nav {
+    display: none;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: #111;
+    border-top: 1px solid #222;
+    z-index: 50;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .bottom-nav-inner {
+    display: flex;
+    align-items: stretch;
+    height: 60px;
+  }
+  .bnav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    font-size: 10px;
+    color: #666;
+    background: none;
+    border: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    transition: color .2s;
+    padding: 8px 4px;
+  }
+  .bnav-btn svg { width: 20px; height: 20px; }
+  .bnav-btn.active { color: #f97316; }
+  .bnav-btn:active { transform: scale(.92); }
+
+  /* ── MORE DRAWER ── */
+  .more-drawer {
+    display: none;
+    position: fixed;
+    bottom: 60px; left: 0; right: 0;
+    background: #1a1a1a;
+    border-top: 1px solid #2a2a2a;
+    border-radius: 16px 16px 0 0;
+    z-index: 49;
+    padding: 12px 0 8px;
+    animation: slideUp .2s ease;
+  }
+  .more-drawer.open { display: block; }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .drawer-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    font-size: 14px;
+    color: #ccc;
+    background: none;
+    border: none;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .drawer-item:active { background: rgba(255,255,255,.05); }
+  .drawer-item svg { width: 18px; height: 18px; color: #888; flex-shrink: 0; }
+  .drawer-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 48;
+  }
+  .drawer-overlay.open { display: block; }
+
+  /* ── SIDEBAR (desktop) ── */
+  .sidebar { width: 220px; min-width: 220px; background: #111; }
+
+  @media (max-width: 1024px) {
+    .sidebar { 
+      display: none !important;
+      visibility: hidden !important;
+      width: 0 !important;
+      min-width: 0 !important;
+      overflow: hidden !important;
+      position: absolute !important;
+      left: -9999px !important;
+    }
+    .bottom-nav { display: block; }
+    .main-content { padding-bottom: 72px !important; }
+
+    /* Mobile header */
+    .dash-header {
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      gap: 10px !important;
+      padding: 12px 16px !important;
+    }
+    .dash-header h2 { font-size: 17px !important; }
+    .header-actions {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .header-actions::-webkit-scrollbar { display: none; }
+    .period-btn { padding: 7px 12px !important; font-size: 12px !important; min-height: 36px !important; white-space: nowrap; }
+    .export-btn { margin-left: auto; flex-shrink: 0; white-space: nowrap; }
+
+    /* Mobile stat cards: 2-col grid */
+    .stats-grid { grid-template-columns: 1fr 1fr !important; }
+    .stats-grid .stat-card:last-child { grid-column: 1 / -1; }
+    .stat-value { font-size: 1.6rem !important; }
+
+    /* Charts: stack */
+    .charts-grid { grid-template-columns: 1fr !important; }
+    .pay-breakdown-grid { grid-template-columns: 1fr 1fr !important; }
+    .review-stats-grid { grid-template-columns: 1fr 1fr 1fr !important; }
+
+    /* Staff table: scrollable */
+    .staff-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .staff-table-wrap table { min-width: 600px; }
+
+    /* Page padding */
+    .tab-content-pad { padding: 12px !important; }
+
+    /* Modal full width */
+    #addUserModal .card, #branchModal .card {
+      margin: 12px !important;
+      padding: 20px !important;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    /* Staff header */
+    .staff-header { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
+    .staff-header button { width: 100%; }
   }
 
-  .dash-nav-btn.active {
-    background: rgba(249, 115, 22, 0.12);
-    color: #f97316;
-  }
-
-  .dash-nav-btn:hover:not(.active) {
-    background: rgba(255, 255, 255, 0.04);
-  }
-
-  /* Mobile optimizations */
-  @media (max-width:1024px) {
-    .sidebar {
-      position: absolute;
-      left: 0;
-      height: 100vh;
-      transform: translateX(-100%);
-      transition: transform .3s ease;
-      z-index: 40;
-    }
-
-    .sidebar.open {
-      transform: translateX(0);
-    }
-  }
-
-  @media (max-width:768px) {
-    .grid-cols-3 {
-      grid-template-columns: 1fr !important;
-    }
-
-    .grid-cols-2 {
-      grid-template-columns: 1fr !important;
-    }
-
-    .stat-card {
-      padding: 16px !important;
-    }
-
-    .period-btn {
-      padding: 8px 12px;
-      font-size: 12px;
-    }
+  @media (max-width: 480px) {
+    .stats-grid { grid-template-columns: 1fr !important; }
+    .stats-grid .stat-card:last-child { grid-column: auto; }
+    .pay-breakdown-grid { grid-template-columns: 1fr 1fr !important; }
   }
 </style>
 {% endblock %}
 {% block body %}
 <div class="flex h-screen overflow-hidden">
-  <!-- Sidebar -->
-  <div style="width:220px;min-width:220px;background:#111" class="border-r border-border flex flex-col">
+
+  <!-- ── SIDEBAR (desktop ≥1024px) ── -->
+  <div class="sidebar border-r border-border flex flex-col">
     <div class="p-5 border-b border-border">
       <div class="flex items-center gap-3">
-        <div id="sidebar-logo" class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden"
-          style="background:linear-gradient(135deg,#f97316,#ea580c)">
+        <div id="sidebar-logo" class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden" style="background:linear-gradient(135deg,#f97316,#ea580c)">
           <span class="text-white text-lg">☕</span>
         </div>
         <div>
@@ -89,128 +203,85 @@
       </div>
     </div>
     <nav class="flex-1 p-3 space-y-1">
-      <button onclick="switchDashTab('analytics')"
-        class="dash-nav-btn active w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-        </svg>
+      <button onclick="switchDashTab('analytics')" class="dash-nav-btn active w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
         Analytics
       </button>
-      <button onclick="switchDashTab('staff')"
-        class="dash-nav-btn w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
+      <button onclick="switchDashTab('staff')" class="dash-nav-btn w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
         Staff
       </button>
-      <button onclick="switchDashTab('attendance')"
-        class="dash-nav-btn w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
+      <button onclick="switchDashTab('attendance')" class="dash-nav-btn w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         Attendance
       </button>
-      <button onclick="switchDashTab('compare')"
-        class="dash-nav-btn w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-        </svg>
+      <button onclick="switchDashTab('compare')" class="dash-nav-btn w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
         Branches
       </button>
-      <button onclick="switchDashTab('settings')"
-        class="dash-nav-btn w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-        </svg>
+      <button onclick="switchDashTab('settings')" class="dash-nav-btn w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/></svg>
         Settings
       </button>
-
       <div class="border-t border-border my-3"></div>
-
       <a href="/backend" class="dash-nav-btn flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
-        </svg>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/></svg>
         Back-end Config
       </a>
       <a href="/pos" class="dash-nav-btn flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-        </svg>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
         Go to POS
       </a>
     </nav>
     <div class="border-t border-border p-3">
-      <button onclick="logout()"
-        class="nav-link w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm bg-red-600/10 hover:bg-red-600/20 text-red-500 hover:text-red-400 transition">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-        </svg> Logout
+      <button onclick="logout()" class="nav-link w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm bg-red-600/10 hover:bg-red-600/20 text-red-500 hover:text-red-400 transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+        Logout
       </button>
     </div>
   </div>
 
-  <div class="flex-1 overflow-auto">
-    <!-- ═══════════════════════════════════════════════════════
-         TAB: Analytics
-         ═══════════════════════════════════════════════════════ -->
+  <!-- ── MAIN ── -->
+  <div class="flex-1 overflow-auto main-content">
+
+    <!-- Analytics Tab -->
     <div id="tab-analytics" class="tab-panel">
-      <!-- Header -->
-      <div class="border-b border-border px-6 py-4 flex items-center justify-between"
-        style="background:#111;position:sticky;top:0;z-index:10">
+      <div class="border-b border-border dash-header flex items-center justify-between" style="background:#111;position:sticky;top:0;z-index:10;">
         <h2 class="font-display text-xl font-700">Reports &amp; Analytics</h2>
-        <div class="flex gap-2">
-          <button class="period-btn active border border-border px-4 py-1.5 rounded-lg text-sm"
-            onclick="setPeriod('today',this)">Today</button>
-          <button class="period-btn border border-border px-4 py-1.5 rounded-lg text-sm text-gray-500"
-            onclick="setPeriod('week',this)">Week</button>
-          <button class="period-btn border border-border px-4 py-1.5 rounded-lg text-sm text-gray-500"
-            onclick="setPeriod('month',this)">Month</button>
-          <button onclick="exportCSV()" class="btn-ghost px-4 py-1.5 rounded-lg text-sm flex items-center gap-1.5"
-            title="Download orders as CSV">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg> Export CSV
+        <div class="header-actions">
+          <button class="period-btn active border border-border rounded-lg text-sm" onclick="setPeriod('today',this)">Today</button>
+          <button class="period-btn border border-border rounded-lg text-sm text-gray-500" onclick="setPeriod('week',this)">Week</button>
+          <button class="period-btn border border-border rounded-lg text-sm text-gray-500" onclick="setPeriod('month',this)">Month</button>
+          <button onclick="exportCSV()" class="export-btn btn-ghost px-4 py-1.5 rounded-lg text-sm flex items-center gap-1.5" title="Export CSV">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Export
           </button>
         </div>
       </div>
 
-      <div class="p-6 space-y-6">
-        <!-- Stats Row -->
-        <div class="grid grid-cols-3 gap-4">
+      <div class="tab-content-pad p-6 space-y-6">
+        <div class="grid stats-grid gap-4" style="grid-template-columns:repeat(3,1fr)">
           <div class="stat-card card p-5" style="border-radius:16px">
             <div class="text-xs text-gray-500 uppercase tracking-wider mb-3">Total Sales</div>
-            <div class="font-display text-3xl font-800 text-brand-500" id="stat-sales">₹0</div>
+            <div class="font-display font-800 text-brand-500 stat-value" style="font-size:1.875rem" id="stat-sales">₹0</div>
             <div class="text-xs text-gray-600 mt-2">Paid orders only</div>
           </div>
           <div class="stat-card card p-5" style="border-radius:16px">
             <div class="text-xs text-gray-500 uppercase tracking-wider mb-3">Total Orders</div>
-            <div class="font-display text-3xl font-800 text-brand-500" id="stat-orders">0</div>
-            <div class="text-xs text-gray-600 mt-2">Completed transactions</div>
+            <div class="font-display font-800 text-brand-500 stat-value" style="font-size:1.875rem" id="stat-orders">0</div>
+            <div class="text-xs text-gray-600 mt-2">Completed</div>
           </div>
           <div class="stat-card card p-5" style="border-radius:16px">
             <div class="text-xs text-gray-500 uppercase tracking-wider mb-3">Avg. Order</div>
-            <div class="font-display text-3xl font-800 text-brand-500" id="stat-avg">₹0</div>
+            <div class="font-display font-800 text-brand-500 stat-value" style="font-size:1.875rem" id="stat-avg">₹0</div>
             <div class="text-xs text-gray-600 mt-2">Per transaction</div>
           </div>
         </div>
 
-        <!-- Charts Row -->
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid charts-grid gap-4" style="grid-template-columns:repeat(2,1fr)">
           <div class="card p-5" style="border-radius:16px">
             <div class="font-display font-700 mb-4">Payment Methods</div>
-            <div style="height:200px;position:relative">
-              <canvas id="chart-methods"></canvas>
-            </div>
+            <div style="height:200px;position:relative"><canvas id="chart-methods"></canvas></div>
           </div>
           <div class="card p-5" style="border-radius:16px">
             <div class="font-display font-700 mb-4">Top Products</div>
@@ -218,63 +289,50 @@
           </div>
         </div>
 
-        <!-- Payment breakdown table -->
         <div class="card p-5" style="border-radius:16px">
           <div class="font-display font-700 mb-4">Payment Breakdown</div>
-          <div id="pay-breakdown" class="grid grid-cols-3 gap-4"></div>
+          <div id="pay-breakdown" class="grid pay-breakdown-grid gap-4" style="grid-template-columns:repeat(3,1fr)"></div>
         </div>
 
-        <!-- Customer Reviews -->
         <div class="card p-5" style="border-radius:16px">
           <div class="flex items-center justify-between gap-4 mb-4">
             <div>
               <div class="font-display font-700">Customer Reviews</div>
-              <div class="text-xs text-gray-500 mt-1">Latest feedback submitted by customers</div>
+              <div class="text-xs text-gray-500 mt-1">Latest feedback from customers</div>
             </div>
             <button onclick="loadReviews()" class="btn-ghost px-3 py-1.5 rounded-lg text-xs">Reload</button>
           </div>
-          <div id="review-stats" class="grid grid-cols-3 gap-3 mb-4"></div>
+          <div id="review-stats" class="grid review-stats-grid gap-3 mb-4" style="grid-template-columns:repeat(3,1fr)"></div>
           <div id="review-list" class="space-y-3"></div>
           <div id="review-empty" class="hidden text-center py-10 text-gray-500">No reviews yet.</div>
         </div>
 
-        <!-- Reservations Management -->
         <div class="card p-5" style="border-radius:16px">
           <div class="flex items-center justify-between gap-4 mb-4">
             <div>
               <div class="font-display font-700">📅 Reservation Requests</div>
-              <div class="text-xs text-gray-500 mt-1">Upcoming reservations that need your approval</div>
+              <div class="text-xs text-gray-500 mt-1">Upcoming reservations needing approval</div>
             </div>
             <div class="flex gap-2 items-center">
-              <span id="pending-badge"
-                class="hidden text-xs font-700 bg-orange-500 text-white rounded-full px-2 py-0.5"></span>
+              <span id="pending-badge" class="hidden text-xs font-700 bg-orange-500 text-white rounded-full px-2 py-0.5"></span>
               <button onclick="loadReservations()" class="btn-ghost px-3 py-1.5 rounded-lg text-xs">↻ Refresh</button>
             </div>
           </div>
-          <!-- Filter tabs -->
-          <div id="res-filter-tabs" style="display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap;">
-            <button class="res-filter-btn" data-status="all" onclick="filterReservations('all',this)"
-              style="padding:5px 14px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; border:1px solid #333; background:#f97316; color:#fff;">All</button>
-            <button class="res-filter-btn" data-status="pending" onclick="filterReservations('pending',this)"
-              style="padding:5px 14px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; border:1px solid #333; background:transparent; color:#888;">Pending</button>
-            <button class="res-filter-btn" data-status="confirmed" onclick="filterReservations('confirmed',this)"
-              style="padding:5px 14px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; border:1px solid #333; background:transparent; color:#888;">Confirmed</button>
-            <button class="res-filter-btn" data-status="seated" onclick="filterReservations('seated',this)"
-              style="padding:5px 14px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; border:1px solid #333; background:transparent; color:#888;">Seated</button>
+          <div id="res-filter-tabs" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
+            <button class="res-filter-btn" data-status="all" onclick="filterReservations('all',this)" style="padding:5px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid #333;background:#f97316;color:#fff;">All</button>
+            <button class="res-filter-btn" data-status="pending" onclick="filterReservations('pending',this)" style="padding:5px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid #333;background:transparent;color:#888;">Pending</button>
+            <button class="res-filter-btn" data-status="confirmed" onclick="filterReservations('confirmed',this)" style="padding:5px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid #333;background:transparent;color:#888;">Confirmed</button>
+            <button class="res-filter-btn" data-status="seated" onclick="filterReservations('seated',this)" style="padding:5px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid #333;background:transparent;color:#888;">Seated</button>
           </div>
           <div id="reservations-mgmt-list" class="space-y-3"></div>
-          <div id="reservations-mgmt-empty" class="hidden text-center py-10 text-gray-500">No upcoming reservations.
-          </div>
+          <div id="reservations-mgmt-empty" class="hidden text-center py-10 text-gray-500">No upcoming reservations.</div>
         </div>
       </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════
-         TAB: Staff Management
-         ═══════════════════════════════════════════════════════ -->
+    <!-- Staff Tab -->
     <div id="tab-staff" class="tab-panel hidden">
-      <div class="border-b border-border px-6 py-4 flex items-center justify-between"
-        style="background:#111;position:sticky;top:0;z-index:10">
+      <div class="border-b border-border px-6 py-4 flex items-center justify-between" style="background:#111;position:sticky;top:0;z-index:10">
         <div>
           <h2 class="font-display text-xl font-700">Staff Management</h2>
           <div class="text-sm text-gray-500 mt-1">Manage staff, rates, and branch assignments.</div>
@@ -282,26 +340,23 @@
         <div class="flex items-center gap-3">
           <div class="hidden" id="branchSwitcherWrap">
             <label class="text-xs text-gray-500 block mb-1">Active Branch</label>
-            <select id="branchSwitcher" class="min-w-[220px]" onchange="handleBranchSwitch()"></select>
+            <select id="branchSwitcher" class="min-w-[180px]" onchange="handleBranchSwitch()"></select>
           </div>
           <div class="card px-4 py-3">
-            <div class="text-[11px] uppercase tracking-wider text-gray-500">Current Scope</div>
-            <div class="font-semibold" id="activeBranchLabel">{% if active_branch %}{{ active_branch.name }}{% else
-              %}All branches{% endif %}</div>
+            <div class="text-[11px] uppercase tracking-wider text-gray-500">Scope</div>
+            <div class="font-semibold" id="activeBranchLabel">{% if active_branch %}{{ active_branch.name }}{% else %}All branches{% endif %}</div>
           </div>
         </div>
       </div>
-
-      <div class="p-6 space-y-6">
-        <div class="flex items-center justify-between mb-5">
+      <div class="tab-content-pad p-6 space-y-6">
+        <div class="flex items-center justify-between mb-5 staff-header">
           <div>
             <h2 class="text-2xl font-bold">Staff Members</h2>
             <p class="text-sm text-gray-500 mt-1">Each staff member belongs to a branch and can have an hourly rate.</p>
           </div>
-          <button onclick="openAddUserModal()" class="btn-primary px-4 py-2 rounded-lg text-white font-semibold">+ Add
-            Staff</button>
+          <button onclick="openAddUserModal()" class="btn-primary px-4 py-2 rounded-lg text-white font-semibold">+ Add Staff</button>
         </div>
-        <div class="card p-6 overflow-x-auto">
+        <div class="card p-6 staff-table-wrap">
           <table class="w-full">
             <thead>
               <tr class="border-b border-border">
@@ -315,25 +370,20 @@
               </tr>
             </thead>
             <tbody id="staffTable">
-              <tr>
-                <td colspan="7" class="py-8 text-center text-gray-500">Loading staff...</td>
-              </tr>
+              <tr><td colspan="7" class="py-8 text-center text-gray-500">Loading staff...</td></tr>
             </tbody>
           </table>
         </div>
       </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════
-         TAB: Attendance & Payroll
-         ═══════════════════════════════════════════════════════ -->
+    <!-- Attendance Tab -->
     <div id="tab-attendance" class="tab-panel hidden">
       <div class="border-b border-border px-6 py-4" style="background:#111;position:sticky;top:0;z-index:10">
         <h2 class="font-display text-xl font-700">Attendance &amp; Payroll</h2>
         <div class="text-sm text-gray-500 mt-1">Review clock-in/out pairs and adjust missed clock-outs.</div>
       </div>
-
-      <div class="p-6 space-y-6">
+      <div class="tab-content-pad p-6 space-y-6">
         <div class="card p-6">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
@@ -349,13 +399,11 @@
               <input type="date" id="attendanceEndDate">
             </div>
             <div class="flex items-end">
-              <button onclick="loadAttendanceReport()"
-                class="w-full btn-primary py-2 rounded-lg text-white font-semibold">Apply Filters</button>
+              <button onclick="loadAttendanceReport()" class="w-full btn-primary py-2 rounded-lg text-white font-semibold">Apply Filters</button>
             </div>
           </div>
         </div>
-
-        <div class="card p-6 overflow-x-auto">
+        <div class="card p-6 staff-table-wrap">
           <table class="w-full">
             <thead>
               <tr class="border-b border-border">
@@ -369,30 +417,23 @@
               </tr>
             </thead>
             <tbody id="attendanceTable">
-              <tr>
-                <td colspan="7" class="py-8 text-center text-gray-500">Loading attendance...</td>
-              </tr>
+              <tr><td colspan="7" class="py-8 text-center text-gray-500">Loading attendance...</td></tr>
             </tbody>
           </table>
         </div>
       </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════
-         TAB: Compare Branches
-         ═══════════════════════════════════════════════════════ -->
+    <!-- Compare Tab -->
     <div id="tab-compare" class="tab-panel hidden">
-      <div class="border-b border-border px-6 py-4 flex items-center justify-between"
-        style="background:#111;position:sticky;top:0;z-index:10">
+      <div class="border-b border-border px-6 py-4 flex items-center justify-between" style="background:#111;position:sticky;top:0;z-index:10">
         <div>
           <h2 class="font-display text-xl font-700">Compare Branches</h2>
           <div class="text-sm text-gray-500 mt-1">Side-by-side sales summary across outlets.</div>
         </div>
-        <button id="addBranchBtn" onclick="openBranchModal()"
-          class="hidden btn-primary px-4 py-2 rounded-lg text-white font-semibold">+ Add Branch</button>
+        <button id="addBranchBtn" onclick="openBranchModal()" class="hidden btn-primary px-4 py-2 rounded-lg text-white font-semibold">+ Add Branch</button>
       </div>
-
-      <div class="p-6 space-y-6">
+      <div class="tab-content-pad p-6 space-y-6">
         <div class="card p-6">
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
@@ -404,8 +445,7 @@
               <input type="date" id="compareEndDate">
             </div>
             <div class="flex items-end">
-              <button onclick="loadBranchComparison()"
-                class="w-full btn-primary py-2 rounded-lg text-white font-semibold">Compare</button>
+              <button onclick="loadBranchComparison()" class="w-full btn-primary py-2 rounded-lg text-white font-semibold">Compare</button>
             </div>
           </div>
         </div>
@@ -413,82 +453,97 @@
       </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════
-         TAB: Settings
-         ═══════════════════════════════════════════════════════ -->
+    <!-- Settings Tab -->
     <div id="tab-settings" class="tab-panel hidden">
       <div class="border-b border-border px-6 py-4" style="background:#111;position:sticky;top:0;z-index:10">
         <h2 class="font-display text-xl font-700">Cafe Settings</h2>
         <div class="text-sm text-gray-500 mt-1">Update shared cafe information.</div>
       </div>
-
-      <div class="p-6">
+      <div class="tab-content-pad p-6">
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div class="lg:col-span-2 card p-6">
             <h2 class="text-2xl font-bold mb-6">Cafe Settings</h2>
             <div class="space-y-4">
-              <!-- Logo Upload -->
               <div>
                 <label class="block text-sm text-gray-500 mb-2">Logo</label>
                 <div class="flex items-center gap-4">
-                  <div id="logoPreview"
-                    class="w-16 h-16 rounded-xl flex items-center justify-center overflow-hidden border border-border"
-                    style="background:#222">
-                    <span class="text-2xl">☕</span>
-                  </div>
+                  <div id="logoPreview" class="w-16 h-16 rounded-xl flex items-center justify-center overflow-hidden border border-border" style="background:#222"><span class="text-2xl">☕</span></div>
                   <div>
-                    <input type="file" id="logoFileInput" accept="image/*" onchange="handleLogoUpload(event)"
-                      class="hidden">
-                    <button onclick="document.getElementById('logoFileInput').click()"
-                      class="btn-ghost px-4 py-2 rounded-lg text-sm">Upload Logo</button>
-                    <button onclick="removeLogo()"
-                      class="btn-ghost px-3 py-2 rounded-lg text-xs text-red-400 ml-2">Remove</button>
+                    <input type="file" id="logoFileInput" accept="image/*" onchange="handleLogoUpload(event)" class="hidden">
+                    <button onclick="document.getElementById('logoFileInput').click()" class="btn-ghost px-4 py-2 rounded-lg text-sm">Upload Logo</button>
+                    <button onclick="removeLogo()" class="btn-ghost px-3 py-2 rounded-lg text-xs text-red-400 ml-2">Remove</button>
                     <div class="text-xs text-gray-600 mt-1">PNG or JPG, max 500KB</div>
                   </div>
                 </div>
                 <input type="hidden" id="cafeLogo">
               </div>
-              <div>
-                <label class="block text-sm text-gray-500 mb-2">Cafe Name</label>
-                <input type="text" id="cafeName">
-              </div>
-              <div>
-                <label class="block text-sm text-gray-500 mb-2">Phone Number</label>
-                <input type="tel" id="cafePhone">
-              </div>
-              <div>
-                <label class="block text-sm text-gray-500 mb-2">Email</label>
-                <input type="email" id="cafeEmail">
-              </div>
-              <div>
-                <label class="block text-sm text-gray-500 mb-2">Address</label>
-                <textarea id="cafeAddress" rows="3"></textarea>
-              </div>
+              <div><label class="block text-sm text-gray-500 mb-2">Cafe Name</label><input type="text" id="cafeName"></div>
+              <div><label class="block text-sm text-gray-500 mb-2">Phone Number</label><input type="tel" id="cafePhone"></div>
+              <div><label class="block text-sm text-gray-500 mb-2">Email</label><input type="email" id="cafeEmail"></div>
+              <div><label class="block text-sm text-gray-500 mb-2">Address</label><textarea id="cafeAddress" rows="3"></textarea></div>
               <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-sm text-gray-500 mb-2">Open Time</label>
-                  <input type="time" id="openTime">
-                </div>
-                <div>
-                  <label class="block text-sm text-gray-500 mb-2">Close Time</label>
-                  <input type="time" id="closeTime">
-                </div>
+                <div><label class="block text-sm text-gray-500 mb-2">Open Time</label><input type="time" id="openTime"></div>
+                <div><label class="block text-sm text-gray-500 mb-2">Close Time</label><input type="time" id="closeTime"></div>
               </div>
-              <div>
-                <label class="block text-sm text-gray-500 mb-2">Default Tax Rate (%)</label>
-                <input type="number" id="taxRate" min="0" max="100">
-              </div>
+              <div><label class="block text-sm text-gray-500 mb-2">Default Tax Rate (%)</label><input type="number" id="taxRate" min="0" max="100"></div>
             </div>
           </div>
           <div class="card p-6">
             <h3 class="text-xl font-bold mb-4">Actions</h3>
-            <button onclick="saveCafeSettings()"
-              class="w-full btn-primary py-2 rounded-lg text-white font-semibold">Save Changes</button>
+            <button onclick="saveCafeSettings()" class="w-full btn-primary py-2 rounded-lg text-white font-semibold">Save Changes</button>
           </div>
         </div>
       </div>
     </div>
   </div>
+</div>
+
+<!-- ── BOTTOM NAV (mobile) ── -->
+<div class="bottom-nav">
+  <div class="bottom-nav-inner">
+    <button class="bnav-btn active" id="bnav-analytics" onclick="switchDashTab('analytics')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+      Analytics
+    </button>
+    <button class="bnav-btn" id="bnav-staff" onclick="switchDashTab('staff')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      Staff
+    </button>
+    <button class="bnav-btn" id="bnav-attendance" onclick="switchDashTab('attendance')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      Attendance
+    </button>
+    <button class="bnav-btn" id="bnav-settings" onclick="switchDashTab('settings')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/></svg>
+      Settings
+    </button>
+    <button class="bnav-btn" id="bnav-more" onclick="toggleMoreDrawer()">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"/></svg>
+      More
+    </button>
+  </div>
+</div>
+
+<!-- More Drawer -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeMoreDrawer()"></div>
+<div class="more-drawer" id="moreDrawer">
+  <button class="drawer-item" onclick="switchDashTab('compare');closeMoreDrawer()">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+    Branches
+  </button>
+  <a href="/backend" class="drawer-item">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/></svg>
+    Back-end Config
+  </a>
+  <a href="/pos" class="drawer-item">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+    Go to POS
+  </a>
+  <div style="border-top:1px solid #222;margin:8px 0"></div>
+  <button class="drawer-item" onclick="logout()" style="color:#ef4444;">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+    Logout
+  </button>
 </div>
 
 <!-- Add Staff Modal -->
@@ -497,14 +552,8 @@
     <h2 class="text-2xl font-bold mb-6" id="userModalTitle">Add Staff Member</h2>
     <input type="hidden" id="editUserId">
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div class="md:col-span-2">
-        <label class="block text-sm text-gray-500 mb-2">Full Name</label>
-        <input type="text" id="newUserName">
-      </div>
-      <div>
-        <label class="block text-sm text-gray-500 mb-2">Email</label>
-        <input type="email" id="newUserEmail">
-      </div>
+      <div class="md:col-span-2"><label class="block text-sm text-gray-500 mb-2">Full Name</label><input type="text" id="newUserName"></div>
+      <div><label class="block text-sm text-gray-500 mb-2">Email</label><input type="email" id="newUserEmail"></div>
       <div>
         <label class="block text-sm text-gray-500 mb-2">Password</label>
         <input type="password" id="newUserPassword">
@@ -519,19 +568,12 @@
           <option value="restaurant">Admin</option>
         </select>
       </div>
-      <div>
-        <label class="block text-sm text-gray-500 mb-2">Hourly Rate</label>
-        <input type="number" id="newUserHourlyRate" min="0" step="0.01" placeholder="0.00">
-      </div>
-      <div class="md:col-span-2 hidden" id="newUserBranchWrap">
-        <label class="block text-sm text-gray-500 mb-2">Branch</label>
-        <select id="newUserBranch"></select>
-      </div>
+      <div><label class="block text-sm text-gray-500 mb-2">Hourly Rate</label><input type="number" id="newUserHourlyRate" min="0" step="0.01" placeholder="0.00"></div>
+      <div class="md:col-span-2 hidden" id="newUserBranchWrap"><label class="block text-sm text-gray-500 mb-2">Branch</label><select id="newUserBranch"></select></div>
     </div>
     <div class="flex gap-3 mt-6">
       <button onclick="closeAddUserModal()" class="flex-1 btn-ghost py-2 rounded-lg font-semibold">Cancel</button>
-      <button onclick="saveStaffMember()" class="flex-1 btn-primary py-2 rounded-lg text-white font-semibold"
-        id="userModalSaveBtn">Add Staff</button>
+      <button onclick="saveStaffMember()" class="flex-1 btn-primary py-2 rounded-lg text-white font-semibold" id="userModalSaveBtn">Add Staff</button>
     </div>
   </div>
 </div>
@@ -541,26 +583,18 @@
   <div class="card p-8 max-w-lg w-full mx-4">
     <h2 class="text-2xl font-bold mb-6">Add Branch</h2>
     <div class="space-y-4">
-      <div>
-        <label class="block text-sm text-gray-500 mb-2">Branch Name</label>
-        <input type="text" id="branchName">
-      </div>
-      <div>
-        <label class="block text-sm text-gray-500 mb-2">Address</label>
-        <textarea id="branchAddress" rows="3"></textarea>
-      </div>
+      <div><label class="block text-sm text-gray-500 mb-2">Branch Name</label><input type="text" id="branchName"></div>
+      <div><label class="block text-sm text-gray-500 mb-2">Address</label><textarea id="branchAddress" rows="3"></textarea></div>
     </div>
     <div class="flex gap-3 mt-6">
       <button onclick="closeBranchModal()" class="flex-1 btn-ghost py-2 rounded-lg font-semibold">Cancel</button>
-      <button onclick="createBranch()" class="flex-1 btn-primary py-2 rounded-lg text-white font-semibold">Add
-        Branch</button>
+      <button onclick="createBranch()" class="flex-1 btn-primary py-2 rounded-lg text-white font-semibold">Add Branch</button>
     </div>
   </div>
 </div>
 {% endblock %}
 {% block scripts %}
 <script>
-  /* ─── Dashboard Context ────────────────────────────────────── */
   const DASHBOARD_CONTEXT = {
     isSuperadmin: {{ 'true' if is_superadmin else 'false' }},
     activeBranchId: {{ active_branch.id if active_branch else 'null' }}
@@ -574,7 +608,20 @@
   let attendanceStaff = [];
   let staffUsers = [];
 
-  /* ─── Load Tenant Info ────────────────────────────────────── */
+  /* ── More Drawer ── */
+  function toggleMoreDrawer() {
+    const d = document.getElementById('moreDrawer');
+    const o = document.getElementById('drawerOverlay');
+    const isOpen = d.classList.contains('open');
+    d.classList.toggle('open', !isOpen);
+    o.classList.toggle('open', !isOpen);
+  }
+  function closeMoreDrawer() {
+    document.getElementById('moreDrawer').classList.remove('open');
+    document.getElementById('drawerOverlay').classList.remove('open');
+  }
+
+  /* ── Tenant Info ── */
   async function loadTenantInfo() {
     try {
       const res = await fetch('/api/cafe-settings');
@@ -582,67 +629,46 @@
       const tenantEl = document.getElementById('tenant-info');
       const nameEl = document.getElementById('sidebar-cafe-name');
       const logoEl = document.getElementById('sidebar-logo');
-      if (tenantEl && data.name) {
-        tenantEl.textContent = '📍 ' + data.name;
-      }
-      if (nameEl && data.name) {
-        nameEl.textContent = data.name;
-      }
-      if (logoEl && data.logo_b64) {
-        logoEl.innerHTML = `<img src="${data.logo_b64}" alt="Logo" class="w-full h-full object-cover">`;
-      }
-    } catch (e) {
-      console.log('Could not load tenant info');
-    }
+      if (tenantEl && data.name) tenantEl.textContent = '📍 ' + data.name;
+      if (nameEl && data.name) nameEl.textContent = data.name;
+      if (logoEl && data.logo_b64) logoEl.innerHTML = `<img src="${data.logo_b64}" alt="Logo" class="w-full h-full object-cover">`;
+    } catch (e) {}
   }
   loadTenantInfo();
 
-  /* ─── Tab Switching ────────────────────────────────────────── */
+  /* ── Tab Switching ── */
   function switchDashTab(tab) {
     document.querySelectorAll('.tab-panel').forEach(el => el.classList.add('hidden'));
     document.querySelectorAll('.dash-nav-btn').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.bnav-btn').forEach(el => el.classList.remove('active'));
     const panel = document.getElementById('tab-' + tab);
     if (panel) panel.classList.remove('hidden');
-    // Activate button
-    const btns = document.querySelectorAll('.dash-nav-btn');
-    btns.forEach(btn => {
-      if (btn.textContent.trim().toLowerCase().startsWith(tab === 'compare' ? 'branch' : tab)) {
-        btn.classList.add('active');
-      }
+    // Sidebar active
+    document.querySelectorAll('.dash-nav-btn').forEach(btn => {
+      if (btn.textContent.trim().toLowerCase().startsWith(tab === 'compare' ? 'branch' : tab)) btn.classList.add('active');
     });
+    // Bottom nav active
+    const bnavMap = { analytics: 'bnav-analytics', staff: 'bnav-staff', attendance: 'bnav-attendance', settings: 'bnav-settings', compare: 'bnav-more' };
+    const bnavId = bnavMap[tab];
+    if (bnavId) { const b = document.getElementById(bnavId); if (b) b.classList.add('active'); }
     currentTab = tab;
-
-    // Lazy load tab data
     if (tab === 'staff') loadStaff();
     if (tab === 'attendance') loadAttendanceReport();
     if (tab === 'compare') loadBranchComparison();
     if (tab === 'settings') loadCafeSettings();
   }
 
-  /* ─── Utility ──────────────────────────────────────────────── */
-  function escHtml(s) {
-    const el = document.createElement('div');
-    el.textContent = s || '';
-    return el.innerHTML;
-  }
-
-  function formatMoney(amount) {
-    return '₹' + Number(amount || 0).toFixed(2);
-  }
-
-  function formatDateTime(value) {
-    if (!value) return '—';
-    return new Date(value).toLocaleString();
-  }
-
+  function escHtml(s) { const el = document.createElement('div'); el.textContent = s || ''; return el.innerHTML; }
+  function formatMoney(amount) { return '₹' + Number(amount || 0).toFixed(2); }
+  function formatDateTime(value) { if (!value) return '—'; return new Date(value).toLocaleString(); }
   function toDatetimeLocalValue(value) {
     if (!value) return '';
     const date = new Date(value);
     const pad = n => String(n).padStart(2, '0');
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
   }
 
-  /* ─── Analytics Tab ────────────────────────────────────────── */
+  /* ── Analytics ── */
   async function loadStats(period) {
     const d = await api('/api/dashboard/stats?period=' + period);
     if (d.error) return;
@@ -662,15 +688,8 @@
     if (!values.length) return;
     methodChart = new Chart(ctx, {
       type: 'doughnut',
-      data: {
-        labels,
-        datasets: [{ data: values, backgroundColor: ['#22c55e', '#f97316', '#3b82f6'], borderWidth: 0 }]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { labels: { color: '#9ca3af', font: { size: 12 } } } },
-        cutout: '70%'
-      }
+      data: { labels, datasets: [{ data: values, backgroundColor: ['#22c55e','#f97316','#3b82f6'], borderWidth: 0 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#9ca3af', font: { size: 12 } } } }, cutout: '70%' }
     });
   }
 
@@ -678,78 +697,59 @@
     const el = document.getElementById('top-products');
     const max = products[0]?.qty || 1;
     el.innerHTML = products.map((p, i) => `
-    <div class="flex items-center gap-3">
-      <span class="text-xs text-gray-600 w-4">${i + 1}</span>
-      <div class="flex-1">
-        <div class="text-sm mb-1">${p.name}</div>
-        <div class="h-1.5 rounded-full bg-gray-800 overflow-hidden">
-          <div class="h-full brand-gradient rounded-full" style="width:${(p.qty / max * 100).toFixed(0)}%;transition:width .6s"></div>
+      <div class="flex items-center gap-3">
+        <span class="text-xs text-gray-600 w-4">${i+1}</span>
+        <div class="flex-1">
+          <div class="text-sm mb-1">${p.name}</div>
+          <div class="h-1.5 rounded-full bg-gray-800 overflow-hidden">
+            <div class="h-full brand-gradient rounded-full" style="width:${(p.qty/max*100).toFixed(0)}%;transition:width .6s"></div>
+          </div>
         </div>
-      </div>
-      <span class="text-xs text-gray-500 w-8 text-right">${p.qty}</span>
-    </div>`).join('');
+        <span class="text-xs text-gray-500 w-8 text-right">${p.qty}</span>
+      </div>`).join('');
   }
 
   function renderPayBreakdown(byMethod, total) {
     const el = document.getElementById('pay-breakdown');
-    const icons = { cash: '💵', upi: '📱', digital: '💳', card: '💳', '': '—' };
-    const names = { cash: 'Cash', upi: 'UPI / QR', digital: 'Card', card: 'Card' };
-    el.innerHTML = Object.entries(byMethod).map(([k, v]) => `
-    <div class="card p-4" style="border-radius:12px">
-      <div class="text-xl mb-2">${icons[k] || '💰'}</div>
-      <div class="text-xs text-gray-500 mb-1">${names[k] || k}</div>
-      <div class="font-display font-800 text-lg text-gray-900">₹${v.toFixed(0)}</div>
-      <div class="text-xs text-gray-600">${total ? ((v / total) * 100).toFixed(1) : 0}% of total</div>
-    </div>`).join('');
+    const icons = { cash:'💵', upi:'📱', digital:'💳', card:'💳', '':'—' };
+    const names = { cash:'Cash', upi:'UPI / QR', digital:'Card', card:'Card' };
+    el.innerHTML = Object.entries(byMethod).map(([k,v]) => `
+      <div class="card p-4" style="border-radius:12px">
+        <div class="text-xl mb-2">${icons[k]||'💰'}</div>
+        <div class="text-xs text-gray-500 mb-1">${names[k]||k}</div>
+        <div class="font-display font-800 text-lg text-gray-900">₹${v.toFixed(0)}</div>
+        <div class="text-xs text-gray-600">${total?((v/total)*100).toFixed(1):0}% of total</div>
+      </div>`).join('');
   }
 
   function renderReviews() {
     const statsEl = document.getElementById('review-stats');
     const listEl = document.getElementById('review-list');
     const emptyEl = document.getElementById('review-empty');
-    if (!statsEl || !listEl || !emptyEl) return;
-
+    if (!statsEl||!listEl||!emptyEl) return;
     const total = reviews.length;
-    const avg = total ? reviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0) / total : 0;
-    const fiveStar = reviews.filter(r => Number(r.rating) === 5).length;
-
+    const avg = total ? reviews.reduce((s,r)=>s+(Number(r.rating)||0),0)/total : 0;
+    const fiveStar = reviews.filter(r=>Number(r.rating)===5).length;
     statsEl.innerHTML = `
-    <div class="card p-3" style="border-radius:12px">
-      <div class="text-xs text-gray-500 uppercase tracking-wider mb-1">Reviews</div>
-      <div class="font-display text-2xl font-800">${total}</div>
-    </div>
-    <div class="card p-3" style="border-radius:12px">
-      <div class="text-xs text-gray-500 uppercase tracking-wider mb-1">Average</div>
-      <div class="font-display text-2xl font-800">${avg.toFixed(1)}</div>
-    </div>
-    <div class="card p-3" style="border-radius:12px">
-      <div class="text-xs text-gray-500 uppercase tracking-wider mb-1">5-Star</div>
-      <div class="font-display text-2xl font-800">${fiveStar}</div>
-    </div>
-  `;
-
-    if (!reviews.length) {
-      listEl.innerHTML = '';
-      emptyEl.classList.remove('hidden');
-      return;
-    }
-
+      <div class="card p-3" style="border-radius:12px"><div class="text-xs text-gray-500 uppercase tracking-wider mb-1">Reviews</div><div class="font-display text-2xl font-800">${total}</div></div>
+      <div class="card p-3" style="border-radius:12px"><div class="text-xs text-gray-500 uppercase tracking-wider mb-1">Average</div><div class="font-display text-2xl font-800">${avg.toFixed(1)}</div></div>
+      <div class="card p-3" style="border-radius:12px"><div class="text-xs text-gray-500 uppercase tracking-wider mb-1">5-Star</div><div class="font-display text-2xl font-800">${fiveStar}</div></div>`;
+    if (!reviews.length) { listEl.innerHTML=''; emptyEl.classList.remove('hidden'); return; }
     emptyEl.classList.add('hidden');
     listEl.innerHTML = reviews.map(r => `
-    <div class="card p-4" style="border-radius:14px">
-      <div class="flex items-start justify-between gap-4 mb-3">
-        <div>
-          <div class="font-medium text-white">Order #${escHtml(r.order_number || '')}</div>
-          <div class="text-xs text-gray-500">Table ${escHtml(r.table || 'Takeaway')} · ${new Date(r.created_at).toLocaleString()}</div>
+      <div class="card p-4" style="border-radius:14px">
+        <div class="flex items-start justify-between gap-4 mb-3">
+          <div>
+            <div class="font-medium text-white">Order #${escHtml(r.order_number||'')}</div>
+            <div class="text-xs text-gray-500">Table ${escHtml(r.table||'Takeaway')} · ${new Date(r.created_at).toLocaleString()}</div>
+          </div>
+          <div class="text-right">
+            <div class="text-brand-500">${'⭐'.repeat(Number(r.rating)||0)}</div>
+            <div class="text-xs text-gray-500">${r.rating}/5</div>
+          </div>
         </div>
-        <div class="text-right">
-          <div class="text-brand-500">${'⭐'.repeat(Number(r.rating) || 0)}</div>
-          <div class="text-xs text-gray-500">${r.rating}/5</div>
-        </div>
-      </div>
-      ${r.comment ? `<div class="text-sm text-gray-300">${escHtml(r.comment)}</div>` : '<div class="text-sm text-gray-500 italic">No comment provided</div>'}
-    </div>
-  `).join('');
+        ${r.comment?`<div class="text-sm text-gray-300">${escHtml(r.comment)}</div>`:'<div class="text-sm text-gray-500 italic">No comment provided</div>'}
+      </div>`).join('');
   }
 
   async function loadReviews() {
@@ -761,14 +761,14 @@
 
   function setPeriod(p, btn) {
     currentPeriod = p;
-    document.querySelectorAll('.period-btn').forEach(b => { b.classList.remove('active'); b.classList.add('text-gray-500') });
+    document.querySelectorAll('.period-btn').forEach(b => { b.classList.remove('active'); b.classList.add('text-gray-500'); });
     btn.classList.add('active'); btn.classList.remove('text-gray-500');
     loadStats(p);
   }
 
   function exportCSV() { window.open('/api/export/orders?period=' + currentPeriod); }
 
-  /* ─── Staff Tab ────────────────────────────────────────────── */
+  /* ── Staff ── */
   function openAddUserModal() {
     document.getElementById('editUserId').value = '';
     document.getElementById('newUserEmail').disabled = false;
@@ -781,16 +781,12 @@
   function closeAddUserModal() {
     document.getElementById('addUserModal').classList.add('hidden');
     document.getElementById('newUserEmail').disabled = false;
-    ['newUserName', 'newUserEmail', 'newUserPassword', 'newUserHourlyRate', 'editUserId'].forEach(id => {
-      const field = document.getElementById(id);
-      if (field) field.value = '';
+    ['newUserName','newUserEmail','newUserPassword','newUserHourlyRate','editUserId'].forEach(id => {
+      const f = document.getElementById(id); if (f) f.value = '';
     });
   }
 
-  function openBranchModal() {
-    document.getElementById('branchModal').classList.remove('hidden');
-  }
-
+  function openBranchModal() { document.getElementById('branchModal').classList.remove('hidden'); }
   function closeBranchModal() {
     document.getElementById('branchModal').classList.add('hidden');
     document.getElementById('branchName').value = '';
@@ -799,25 +795,19 @@
 
   async function loadBranches() {
     const wrap = document.getElementById('branchSwitcherWrap');
-    if (!DASHBOARD_CONTEXT.isSuperadmin) {
-      wrap.classList.add('hidden');
-      return;
-    }
-
+    if (!DASHBOARD_CONTEXT.isSuperadmin) { wrap.classList.add('hidden'); return; }
     const response = await api('/api/branches');
     branches = response.branches || [];
     wrap.classList.remove('hidden');
-
     const switcher = document.getElementById('branchSwitcher');
     const addUserBranch = document.getElementById('newUserBranch');
     const activeBranchId = response.active_branch_id || DASHBOARD_CONTEXT.activeBranchId;
-
-    switcher.innerHTML = branches.map(branch => `<option value="${branch.id}">${branch.name}</option>`).join('');
+    switcher.innerHTML = branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
     addUserBranch.innerHTML = switcher.innerHTML;
     if (activeBranchId) {
       switcher.value = String(activeBranchId);
       addUserBranch.value = String(activeBranchId);
-      const active = branches.find(branch => branch.id === activeBranchId);
+      const active = branches.find(b => b.id === activeBranchId);
       document.getElementById('activeBranchLabel').textContent = active ? active.name : 'Unknown branch';
     }
     document.getElementById('newUserBranchWrap').classList.remove('hidden');
@@ -827,10 +817,7 @@
   async function handleBranchSwitch() {
     const branchId = Number(document.getElementById('branchSwitcher').value);
     const result = await api('/api/branches/switch', 'POST', { branch_id: branchId });
-    if (result.error) {
-      toast(result.error, 'error');
-      return;
-    }
+    if (result.error) { toast(result.error, 'error'); return; }
     document.getElementById('activeBranchLabel').textContent = result.branch_name;
     toast(`Switched to ${result.branch_name}`, 'success');
     await Promise.all([loadStaff(), loadAttendanceReport(), loadBranchComparison()]);
@@ -845,59 +832,39 @@
       hourly_rate: parseFloat(document.getElementById('newUserHourlyRate').value || '0'),
     };
     const password = document.getElementById('newUserPassword').value;
-    if (DASHBOARD_CONTEXT.isSuperadmin) {
-      payload.branch_id = Number(document.getElementById('newUserBranch').value);
-    }
-    if (!payload.name || !payload.email || (!editUserId && !password)) {
-      toast('Name, email, and password are required', 'error');
-      return;
-    }
+    if (DASHBOARD_CONTEXT.isSuperadmin) payload.branch_id = Number(document.getElementById('newUserBranch').value);
+    if (!payload.name || !payload.email || (!editUserId && !password)) { toast('Name, email, and password are required', 'error'); return; }
     if (!editUserId) payload.password = password;
-    const result = editUserId
-      ? await api(`/api/users/${editUserId}`, 'PUT', payload)
-      : await api('/api/users', 'POST', payload);
-    if (result.error) {
-      toast(result.error, 'error');
-      return;
-    }
+    const result = editUserId ? await api(`/api/users/${editUserId}`, 'PUT', payload) : await api('/api/users', 'POST', payload);
+    if (result.error) { toast(result.error, 'error'); return; }
     closeAddUserModal();
     toast(editUserId ? 'Staff member updated' : 'Staff member created', 'success');
-    await loadStaff();
-    await loadAttendanceReport();
+    await loadStaff(); await loadAttendanceReport();
   }
 
   async function loadStaff() {
     const users = await api('/api/users');
     const tbody = document.getElementById('staffTable');
-    if (users.error) {
-      tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-red-400">${users.error}</td></tr>`;
-      return;
-    }
-    if (!users.length) {
-      staffUsers = [];
-      tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-gray-500">No staff found for this branch.</td></tr>';
-      return;
-    }
+    if (users.error) { tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-red-400">${users.error}</td></tr>`; return; }
+    if (!users.length) { staffUsers = []; tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-gray-500">No staff found for this branch.</td></tr>'; return; }
     staffUsers = users;
-
     tbody.innerHTML = users.map(user => `
-    <tr class="border-b border-border">
-      <td class="py-4 px-4 font-semibold">${user.name}</td>
-      <td class="py-4 px-4 text-gray-500">${user.email}</td>
-      <td class="py-4 px-4"><span class="tag bg-brand-600/20 text-brand-600">${user.role}</span></td>
-      <td class="py-4 px-4">${formatMoney(user.hourly_rate)}</td>
-      <td class="py-4 px-4 text-gray-500">${user.branch_name || '—'}</td>
-      <td class="py-4 px-4 text-gray-500">${new Date(user.created_at).toLocaleDateString()}</td>
-      <td class="py-4 px-4">
-        <button onclick="editUser(${user.id})" class="text-brand-400 hover:text-brand-300 text-sm mr-3">Edit</button>
-        <button onclick="deleteUser(${user.id})" class="text-red-400 hover:text-red-300 text-sm">Delete</button>
-      </td>
-    </tr>
-  `).join('');
+      <tr class="border-b border-border">
+        <td class="py-4 px-4 font-semibold">${user.name}</td>
+        <td class="py-4 px-4 text-gray-500">${user.email}</td>
+        <td class="py-4 px-4"><span class="tag bg-brand-600/20 text-brand-600">${user.role}</span></td>
+        <td class="py-4 px-4">${formatMoney(user.hourly_rate)}</td>
+        <td class="py-4 px-4 text-gray-500">${user.branch_name||'—'}</td>
+        <td class="py-4 px-4 text-gray-500">${new Date(user.created_at).toLocaleDateString()}</td>
+        <td class="py-4 px-4">
+          <button onclick="editUser(${user.id})" class="text-brand-400 hover:text-brand-300 text-sm mr-3">Edit</button>
+          <button onclick="deleteUser(${user.id})" class="text-red-400 hover:text-red-300 text-sm">Delete</button>
+        </td>
+      </tr>`).join('');
   }
 
   function editUser(userId) {
-    const user = staffUsers.find(item => item.id === userId);
+    const user = staffUsers.find(u => u.id === userId);
     if (!user) return;
     document.getElementById('editUserId').value = user.id;
     document.getElementById('newUserName').value = user.name;
@@ -906,9 +873,7 @@
     document.getElementById('newUserPassword').value = '';
     document.getElementById('newUserRole').value = user.role;
     document.getElementById('newUserHourlyRate').value = user.hourly_rate;
-    if (DASHBOARD_CONTEXT.isSuperadmin && user.branch_id) {
-      document.getElementById('newUserBranch').value = user.branch_id;
-    }
+    if (DASHBOARD_CONTEXT.isSuperadmin && user.branch_id) document.getElementById('newUserBranch').value = user.branch_id;
     document.getElementById('userModalTitle').textContent = 'Edit Staff Member';
     document.getElementById('userModalSaveBtn').textContent = 'Update Staff';
     document.getElementById('userPasswordHint').textContent = 'Leave blank to keep current password.';
@@ -918,36 +883,21 @@
   async function deleteUser(userId) {
     if (!confirm('Delete this staff member?')) return;
     const result = await api(`/api/users/${userId}`, 'DELETE');
-    if (result.error) {
-      toast(result.error, 'error');
-      return;
-    }
+    if (result.error) { toast(result.error, 'error'); return; }
     toast('Staff member deleted', 'success');
-    await loadStaff();
-    await loadAttendanceReport();
+    await loadStaff(); await loadAttendanceReport();
   }
 
   async function createBranch() {
-    const payload = {
-      name: document.getElementById('branchName').value.trim(),
-      address: document.getElementById('branchAddress').value.trim(),
-    };
-    if (!payload.name) {
-      toast('Branch name is required', 'error');
-      return;
-    }
+    const payload = { name: document.getElementById('branchName').value.trim(), address: document.getElementById('branchAddress').value.trim() };
+    if (!payload.name) { toast('Branch name is required', 'error'); return; }
     const result = await api('/api/branches', 'POST', payload);
-    if (result.error) {
-      toast(result.error, 'error');
-      return;
-    }
-    closeBranchModal();
-    toast('Branch created', 'success');
-    await loadBranches();
-    await loadBranchComparison();
+    if (result.error) { toast(result.error, 'error'); return; }
+    closeBranchModal(); toast('Branch created', 'success');
+    await loadBranches(); await loadBranchComparison();
   }
 
-  /* ─── Attendance Tab ───────────────────────────────────────── */
+  /* ── Attendance ── */
   async function loadAttendanceReport() {
     const staffId = document.getElementById('attendanceStaffFilter').value;
     const startDate = document.getElementById('attendanceStartDate').value;
@@ -956,62 +906,42 @@
     if (staffId) params.set('staff_id', staffId);
     if (startDate) params.set('start_date', startDate);
     if (endDate) params.set('end_date', endDate);
-
     const report = await api('/api/admin/attendance-report?' + params.toString());
     const tbody = document.getElementById('attendanceTable');
-    if (report.error) {
-      tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-red-400">${report.error}</td></tr>`;
-      return;
-    }
-
+    if (report.error) { tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-red-400">${report.error}</td></tr>`; return; }
     attendanceStaff = report.staff || [];
     const staffFilter = document.getElementById('attendanceStaffFilter');
     const currentValue = staffFilter.value;
-    staffFilter.innerHTML = '<option value="">All staff</option>' + attendanceStaff.map(staff => `<option value="${staff.id}">${staff.name}</option>`).join('');
+    staffFilter.innerHTML = '<option value="">All staff</option>' + attendanceStaff.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
     if (currentValue) staffFilter.value = currentValue;
-
-    if (!report.rows.length) {
-      tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-gray-500">No shifts found for the selected filters.</td></tr>';
-      return;
-    }
-
+    if (!report.rows.length) { tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-gray-500">No shifts found for the selected filters.</td></tr>'; return; }
     tbody.innerHTML = report.rows.map(row => `
-    <tr class="border-b border-border align-top">
-      <td class="py-4 px-4 font-semibold">${row.staff_name}</td>
-      <td class="py-4 px-4 text-gray-500">${row.date}</td>
-      <td class="py-4 px-4">${formatDateTime(row.clock_in_time)}</td>
-      <td class="py-4 px-4 ${row.is_open_shift ? 'text-amber-400' : ''}">${row.clock_out_time ? formatDateTime(row.clock_out_time) : 'Open shift'}</td>
-      <td class="py-4 px-4">${row.hours_worked.toFixed(2)}</td>
-      <td class="py-4 px-4 font-semibold">${formatMoney(row.pay)}</td>
-      <td class="py-4 px-4">
-        <div class="flex gap-2 items-center">
-          <input type="datetime-local" id="clock-out-${row.clock_in_event_id}" value="${toDatetimeLocalValue(row.clock_out_time)}" class="text-sm">
-          <button onclick="saveClockOut(${row.clock_in_event_id}, ${row.clock_out_event_id || 'null'})" class="btn-ghost px-3 py-2 rounded-lg text-xs">Save</button>
-        </div>
-      </td>
-    </tr>
-  `).join('');
+      <tr class="border-b border-border align-top">
+        <td class="py-4 px-4 font-semibold">${row.staff_name}</td>
+        <td class="py-4 px-4 text-gray-500">${row.date}</td>
+        <td class="py-4 px-4">${formatDateTime(row.clock_in_time)}</td>
+        <td class="py-4 px-4 ${row.is_open_shift?'text-amber-400':''}">${row.clock_out_time?formatDateTime(row.clock_out_time):'Open shift'}</td>
+        <td class="py-4 px-4">${row.hours_worked.toFixed(2)}</td>
+        <td class="py-4 px-4 font-semibold">${formatMoney(row.pay)}</td>
+        <td class="py-4 px-4">
+          <div class="flex gap-2 items-center">
+            <input type="datetime-local" id="clock-out-${row.clock_in_event_id}" value="${toDatetimeLocalValue(row.clock_out_time)}" class="text-sm">
+            <button onclick="saveClockOut(${row.clock_in_event_id},${row.clock_out_event_id||'null'})" class="btn-ghost px-3 py-2 rounded-lg text-xs">Save</button>
+          </div>
+        </td>
+      </tr>`).join('');
   }
 
   async function saveClockOut(clockInEventId, clockOutEventId) {
     const value = document.getElementById(`clock-out-${clockInEventId}`).value;
-    if (!value) {
-      toast('Choose a clock-out time first', 'error');
-      return;
-    }
-    const result = await api(`/api/admin/attendance/shifts/${clockInEventId}`, 'PATCH', {
-      clock_out_at: value,
-      clock_out_event_id: clockOutEventId
-    });
-    if (result.error) {
-      toast(result.error, 'error');
-      return;
-    }
+    if (!value) { toast('Choose a clock-out time first', 'error'); return; }
+    const result = await api(`/api/admin/attendance/shifts/${clockInEventId}`, 'PATCH', { clock_out_at: value, clock_out_event_id: clockOutEventId });
+    if (result.error) { toast(result.error, 'error'); return; }
     toast('Clock-out updated', 'success');
     await loadAttendanceReport();
   }
 
-  /* ─── Compare Branches Tab ─────────────────────────────────── */
+  /* ── Compare Branches ── */
   async function loadBranchComparison() {
     const startDate = document.getElementById('compareStartDate').value;
     const endDate = document.getElementById('compareEndDate').value;
@@ -1020,57 +950,44 @@
     if (endDate) params.set('end_date', endDate);
     const result = await api('/api/admin/branches/compare?' + params.toString());
     const grid = document.getElementById('branchCompareGrid');
-    if (result.error) {
-      grid.innerHTML = `<div class="card p-6 text-red-400">${result.error}</div>`;
-      return;
-    }
-    if (!(result.branches || []).length) {
-      grid.innerHTML = '<div class="card p-6 text-gray-500">No branch data available.</div>';
-      return;
-    }
+    if (result.error) { grid.innerHTML = `<div class="card p-6 text-red-400">${result.error}</div>`; return; }
+    if (!(result.branches||[]).length) { grid.innerHTML = '<div class="card p-6 text-gray-500">No branch data available.</div>'; return; }
     grid.innerHTML = result.branches.map(branch => `
-    <div class="card p-6">
-      <div class="flex items-start justify-between gap-4 mb-4">
-        <div>
-          <div class="text-xl font-bold">${branch.branch_name}</div>
-          <div class="text-sm text-gray-500 mt-1">${branch.address || 'No address set'}</div>
+      <div class="card p-6">
+        <div class="flex items-start justify-between gap-4 mb-4">
+          <div>
+            <div class="text-xl font-bold">${branch.branch_name}</div>
+            <div class="text-sm text-gray-500 mt-1">${branch.address||'No address set'}</div>
+          </div>
+          <span class="tag bg-brand-600/20 text-brand-600">Branch #${branch.branch_id}</span>
         </div>
-        <span class="tag bg-brand-600/20 text-brand-600">Branch #${branch.branch_id}</span>
-      </div>
-      <div class="space-y-3">
-        <div class="flex justify-between"><span class="text-gray-500">Total Orders</span><span class="font-semibold">${branch.total_orders}</span></div>
-        <div class="flex justify-between"><span class="text-gray-500">Total Revenue</span><span class="font-semibold">${formatMoney(branch.total_revenue)}</span></div>
-        <div class="flex justify-between gap-4"><span class="text-gray-500">Top Selling Item</span><span class="font-semibold text-right">${branch.top_selling_item}${branch.top_selling_qty ? ` × ${branch.top_selling_qty}` : ''}</span></div>
-      </div>
-    </div>
-  `).join('');
+        <div class="space-y-3">
+          <div class="flex justify-between"><span class="text-gray-500">Total Orders</span><span class="font-semibold">${branch.total_orders}</span></div>
+          <div class="flex justify-between"><span class="text-gray-500">Total Revenue</span><span class="font-semibold">${formatMoney(branch.total_revenue)}</span></div>
+          <div class="flex justify-between gap-4"><span class="text-gray-500">Top Selling Item</span><span class="font-semibold text-right">${branch.top_selling_item}${branch.top_selling_qty?` × ${branch.top_selling_qty}`:''}</span></div>
+        </div>
+      </div>`).join('');
   }
 
-  /* ─── Settings Tab ─────────────────────────────────────────── */
+  /* ── Settings ── */
   let currentLogo = '';
-
   function handleLogoUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
-    if (file.size > 500 * 1024) {
-      toast('Logo must be under 500KB', 'error');
-      return;
-    }
+    if (file.size > 500*1024) { toast('Logo must be under 500KB', 'error'); return; }
     const reader = new FileReader();
-    reader.onload = function (e) {
+    reader.onload = function(e) {
       currentLogo = e.target.result;
       document.getElementById('cafeLogo').value = currentLogo;
       document.getElementById('logoPreview').innerHTML = `<img src="${currentLogo}" alt="Logo" class="w-full h-full object-cover">`;
     };
     reader.readAsDataURL(file);
   }
-
   function removeLogo() {
     currentLogo = '';
     document.getElementById('cafeLogo').value = '';
     document.getElementById('logoPreview').innerHTML = '<span class="text-2xl">☕</span>';
   }
-
   async function saveCafeSettings() {
     const payload = {
       name: document.getElementById('cafeName').value,
@@ -1080,35 +997,29 @@
       logo_b64: document.getElementById('cafeLogo').value,
       open_time: document.getElementById('openTime').value,
       close_time: document.getElementById('closeTime').value,
-      tax_rate: parseFloat(document.getElementById('taxRate').value || '0'),
+      tax_rate: parseFloat(document.getElementById('taxRate').value||'0'),
     };
     const result = await api('/api/cafe-settings', 'POST', payload);
-    if (result.error) {
-      toast(result.error, 'error');
-      return;
-    }
+    if (result.error) { toast(result.error, 'error'); return; }
     toast('Settings saved', 'success');
     loadTenantInfo();
   }
-
   async function loadCafeSettings() {
     const settings = await api('/api/cafe-settings');
     if (settings.error) return;
-    document.getElementById('cafeName').value = settings.name || '';
-    document.getElementById('cafePhone').value = settings.phone || '';
-    document.getElementById('cafeEmail').value = settings.email || '';
-    document.getElementById('cafeAddress').value = settings.address || '';
-    document.getElementById('openTime').value = settings.open_time || '';
-    document.getElementById('closeTime').value = settings.close_time || '';
-    document.getElementById('taxRate').value = settings.tax_rate || '';
-    currentLogo = settings.logo_b64 || '';
+    document.getElementById('cafeName').value = settings.name||'';
+    document.getElementById('cafePhone').value = settings.phone||'';
+    document.getElementById('cafeEmail').value = settings.email||'';
+    document.getElementById('cafeAddress').value = settings.address||'';
+    document.getElementById('openTime').value = settings.open_time||'';
+    document.getElementById('closeTime').value = settings.close_time||'';
+    document.getElementById('taxRate').value = settings.tax_rate||'';
+    currentLogo = settings.logo_b64||'';
     document.getElementById('cafeLogo').value = currentLogo;
-    if (currentLogo) {
-      document.getElementById('logoPreview').innerHTML = `<img src="${currentLogo}" alt="Logo" class="w-full h-full object-cover">`;
-    }
+    if (currentLogo) document.getElementById('logoPreview').innerHTML = `<img src="${currentLogo}" alt="Logo" class="w-full h-full object-cover">`;
   }
 
-  /* ─── Reservations ─────────────────────────────────────────── */
+  /* ── Reservations ── */
   let allReservations = [];
   let currentResFilter = 'all';
 
@@ -1117,125 +1028,95 @@
       const data = await api('/api/reservations');
       if (data.error) return;
       allReservations = data;
-      const pendingCount = allReservations.filter(r => r.status === 'pending').length;
+      const pendingCount = allReservations.filter(r=>r.status==='pending').length;
       const badge = document.getElementById('pending-badge');
-      if (pendingCount > 0) {
-        badge.textContent = pendingCount + ' pending';
-        badge.classList.remove('hidden');
-      } else {
-        badge.classList.add('hidden');
-      }
+      if (pendingCount > 0) { badge.textContent = pendingCount+' pending'; badge.classList.remove('hidden'); }
+      else badge.classList.add('hidden');
       renderReservations(currentResFilter);
-    } catch (e) { console.error('Reservations load error:', e); }
+    } catch(e) { console.error('Reservations load error:', e); }
   }
 
   function filterReservations(status, btn) {
     currentResFilter = status;
-    document.querySelectorAll('.res-filter-btn').forEach(b => {
-      b.style.background = 'transparent'; b.style.color = '#888';
-    });
-    btn.style.background = '#f97316'; btn.style.color = '#fff';
+    document.querySelectorAll('.res-filter-btn').forEach(b => { b.style.background='transparent'; b.style.color='#888'; });
+    btn.style.background='#f97316'; btn.style.color='#fff';
     renderReservations(status);
   }
 
   function renderReservations(filter) {
     const el = document.getElementById('reservations-mgmt-list');
     const empty = document.getElementById('reservations-mgmt-empty');
-    const filtered = filter === 'all'
-      ? allReservations.filter(r => r.status !== 'cancelled')
-      : allReservations.filter(r => r.status === filter);
-
-    if (!filtered.length) {
-      el.innerHTML = '';
-      empty.classList.remove('hidden');
-      return;
-    }
+    const filtered = filter==='all' ? allReservations.filter(r=>r.status!=='cancelled') : allReservations.filter(r=>r.status===filter);
+    if (!filtered.length) { el.innerHTML=''; empty.classList.remove('hidden'); return; }
     empty.classList.add('hidden');
     const statusColors = {
-      pending: { bg: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: 'rgba(251,191,36,0.3)' },
-      confirmed: { bg: 'rgba(34,197,94,0.1)', color: '#22c55e', border: 'rgba(34,197,94,0.3)' },
-      seated: { bg: 'rgba(99,102,241,0.1)', color: '#818cf8', border: 'rgba(99,102,241,0.3)' },
-      cancelled: { bg: 'rgba(239,68,68,0.08)', color: '#ef4444', border: 'rgba(239,68,68,0.2)' },
+      pending: { bg:'rgba(251,191,36,0.12)', color:'#fbbf24', border:'rgba(251,191,36,0.3)' },
+      confirmed: { bg:'rgba(34,197,94,0.1)', color:'#22c55e', border:'rgba(34,197,94,0.3)' },
+      seated: { bg:'rgba(99,102,241,0.1)', color:'#818cf8', border:'rgba(99,102,241,0.3)' },
+      cancelled: { bg:'rgba(239,68,68,0.08)', color:'#ef4444', border:'rgba(239,68,68,0.2)' },
     };
     el.innerHTML = filtered.map(r => {
-      const sc = statusColors[r.status] || statusColors.pending;
+      const sc = statusColors[r.status]||statusColors.pending;
       const dt = new Date(r.reserved_at);
-      const dtLabel = dt.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+      const dtLabel = dt.toLocaleString('en-IN', { dateStyle:'medium', timeStyle:'short' });
       const isUpcoming = dt > new Date();
-      const preorderHtml = r.items && r.items.length
-        ? `<div style="margin-top:10px; padding:10px; background:#0d0d0d; border-radius:8px; font-size:12px;">
-          <div style="color:#f97316; font-weight:600; margin-bottom:6px;">🛒 Pre-Order Items</div>
-          ${r.items.map(i => `<div style="display:flex;justify-content:space-between;color:#999;padding:2px 0;">${i.product_name} <span>×${i.qty} — ₹${(i.qty * i.price).toFixed(0)}</span></div>`).join('')}
+      const preorderHtml = r.items && r.items.length ? `
+        <div style="margin-top:10px;padding:10px;background:#0d0d0d;border-radius:8px;font-size:12px;">
+          <div style="color:#f97316;font-weight:600;margin-bottom:6px;">🛒 Pre-Order Items</div>
+          ${r.items.map(i=>`<div style="display:flex;justify-content:space-between;color:#999;padding:2px 0;">${i.product_name} <span>×${i.qty} — ₹${(i.qty*i.price).toFixed(0)}</span></div>`).join('')}
           <div style="border-top:1px solid #222;margin-top:6px;padding-top:6px;font-weight:700;color:#f97316;display:flex;justify-content:space-between;">
-            <span>Total</span><span>₹${r.items.reduce((s, i) => s + i.qty * i.price, 0).toFixed(0)}</span>
+            <span>Total</span><span>₹${r.items.reduce((s,i)=>s+i.qty*i.price,0).toFixed(0)}</span>
           </div>
         </div>` : '';
       return `
-    <div style="border:1px solid ${sc.border}; background:${sc.bg}; border-radius:14px; padding:16px; transition:all .2s;">
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
-        <div>
-          <div style="font-size:15px; font-weight:700; color:#fff;">📅 ${dtLabel}
-            ${isUpcoming ? '' : '<span style="font-size:10px;color:#666;margin-left:8px;">(past)</span>'}
+        <div style="border:1px solid ${sc.border};background:${sc.bg};border-radius:14px;padding:16px;transition:all .2s;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
+            <div>
+              <div style="font-size:15px;font-weight:700;color:#fff;">📅 ${dtLabel}
+                ${isUpcoming?'':`<span style="font-size:10px;color:#666;margin-left:8px;">(past)</span>`}
+              </div>
+              <div style="font-size:12px;color:#888;margin-top:4px;">
+                👤 ${escHtml(r.customer_name||'Guest')}
+                ${r.table?` · 🪑 Table ${r.table}`:' · <span style="color:#f97316;">No table assigned</span>'}
+                · 👥 ${r.party_size} people
+                ${r.notes?` · <em style="color:#999;">${escHtml(r.notes)}</em>`:''}
+              </div>
+            </div>
+            <span style="display:inline-block;padding:4px 12px;border-radius:8px;font-size:12px;font-weight:700;background:${sc.bg};color:${sc.color};border:1px solid ${sc.border};">
+              ${r.status.charAt(0).toUpperCase()+r.status.slice(1)}
+            </span>
           </div>
-          <div style="font-size:12px; color:#888; margin-top:4px;">
-            👤 ${escHtml(r.customer_name || 'Guest')}
-            ${r.table ? ` · 🪑 Table ${r.table}` : ' · <span style="color:#f97316;">No table assigned</span>'}
-            · 👥 ${r.party_size} people
-            ${r.notes ? ` · <em style="color:#999;">${escHtml(r.notes)}</em>` : ''}
-          </div>
-        </div>
-        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
-          <span style="display:inline-block; padding:4px 12px; border-radius:8px; font-size:12px; font-weight:700; background:${sc.bg}; color:${sc.color}; border:1px solid ${sc.border};">
-            ${r.status.charAt(0).toUpperCase() + r.status.slice(1)}
-          </span>
-        </div>
-      </div>
-      ${preorderHtml}
-      ${r.status !== 'seated' && r.status !== 'cancelled' ? `
-      <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
-        ${r.status === 'pending' ? `
-        <button onclick="confirmReservation(${r.id})" style="flex:1;min-width:100px;padding:8px 12px;background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.4);border-radius:8px;color:#22c55e;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;" onmouseover="this.style.background='rgba(34,197,94,0.25)'" onmouseout="this.style.background='rgba(34,197,94,0.15)'">
-          ✅ Confirm
-        </button>` : ''}
-        ${r.status === 'confirmed' ? `
-        <button onclick="seatReservation(${r.id})" style="flex:1;min-width:100px;padding:8px 12px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.4);border-radius:8px;color:#818cf8;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;" onmouseover="this.style.background='rgba(99,102,241,0.25)'" onmouseout="this.style.background='rgba(99,102,241,0.15)'">
-          🪑 Seat & Start Order
-        </button>` : ''}
-        <button onclick="cancelReservation(${r.id})" style="flex:1;min-width:100px;padding:8px 12px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:8px;color:#ef4444;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;" onmouseover="this.style.background='rgba(239,68,68,0.18)'" onmouseout="this.style.background='rgba(239,68,68,0.08)'">
-          ✕ Cancel
-        </button>
-      </div>` : ''}
-    </div>`;
+          ${preorderHtml}
+          ${r.status!=='seated'&&r.status!=='cancelled'?`
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+            ${r.status==='pending'?`<button onclick="confirmReservation(${r.id})" style="flex:1;min-width:100px;padding:8px 12px;background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.4);border-radius:8px;color:#22c55e;font-size:12px;font-weight:700;cursor:pointer;" onmouseover="this.style.background='rgba(34,197,94,0.25)'" onmouseout="this.style.background='rgba(34,197,94,0.15)'">✅ Confirm</button>`:''}
+            ${r.status==='confirmed'?`<button onclick="seatReservation(${r.id})" style="flex:1;min-width:100px;padding:8px 12px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.4);border-radius:8px;color:#818cf8;font-size:12px;font-weight:700;cursor:pointer;" onmouseover="this.style.background='rgba(99,102,241,0.25)'" onmouseout="this.style.background='rgba(99,102,241,0.15)'">🪑 Seat & Start Order</button>`:''}
+            <button onclick="cancelReservation(${r.id})" style="flex:1;min-width:100px;padding:8px 12px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:8px;color:#ef4444;font-size:12px;font-weight:600;cursor:pointer;" onmouseover="this.style.background='rgba(239,68,68,0.18)'" onmouseout="this.style.background='rgba(239,68,68,0.08)'">✕ Cancel</button>
+          </div>`:''}
+        </div>`;
     }).join('');
   }
 
   async function confirmReservation(id) {
-    const r = await api('/api/reservations/' + id + '/confirm', 'POST');
-    if (r.ok) { toast('✅ Reservation confirmed!', 'success'); loadReservations(); }
-    else toast(r.error || 'Error', 'error');
+    const r = await api('/api/reservations/'+id+'/confirm','POST');
+    if (r.ok) { toast('✅ Reservation confirmed!','success'); loadReservations(); }
+    else toast(r.error||'Error','error');
   }
-
   async function seatReservation(id) {
     if (!confirm('Seat this party? Pre-order items will be sent to kitchen automatically.')) return;
-    const r = await api('/api/reservations/' + id + '/seat', 'POST');
-    if (r.ok) { toast('🪑 Party seated! Kitchen ticket created.', 'success'); loadReservations(); }
-    else toast(r.error || 'Error', 'error');
+    const r = await api('/api/reservations/'+id+'/seat','POST');
+    if (r.ok) { toast('🪑 Party seated! Kitchen ticket created.','success'); loadReservations(); }
+    else toast(r.error||'Error','error');
   }
-
   async function cancelReservation(id) {
     if (!confirm('Cancel this reservation?')) return;
-    const r = await api('/api/reservations/' + id, 'DELETE');
-    if (r.ok) { toast('Reservation cancelled', 'success'); loadReservations(); }
-    else toast(r.error || 'Error', 'error');
+    const r = await api('/api/reservations/'+id,'DELETE');
+    if (r.ok) { toast('Reservation cancelled','success'); loadReservations(); }
+    else toast(r.error||'Error','error');
   }
 
-  /* ─── Auth ─────────────────────────────────────────────────── */
-  async function logout() {
-    await fetch('/api/logout', { method: 'POST' });
-    window.location.href = '/';
-  }
+  async function logout() { await fetch('/api/logout',{method:'POST'}); window.location.href='/'; }
 
-  /* ─── Init ─────────────────────────────────────────────────── */
   document.addEventListener('DOMContentLoaded', async () => {
     await loadBranches();
     loadStats('today');
@@ -1244,7 +1125,6 @@
     loadCafeSettings();
   });
 
-  // Auto-refresh reservations every 60s
   setInterval(loadReservations, 60000);
 </script>
 {% endblock %}

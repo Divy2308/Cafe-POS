@@ -31,20 +31,53 @@
             transition: all 0.2s;
             color: white;
             font-weight: 600;
+            min-height: 44px;
+            min-width: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 16px;
+            border: none;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
         }
         .btn-primary:hover {
             transform: translateY(-2px);
             box-shadow: 0 12px 32px rgba(249, 115, 22, 0.4);
+        }
+        .btn-primary:active {
+            transform: scale(.96);
+        }
+        .btn-primary:focus-visible {
+            outline: 2px solid rgba(113, 75, 103, 0.4);
+            outline-offset: 2px;
         }
         .btn-secondary {
             background: rgba(0, 0, 0, 0.05);
             border: 1px solid rgba(0, 0, 0, 0.1);
             color: #111827;
             transition: all 0.2s;
+            min-height: 44px;
+            min-width: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 16px;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
         }
         .btn-secondary:hover {
             background: rgba(0, 0, 0, 0.1);
             border-color: #714b67;
+        }
+        .btn-secondary:active {
+            transform: scale(.96);
+        }
+        .btn-secondary:focus-visible {
+            outline: 2px solid rgba(113, 75, 103, 0.3);
+            outline-offset: 2px;
         }
         .card-glass {
             background: rgba(255, 255, 255, 0.8);
@@ -96,6 +129,32 @@
             to {
                 opacity: 1;
                 transform: translateX(0);
+            }
+        }
+
+        /* Mobile Touch Optimizations */
+        @media (max-width: 768px) {
+            .btn-primary, .btn-secondary {
+                min-height: 48px;
+                padding: 12px 16px;
+                font-size: 14px;
+            }
+
+            h1 {
+                font-size: 2.5rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .btn-primary, .btn-secondary {
+                min-height: 44px;
+                padding: 10px 14px;
+                font-size: 13px;
+                width: 100%;
+            }
+
+            h1 {
+                font-size: 2rem;
             }
         }
     </style>

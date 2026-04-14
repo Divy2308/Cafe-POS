@@ -3,8 +3,9 @@
 {% block extra_head %}
 <style>
   body { background:#080808; }
-  .ticket { transition:all .2s; cursor:pointer; }
+  .ticket { transition:all .2s; cursor:pointer; min-height:44px; display:flex; align-items:center; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
   .ticket:hover { transform:translateY(-2px); box-shadow:0 12px 40px rgba(0,0,0,0.4); }
+  .ticket:active { transform:scale(.98); }
   .ticket.to_cook { border-top:3px solid #ef4444; }
   .ticket.preparing { border-top:3px solid #f97316; }
   .ticket.completed { border-top:3px solid #22c55e; opacity:0.7; }
@@ -13,8 +14,9 @@
     0%,100%{ box-shadow:0 0 0 0 rgba(220,38,38,0); }
     50%{ box-shadow:0 0 0 6px rgba(220,38,38,0.25); }
   }
-  .item-line { cursor:pointer; transition:all .15s; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.06); }
+  .item-line { cursor:pointer; transition:all .15s; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.06); min-height:36px; display:flex; align-items:center; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
   .item-line:hover { background:rgba(255,255,255,0.04); }
+  .item-line:active { background:rgba(255,255,255,0.08); transform:scale(.99); }
   .item-line.done { text-decoration:line-through; color:#4a4a4a; }
   .item-notes { font-size:11px; color:#f97316; font-style:italic; margin-top:2px; }
   .items-container { max-height:600px; overflow-y:auto; overflow-x:hidden; padding-right:6px; }
