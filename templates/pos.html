@@ -841,15 +841,10 @@
         </div>
         
         <div class="p-4 border-b border-border space-y-3">
-          <!-- Takeaway toggle -->
           <div id="order-type-toggle">
             <button id="btn-take" class="order-type-btn w-full" onclick="setOrderType()">🛵 Takeaway</button>
-        
-        <!-- Standard Desktop Cart Body -->
-        <div id="cart-items" class="flex-1 overflow-auto"></div>
-
-          <!-- Customer CRM -->
-          <div id="customer-crm-wrap" class="space-y-2 mt-2">
+          </div>
+          <div id="customer-crm-wrap" class="space-y-2">
             <div class="relative">
               <input type="text" id="customer-phone" placeholder="Customer Phone" maxlength="15"
                 class="text-xs w-full px-3 py-2 bg-gray-900 border border-border rounded-lg text-white pr-8"
@@ -863,9 +858,12 @@
                 </svg>
               </div>
             </div>
-            <input type="text" id="customer-name" placeholder="Customer Name (optional)"
+            <input type="text" id="customer-name" placeholder="Customer Name"
               class="text-xs w-full px-3 py-2 bg-gray-900 border border-border rounded-lg text-white" />
           </div>
+        </div>
+
+        <div id="cart-items" class="flex-1 overflow-auto"></div>
 
         <div class="p-4 border-t border-border space-y-3">
           <div class="flex justify-between text-sm text-gray-400"><span>Subtotal</span><span
@@ -876,8 +874,8 @@
             Send to Kitchen
           </button>
           <button id="pay-now-btn" onclick="goToPayment()"
-            class="btn-primary w-full py-2.5 rounded-xl text-white text-sm font-medium">
-            Pay Now →
+            class="btn-primary hidden w-full py-2.5 rounded-xl text-white text-sm font-medium">
+            Checkout Sent Order →
           </button>
           <button onclick="clearOrder()"
             class="btn-ghost w-full py-2 rounded-xl text-xs text-red-400 border border-red-400/30">
@@ -1091,7 +1089,7 @@
     </svg>
     <span>Reservations</span>
   </button>
-  <button onclick="showView('history')" class="nav-item" id="mobile-nav-history">
+  <button onclick="showView('history')" class="nav-item" id="m-nav-history">
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
         d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1148,11 +1146,13 @@
     if (isTakeaway) {
       btn.className = 'order-type-btn w-full active-take';
       currentTable = null;
-      document.getElementById('order-table-label').textContent = '\uD83D\uDEF5 Takeaway Order';
+      currentBill = null;
+      document.getElementById('cart-table-name').textContent = '\uD83D\uDEF5 Takeaway Order';
     } else {
       btn.className = 'order-type-btn w-full';
+      document.getElementById('cart-table-name').textContent = currentTable ? 'Table ' + currentTable.number : 'Order';
     }
-    // global crm enabled
+    updatePayButtonState();
   }
 
   function toggleMobileMenu() {
@@ -1277,9 +1277,10 @@
   function startOnlineOrder() {
     isTakeaway = true;
     currentTable = null;
+    currentBill = null;
     currentOrder = null;
     cart = [];
-    document.getElementById('order-table-label').textContent = '📱 Online Order (Zomato/Swiggy)';
+    document.getElementById('cart-table-name').textContent = '📱 Online Order (Zomato/Swiggy)';
     document.getElementById('cart-order-num').textContent = '';
     const btn = document.getElementById('btn-take');
     if (btn) {
@@ -1394,6 +1395,8 @@
     
     // Sync to mobile overlay content as well
     if (mobileContent) {
+       const payableOrder = currentBill || currentOrder;
+       const canPay = Boolean(payableOrder && (payableOrder.sent_to_kitchen_at || payableOrder.status === 'sent'));
        mobileContent.innerHTML = `
          <div class="flex flex-col h-full" style="max-height: 100%;">
            <div class="flex-1 overflow-auto px-4 py-2">${cartHtml}</div>
@@ -1403,7 +1406,7 @@
               <div class="flex justify-between text-lg font-800 text-white"><span>Total</span><span id="mobile-drawer-total"></span></div>
               <div class="flex gap-2 pt-1">
                  <button onclick="sendToKitchen()" class="flex-1 btn-orange py-3.5 rounded-xl font-bold transition-all active:scale-95 text-sm">Send to Kitchen</button>
-                 <button onclick="goToPayment()" class="flex-1 btn-primary py-3.5 rounded-xl font-bold transition-all active:scale-95 text-sm">Pay & Checkout</button>
+                 ${canPay ? `<button onclick="goToPayment()" class="flex-1 btn-primary py-3.5 rounded-xl font-bold transition-all active:scale-95 text-sm">Pay & Checkout</button>` : ''}
               </div>
            </div>` : ''}
          </div>
@@ -1502,7 +1505,8 @@
   function updatePayButtonState() {
     const btn = document.getElementById('pay-now-btn');
     if (!btn) return;
-    const canPay = Boolean(currentBill && (currentBill.sent_to_kitchen_at || currentBill.status === 'sent'));
+    const payableOrder = currentBill || currentOrder;
+    const canPay = Boolean(payableOrder && (payableOrder.sent_to_kitchen_at || payableOrder.status === 'sent'));
     btn.classList.toggle('hidden', !canPay);
   }
 
@@ -2026,8 +2030,8 @@
       <div class="card p-5 rounded-3xl transition-all hover:scale-[1.01] ${isCurrent ? 'ring-2 ring-brand-500 bg-brand-500/5' : 'bg-card-2'}" style="border: 1px solid rgba(255,255,255,0.05)">
         <div class="flex justify-between items-start mb-4">
           <div>
-            <div class="text-[10px] font-800 text-gray-500 uppercase tracking-widest mb-1">#${b.order_number.split('-')[1]}</div>
-            <div class="text-xl font-display font-800 text-white">Table ${b.table}</div>
+            <div class="text-[10px] font-800 text-gray-500 uppercase tracking-widest mb-1">#${String(b.order_number).includes('-') ? b.order_number.split('-')[1] : b.order_number}</div>
+            <div class="text-xl font-display font-800 text-white">${b.is_takeaway ? 'Takeaway' : 'Table ' + b.table}</div>
           </div>
           <div class="text-right">
             <span class="inline-block px-2 py-1 rounded-md text-[9px] font-800 uppercase tracking-tighter ${statusClass}">${b.status}</span>
@@ -2287,7 +2291,7 @@
       <div class="card p-4 rounded-2xl bg-card-2 border border-white/5 transition-all active:scale-[0.98]">
         <div class="flex items-center justify-between mb-2">
           <div class="flex items-center gap-3">
-             <div class="px-2 py-1 bg-white/5 rounded text-[10px] font-800 text-gray-500 uppercase tracking-tighter border border-white/5">${o.order_number.split('-')[1]}</div>
+             <div class="px-2 py-1 bg-white/5 rounded text-[10px] font-800 text-gray-500 uppercase tracking-tighter border border-white/5">${String(o.order_number).includes('-') ? o.order_number.split('-')[1] : o.order_number}</div>
              <span class="text-xs font-700 text-white">${dateStr} &middot; <span class="text-gray-500 font-500">${timeStr}</span></span>
           </div>
           <div class="flex items-center gap-2">

@@ -123,6 +123,8 @@ class Branch(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     address = db.Column(db.Text, default='')
+    phone = db.Column(db.String(20), default='')
+    monthly_target = db.Column(db.Float, default=0.0)
     tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     tenant = db.relationship('Tenant', backref='branches')
@@ -134,6 +136,7 @@ class User(db.Model):
     password = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(20), default='cashier')
     hourly_rate = db.Column(db.Float, default=0)
+    monthly_target = db.Column(db.Float, default=0.0)
     is_superadmin = db.Column(db.Boolean, default=False)
     is_platform_admin = db.Column(db.Boolean, default=False)
     tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
@@ -1134,6 +1137,24 @@ def dashboard():
         is_superadmin=is_superadmin(),
     )
 
+@app.route('/shrey')
+def shrey_login_page():
+    return render_template('shrey_login.html')
+
+@app.route('/shreyapi/login', methods=['POST'])
+def shrey_login_api():
+    d = request.json or {}
+    if d.get('username') == 'admin' and d.get('password') == 'admin':
+        session['shrey_admin'] = True
+        return jsonify({'ok': True})
+    return jsonify({'error': 'Invalid credentials'}), 401
+
+@app.route('/shreyadmin')
+def shreyadmin_page():
+    if not session.get('shrey_admin'):
+        return redirect(url_for('shrey_login_page'))
+    return render_template('shrey.html')
+
 # ─── API: Products ─────────────────────────────────────────
 @app.route('/api/products', methods=['GET'])
 def get_products():
@@ -1865,13 +1886,14 @@ def send_to_kitchen(oid):
 @app.route('/api/bills', methods=['GET'])
 @staff_required
 def get_bills():
-    s = Session.query.filter_by(user_id=session['user_id'], status='open').first()
-    if not s:
-        return jsonify([])
-    orders = apply_branch_scope(
-        Order.query.filter_by(session_id=s.id, status='sent'),
-        Order.branch_id,
-    ).order_by(Order.created_at.desc()).all()
+    orders = (
+        apply_branch_scope(
+            apply_tenant_scope(Order.query.filter_by(status='sent'), Order),
+            Order.branch_id,
+        )
+        .order_by(Order.created_at.desc())
+        .all()
+    )
     return jsonify([serialize_bill(o) for o in orders])
 
 @app.route('/api/orders/all', methods=['GET'])
@@ -1885,12 +1907,9 @@ def get_all_orders():
 @app.route('/api/bills/table/<int:tid>', methods=['GET'])
 @staff_required
 def get_bill_for_table(tid):
-    s = Session.query.filter_by(user_id=session['user_id'], status='open').first()
-    if not s:
-        return jsonify({'bill': None})
     order = (
         Order.query
-        .filter_by(session_id=s.id, table_id=tid, status='sent', branch_id=get_active_branch_id(), tenant_id=get_current_tenant_id())
+        .filter_by(table_id=tid, status='sent', branch_id=get_active_branch_id(), tenant_id=get_current_tenant_id())
         .order_by(Order.created_at.desc())
         .first()
     )
@@ -2588,6 +2607,8 @@ def get_branches():
             'id': branch.id,
             'name': branch.name,
             'address': branch.address,
+            'phone': branch.phone or '',
+            'monthly_target': float(branch.monthly_target or 0),
             'created_at': branch.created_at.isoformat() if branch.created_at else None,
         } for branch in branches],
         'active_branch_id': get_active_branch_id(user),
@@ -2620,13 +2641,42 @@ def switch_branch():
     if not is_superadmin(user):
         return jsonify({'error': 'Only super-admins can switch branches'}), 403
     branch_id = request.json.get('branch_id') if request.json else None
+    if branch_id is None or branch_id == "":
+        session.pop('active_branch_id', None)
+        return jsonify({'ok': True, 'active_branch_id': None, 'branch_name': 'All Branches'})
+        
     try:
         branch_id = int(branch_id)
     except (TypeError, ValueError):
         return jsonify({'error': 'Invalid branch'}), 400
+        
     branch = Branch.query.filter_by(id=branch_id, tenant_id=get_current_tenant_id()).first_or_404()
     session['active_branch_id'] = branch.id
     return jsonify({'ok': True, 'active_branch_id': branch.id, 'branch_name': branch.name})
+
+@app.route('/api/branches/<int:bid>', methods=['PUT', 'DELETE'])
+@admin_required
+def update_branch_detail(bid):
+    user = get_current_user()
+    if not is_superadmin(user):
+         return jsonify({'error': 'Only super-admins can manage branches'}), 403
+    
+    branch = Branch.query.filter_by(id=bid, tenant_id=get_current_tenant_id()).first_or_404()
+    
+    if request.method == 'DELETE':
+        # Safety check: don't delete if it has users or orders?
+        db.session.delete(branch)
+        db.session.commit()
+        return jsonify({'ok': True})
+    
+    d = request.json or {}
+    branch.name = (d.get('name') or branch.name).strip()
+    branch.address = (d.get('address') or branch.address).strip()
+    branch.phone = (d.get('phone') or branch.phone).strip()
+    branch.monthly_target = float(d.get('monthly_target', branch.monthly_target or 0))
+    
+    db.session.commit()
+    return jsonify({'ok': True})
 
 @app.route('/api/attendance/status', methods=['GET'])
 @staff_required
@@ -2834,6 +2884,7 @@ def get_users():
         'role': u.role,
         'created_at': u.created_at.isoformat(),
         'hourly_rate': float(u.hourly_rate or 0),
+        'monthly_target': float(u.monthly_target or 0),
         'branch_id': u.branch_id,
         'branch_name': u.branch.name if u.branch else '',
         'is_superadmin': bool(u.is_superadmin),
@@ -2852,6 +2903,7 @@ def create_user():
     password = d.get('password') or ''
     role = normalize_role(d.get('role', 'cashier'))
     hourly_rate = float(d.get('hourly_rate', 0) or 0)
+    monthly_target = float(d.get('monthly_target', 0) or 0)
     branch_id = d.get('branch_id') or get_active_branch_id(admin)
     tenant_id = get_current_tenant_id()
     try:
@@ -2877,6 +2929,7 @@ def create_user():
         password=generate_password_hash(password, method='scrypt'),
         role=role,
         hourly_rate=hourly_rate,
+        monthly_target=monthly_target,
         branch_id=branch_id,
         tenant_id=tenant_id,
         is_superadmin=bool(d.get('is_superadmin', False)) if admin.is_superadmin else False,
@@ -2918,6 +2971,7 @@ def update_user(uid):
     name = (d.get('name') or user.name).strip()
     role = normalize_role(d.get('role', user.role))
     hourly_rate = float(d.get('hourly_rate', user.hourly_rate or 0) or 0)
+    monthly_target = float(d.get('monthly_target', user.monthly_target or 0) or 0)
     branch_id = d.get('branch_id', user.branch_id)
     try:
         branch_id = int(branch_id) if branch_id else None
@@ -2932,6 +2986,7 @@ def update_user(uid):
     user.name = name
     user.role = role
     user.hourly_rate = hourly_rate
+    user.monthly_target = monthly_target
     user.branch_id = branch_id
     db.session.commit()
     return jsonify({'ok': True})
@@ -3724,6 +3779,248 @@ def ensure_default_accounts():
         customer.tenant_id = default_tenant.id
     db.session.commit()
 
+def ensure_sample_data():
+    """Create comprehensive sample data for testing all features"""
+    default_tenant = Tenant.query.filter_by(slug='default').first()
+    if not default_tenant:
+        return
+    
+    # Create branches if needed
+    branches = []
+    branch_names = ['Main Branch', 'Downtown Outlet', 'Mall Branch', 'Airport Lounge']
+    for bname in branch_names:
+        existing = Branch.query.filter_by(name=bname, tenant_id=default_tenant.id).first()
+        if not existing:
+            b = Branch(name=bname, address=f'{bname}, City', phone='9876543210', monthly_target=50000, tenant_id=default_tenant.id)
+            db.session.add(b)
+            db.session.flush()
+            branches.append(b)
+        else:
+            branches.append(existing)
+    
+    # Create staff members
+    staff_data = [
+        {'name': 'Raj Kumar', 'email': 'raj@cafe.local', 'role': 'cashier', 'rate': 200, 'target': 5000},
+        {'name': 'Priya Singh', 'email': 'priya@cafe.local', 'role': 'waitstaff', 'rate': 180, 'target': 3000},
+        {'name': 'Ahmed Khan', 'email': 'ahmed@cafe.local', 'role': 'kitchen', 'rate': 250, 'target': 8000},
+        {'name': 'Anil Tiwari', 'email': 'anil@cafe.local', 'role': 'manager', 'rate': 350, 'target': 15000},
+        {'name': 'Neha Sharma', 'email': 'neha@cafe.local', 'role': 'cashier', 'rate': 200, 'target': 5000},
+        {'name': 'Vikram Patel', 'email': 'vikram@cafe.local', 'role': 'kitchen', 'rate': 250, 'target': 8000},
+    ]
+    for idx, sdata in enumerate(staff_data):
+        existing = User.query.filter_by(email=sdata['email'], tenant_id=default_tenant.id).first()
+        if not existing:
+            u = User(
+                name=sdata['name'],
+                email=sdata['email'],
+                password=generate_password_hash('Cafe@1234'),
+                role=sdata['role'],
+                hourly_rate=sdata['rate'],
+                monthly_target=sdata['target'],
+                tenant_id=default_tenant.id,
+                branch_id=branches[idx % len(branches)].id
+            )
+            db.session.add(u)
+    
+    db.session.commit()
+    
+    # Create tables on all floors
+    floors_data = [
+        {'name': 'Ground Floor', 'tables': [
+            {'number': 'G1', 'seats': 2}, {'number': 'G2', 'seats': 4}, {'number': 'G3', 'seats': 6},
+            {'number': 'G4', 'seats': 4}, {'number': 'G5', 'seats': 2}
+        ]},
+        {'name': 'First Floor', 'tables': [
+            {'number': 'F1', 'seats': 4}, {'number': 'F2', 'seats': 6}, {'number': 'F3', 'seats': 4},
+            {'number': 'F4', 'seats': 2}, {'number': 'F5', 'seats': 8}
+        ]},
+    ]
+    
+    for floor_data in floors_data:
+        existing_floor = Floor.query.filter_by(name=floor_data['name']).first()
+        if not existing_floor:
+            floor = Floor(name=floor_data['name'])
+            db.session.add(floor)
+            db.session.flush()
+            for tdata in floor_data['tables']:
+                t = Table(number=tdata['number'], seats=tdata['seats'], floor_id=floor.id)
+                db.session.add(t)
+    
+    db.session.commit()
+    
+    # Create sample orders
+    products = Product.query.filter_by(tenant_id=default_tenant.id).all()
+    default_branch = branches[0]  # Use first branch for sample orders
+    
+    # Get first cashier user for sample order
+    cashier = User.query.filter_by(role='cashier', tenant_id=default_tenant.id).first()
+    if cashier and products:
+        # Check if sample orders already exist
+        existing_orders = Order.query.filter_by(tenant_id=default_tenant.id).count()
+        if existing_orders < 3:  # Only add if less than 3
+            # Sample Order 1
+            o1 = Order(
+                order_number=str(1000 + len(Order.query.all())),
+                table_id=Table.query.first().id if Table.query.first() else None,
+                total=products[0].price + products[1].price,
+                status='completed',
+                payment_method='cash',
+                user_id=cashier.id,
+                branch_id=default_branch.id,
+                tenant_id=default_tenant.id,
+                created_at=datetime.utcnow() - timedelta(days=2)
+            )
+            oi1 = OrderItem(order=o1, product_name=products[0].name, qty=1, price=products[0].price)
+            oi2 = OrderItem(order=o1, product_name=products[1].name, qty=1, price=products[1].price)
+            db.session.add(o1)
+            db.session.add(oi1)
+            db.session.add(oi2)
+            
+            # Sample Order 2
+            o2 = Order(
+                order_number=str(1001 + len(Order.query.all())),
+                table_id=Table.query.filter_by(number='G2').first().id if Table.query.filter_by(number='G2').first() else None,
+                total=sum(p.price for p in products[:3]),
+                status='paid',
+                payment_method='upi',
+                user_id=cashier.id,
+                branch_id=default_branch.id,
+                tenant_id=default_tenant.id,
+                created_at=datetime.utcnow() - timedelta(days=1)
+            )
+            for p in products[:3]:
+                oi = OrderItem(order=o2, product_name=p.name, qty=1, price=p.price)
+                db.session.add(oi)
+            db.session.add(o2)
+            
+            # Sample Order 3 (Today)
+            o3 = Order(
+                order_number=str(1002 + len(Order.query.all())),
+                table_id=Table.query.filter_by(number='F1').first().id if Table.query.filter_by(number='F1').first() else None,
+                total=products[0].price * 2,
+                status='pending',
+                payment_method='card',
+                user_id=cashier.id,
+                branch_id=default_branch.id,
+                tenant_id=default_tenant.id,
+                created_at=datetime.utcnow()
+            )
+            oi3 = OrderItem(order=o3, product_name=products[0].name, qty=2, price=products[0].price)
+            db.session.add(o3)
+            db.session.add(oi3)
+            
+            db.session.commit()
+    
+    # Create sample customers for reservations
+    if User.query.filter_by(name='John Doe', role='customer').first() is None:
+        c1 = User(name='John Doe', email='john@customers.local', 
+                  password=generate_password_hash('Cafe@1234'), role='customer', tenant_id=default_tenant.id)
+        c2 = User(name='Jane Smith', email='jane@customers.local', 
+                  password=generate_password_hash('Cafe@1234'), role='customer', tenant_id=default_tenant.id)
+        c3 = User(name='Amit Patel', email='amit@customers.local', 
+                  password=generate_password_hash('Cafe@1234'), role='customer', tenant_id=default_tenant.id)
+        db.session.add(c1)
+        db.session.add(c2)
+        db.session.add(c3)
+        db.session.commit()
+    
+    # Create sample reservations
+    if Reservation.query.filter_by(tenant_id=default_tenant.id).count() < 3:
+        c1 = User.query.filter_by(name='John Doe', role='customer').first()
+        c2 = User.query.filter_by(name='Jane Smith', role='customer').first()
+        c3 = User.query.filter_by(name='Amit Patel', role='customer').first()
+        
+        # Sample Reservation 1 (Pending)
+        r1 = Reservation(
+            customer_id=c1.id if c1 else None,
+            party_size=4,
+            reserved_at=datetime.utcnow() + timedelta(days=1),
+            status='pending',
+            notes='Reservation for 4',
+            table_id=Table.query.filter_by(number='G3').first().id if Table.query.filter_by(number='G3').first() else None,
+            tenant_id=default_tenant.id,
+            created_at=datetime.utcnow()
+        )
+        db.session.add(r1)
+        
+        # Sample Reservation 2 (Confirmed)
+        r2 = Reservation(
+            customer_id=c2.id if c2 else None,
+            party_size=2,
+            reserved_at=datetime.utcnow() + timedelta(days=2),
+            status='confirmed',
+            notes='Reservation for 2, celebrate anniversary',
+            table_id=Table.query.filter_by(number='G1').first().id if Table.query.filter_by(number='G1').first() else None,
+            tenant_id=default_tenant.id,
+            created_at=datetime.utcnow() - timedelta(days=1)
+        )
+        db.session.add(r2)
+        
+        # Sample Reservation 3 (Seated)
+        r3 = Reservation(
+            customer_id=c3.id if c3 else None,
+            party_size=6,
+            reserved_at=datetime.utcnow() - timedelta(hours=2),
+            status='seated',
+            notes='Corporate event, 6 people',
+            table_id=Table.query.filter_by(number='F3').first().id if Table.query.filter_by(number='F3').first() else None,
+            tenant_id=default_tenant.id,
+            created_at=datetime.utcnow() - timedelta(days=1)
+        )
+        db.session.add(r3)
+        db.session.commit()
+    
+    # Create sample inventory items
+    if InventoryItem.query.filter_by(tenant_id=default_tenant.id).count() < 6:
+        inventory_items = [
+            {'name': 'Tomato Sauce', 'unit': 'liter', 'qty': 20, 'cost': 150},
+            {'name': 'Mozzarella Cheese', 'unit': 'kg', 'qty': 5, 'cost': 800},
+            {'name': 'Wheat Flour', 'unit': 'kg', 'qty': 50, 'cost': 50},
+            {'name': 'Fresh Milk', 'unit': 'liter', 'qty': 30, 'cost': 60},
+            {'name': 'Olive Oil', 'unit': 'liter', 'qty': 10, 'cost': 400},
+            {'name': 'Fresh Basil', 'unit': 'bunch', 'qty': 15, 'cost': 30},
+        ]
+        for item in inventory_items:
+            existing = InventoryItem.query.filter_by(name=item['name'], tenant_id=default_tenant.id).first()
+            if not existing:
+                inv = InventoryItem(
+                    name=item['name'],
+                    unit=item['unit'],
+                    current_stock=item['qty'],
+                    unit_cost=item['cost'],
+                    tenant_id=default_tenant.id
+                )
+                db.session.add(inv)
+        db.session.commit()
+    
+    # Create sample recipes for products
+    if ProductRecipe.query.filter_by(tenant_id=default_tenant.id).count() < 3:
+        # Recipe for Pizza
+        pizza = Product.query.filter_by(name='Margherita Pizza', tenant_id=default_tenant.id).first()
+        tomato_sauce = InventoryItem.query.filter_by(name='Tomato Sauce', tenant_id=default_tenant.id).first()
+        cheese = InventoryItem.query.filter_by(name='Mozzarella Cheese', tenant_id=default_tenant.id).first()
+        
+        if pizza and tomato_sauce and cheese:
+            existing = ProductRecipe.query.filter_by(product_id=pizza.id).first()
+            if not existing:
+                # Pizza recipe: 0.2L tomato sauce
+                recipe1 = ProductRecipe(
+                    product_id=pizza.id,
+                    inventory_item_id=tomato_sauce.id,
+                    quantity=0.2,
+                    tenant_id=default_tenant.id
+                )
+                db.session.add(recipe1)
+                # Pizza recipe: 0.15kg cheese
+                recipe2 = ProductRecipe(
+                    product_id=pizza.id,
+                    inventory_item_id=cheese.id,
+                    quantity=0.15,
+                    tenant_id=default_tenant.id
+                )
+                db.session.add(recipe2)
+        db.session.commit()
+
 with app.app_context():
     db.create_all()
     seed_data()
@@ -3734,6 +4031,7 @@ with app.app_context():
     ensure_branch_schema()
     ensure_demo_catalog()
     ensure_demo_floors_and_tables()
+    ensure_sample_data()
     # ensure_demo_paid_orders_and_reviews() - Commented out: depends on request context, call from endpoint instead
 
 if __name__ == '__main__':

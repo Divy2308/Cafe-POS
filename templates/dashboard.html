@@ -154,7 +154,8 @@
     .stat-value { font-size: 1.6rem !important; }
 
     /* Charts: stack */
-    .charts-grid { grid-template-columns: 1fr !important; }
+    .charts-grid { grid-template-columns: 1fr !important; width: 100%; max-width: 100vw; overflow: hidden; box-sizing: border-box; }
+    .charts-grid .card { width: 100%; max-width: 100%; box-sizing: border-box; }
     .pay-breakdown-grid { grid-template-columns: 1fr 1fr !important; }
     .review-stats-grid { grid-template-columns: 1fr 1fr 1fr !important; }
 
@@ -249,6 +250,9 @@
       <div class="border-b border-border dash-header flex items-center justify-between" style="background:#111;position:sticky;top:0;z-index:10;">
         <h2 class="font-display text-xl font-700">Reports &amp; Analytics</h2>
         <div class="header-actions">
+          <select id="analyticsBranchSwitcher" onchange="handleAnalyticsBranchSwitch()" class="bg-[#1a1a1a] border border-border rounded-lg text-sm text-white px-3 py-1.5 min-w-[140px]">
+            <option value="">All Branches</option>
+          </select>
           <button class="period-btn active border border-border rounded-lg text-sm" onclick="setPeriod('today',this)">Today</button>
           <button class="period-btn border border-border rounded-lg text-sm text-gray-500" onclick="setPeriod('week',this)">Week</button>
           <button class="period-btn border border-border rounded-lg text-sm text-gray-500" onclick="setPeriod('month',this)">Month</button>
@@ -327,6 +331,46 @@
           <div id="reservations-mgmt-list" class="space-y-3"></div>
           <div id="reservations-mgmt-empty" class="hidden text-center py-10 text-gray-500">No upcoming reservations.</div>
         </div>
+
+        <!-- Sample Data Overview -->
+        <div class="card p-5" style="border-radius:16px;background:linear-gradient(135deg,rgba(34,197,94,0.1),rgba(22,163,74,0.05));border:1px solid rgba(34,197,94,0.2)">
+          <div class="flex items-center justify-between gap-4 mb-4">
+            <div>
+              <div class="font-display font-700">📊 System Status & Sample Data</div>
+              <div class="text-xs text-gray-500 mt-1">Complete test data loaded for all features</div>
+            </div>
+            <img src="/static/img/delivery-man.png" alt="Ready" style="width:60px;height:60px;opacity:0.8">
+          </div>
+          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+            <div class="card p-3 text-center" style="border-radius:12px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.2)">
+              <div class="text-2xl font-bold text-blue-400">4</div>
+              <div class="text-xs text-gray-500 mt-1">Branches</div>
+            </div>
+            <div class="card p-3 text-center" style="border-radius:12px;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.2)">
+              <div class="text-2xl font-bold text-purple-400">6</div>
+              <div class="text-xs text-gray-500 mt-1">Staff</div>
+            </div>
+            <div class="card p-3 text-center" style="border-radius:12px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2)">
+              <div class="text-2xl font-bold text-green-400">3</div>
+              <div class="text-xs text-gray-500 mt-1">Orders</div>
+            </div>
+            <div class="card p-3 text-center" style="border-radius:12px;background:rgba(249,115,22,0.1);border:1px solid rgba(249,115,22,0.2)">
+              <div class="text-2xl font-bold text-orange-400">3</div>
+              <div class="text-xs text-gray-500 mt-1">Reservations</div>
+            </div>
+            <div class="card p-3 text-center" style="border-radius:12px;background:rgba(236,72,153,0.1);border:1px solid rgba(236,72,153,0.2)">
+              <div class="text-2xl font-bold text-pink-400">10</div>
+              <div class="text-xs text-gray-500 mt-1">Tables</div>
+            </div>
+            <div class="card p-3 text-center" style="border-radius:12px;background:rgba(14,165,233,0.1);border:1px solid rgba(14,165,233,0.2)">
+              <div class="text-2xl font-bold text-sky-400">6</div>
+              <div class="text-xs text-gray-500 mt-1">Inventory</div>
+            </div>
+          </div>
+          <div class="text-xs text-gray-600 mt-4 p-3 rounded-lg bg-gray-900/30">
+            ✅ All features seeded with realistic test data • Staff credentials: <code>raj@cafe.local</code> / <code>Cafe@1234</code> • Check Staff, OrderHistory & Reservations tabs for demo data
+          </div>
+        </div>
       </div>
     </div>
 
@@ -364,6 +408,7 @@
                 <th class="text-left py-3 px-4 text-gray-500 font-semibold">Email</th>
                 <th class="text-left py-3 px-4 text-gray-500 font-semibold">Role</th>
                 <th class="text-left py-3 px-4 text-gray-500 font-semibold">Hourly Rate</th>
+                <th class="text-left py-3 px-4 text-gray-500 font-semibold">Target</th>
                 <th class="text-left py-3 px-4 text-gray-500 font-semibold">Branch</th>
                 <th class="text-left py-3 px-4 text-gray-500 font-semibold">Joined</th>
                 <th class="text-left py-3 px-4 text-gray-500 font-semibold">Actions</th>
@@ -457,40 +502,25 @@
     <div id="tab-settings" class="tab-panel hidden">
       <div class="border-b border-border px-6 py-4" style="background:#111;position:sticky;top:0;z-index:10">
         <h2 class="font-display text-xl font-700">Cafe Settings</h2>
-        <div class="text-sm text-gray-500 mt-1">Update shared cafe information.</div>
+        <div class="text-sm text-gray-500 mt-1">Update shared cafe information and branch details.</div>
       </div>
-      <div class="tab-content-pad p-6">
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div class="lg:col-span-2 card p-6">
-            <h2 class="text-2xl font-bold mb-6">Cafe Settings</h2>
-            <div class="space-y-4">
-              <div>
-                <label class="block text-sm text-gray-500 mb-2">Logo</label>
-                <div class="flex items-center gap-4">
-                  <div id="logoPreview" class="w-16 h-16 rounded-xl flex items-center justify-center overflow-hidden border border-border" style="background:#222"><span class="text-2xl">☕</span></div>
-                  <div>
-                    <input type="file" id="logoFileInput" accept="image/*" onchange="handleLogoUpload(event)" class="hidden">
-                    <button onclick="document.getElementById('logoFileInput').click()" class="btn-ghost px-4 py-2 rounded-lg text-sm">Upload Logo</button>
-                    <button onclick="removeLogo()" class="btn-ghost px-3 py-2 rounded-lg text-xs text-red-400 ml-2">Remove</button>
-                    <div class="text-xs text-gray-600 mt-1">PNG or JPG, max 500KB</div>
-                  </div>
-                </div>
-                <input type="hidden" id="cafeLogo">
-              </div>
-              <div><label class="block text-sm text-gray-500 mb-2">Cafe Name</label><input type="text" id="cafeName"></div>
-              <div><label class="block text-sm text-gray-500 mb-2">Phone Number</label><input type="tel" id="cafePhone"></div>
-              <div><label class="block text-sm text-gray-500 mb-2">Email</label><input type="email" id="cafeEmail"></div>
-              <div><label class="block text-sm text-gray-500 mb-2">Address</label><textarea id="cafeAddress" rows="3"></textarea></div>
-              <div class="grid grid-cols-2 gap-4">
-                <div><label class="block text-sm text-gray-500 mb-2">Open Time</label><input type="time" id="openTime"></div>
-                <div><label class="block text-sm text-gray-500 mb-2">Close Time</label><input type="time" id="closeTime"></div>
-              </div>
-              <div><label class="block text-sm text-gray-500 mb-2">Default Tax Rate (%)</label><input type="number" id="taxRate" min="0" max="100"></div>
-            </div>
+      <div class="tab-content-pad p-6 space-y-6">
+        <!-- Branch Selector (TOP) -->
+        <div class="card p-6">
+          <h3 class="text-xl font-bold mb-4">🌿 Select Branch</h3>
+          <div class="mb-4">
+            <label class="block text-sm text-gray-500 mb-2">Active Branch</label>
+            <select id="settingsBranchSelector" class="w-full bg-[#1a1a1a] border border-border rounded-lg text-sm text-white px-3 py-2.5" onchange="loadSelectedBranchSettings()"></select>
           </div>
-          <div class="card p-6">
-            <h3 class="text-xl font-bold mb-4">Actions</h3>
-            <button onclick="saveCafeSettings()" class="w-full btn-primary py-2 rounded-lg text-white font-semibold">Save Changes</button>
+          <div id="branchSettingsForm" class="space-y-4 hidden">
+            <div><label class="block text-sm text-gray-500 mb-2">Branch Name</label><input type="text" id="settingsBranchName" class="w-full"></div>
+            <div><label class="block text-sm text-gray-500 mb-2">Phone</label><input type="text" id="settingsBranchPhone" class="w-full"></div>
+            <div><label class="block text-sm text-gray-500 mb-2">Address</label><textarea id="settingsBranchAddress" rows="2" class="w-full"></textarea></div>
+            <div><label class="block text-sm text-gray-500 mb-2">Monthly Target (₹)</label><input type="number" id="settingsBranchTarget" class="w-full"></div>
+            <div class="flex gap-3">
+              <button onclick="saveBranchSettings()" class="flex-1 btn-primary py-2.5 rounded-lg text-white font-semibold transition hover:opacity-90">💾 Save Branch</button>
+              <button onclick="document.getElementById('branchSettingsForm').classList.add('hidden')" class="flex-1 btn-ghost py-2.5 rounded-lg font-semibold">Cancel</button>
+            </div>
           </div>
         </div>
       </div>
@@ -569,6 +599,7 @@
         </select>
       </div>
       <div><label class="block text-sm text-gray-500 mb-2">Hourly Rate</label><input type="number" id="newUserHourlyRate" min="0" step="0.01" placeholder="0.00"></div>
+      <div><label class="block text-sm text-gray-500 mb-2">Monthly Target</label><input type="number" id="newUserMonthlyTarget" min="0" step="0.01" placeholder="0.00"></div>
       <div class="md:col-span-2 hidden" id="newUserBranchWrap"><label class="block text-sm text-gray-500 mb-2">Branch</label><select id="newUserBranch"></select></div>
     </div>
     <div class="flex gap-3 mt-6">
@@ -585,6 +616,8 @@
     <div class="space-y-4">
       <div><label class="block text-sm text-gray-500 mb-2">Branch Name</label><input type="text" id="branchName"></div>
       <div><label class="block text-sm text-gray-500 mb-2">Address</label><textarea id="branchAddress" rows="3"></textarea></div>
+      <div><label class="block text-sm text-gray-500 mb-2">Phone</label><input type="tel" id="branchPhone"></div>
+      <div><label class="block text-sm text-gray-500 mb-2">Monthly Target</label><input type="number" id="branchTarget" min="0" step="1"></div>
     </div>
     <div class="flex gap-3 mt-6">
       <button onclick="closeBranchModal()" class="flex-1 btn-ghost py-2 rounded-lg font-semibold">Cancel</button>
@@ -687,9 +720,17 @@
     const values = Object.values(byMethod);
     if (!values.length) return;
     methodChart = new Chart(ctx, {
-      type: 'doughnut',
-      data: { labels, datasets: [{ data: values, backgroundColor: ['#22c55e','#f97316','#3b82f6'], borderWidth: 0 }] },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#9ca3af', font: { size: 12 } } } }, cutout: '70%' }
+      type: 'bar',
+      data: { labels, datasets: [{ label: 'Sales', data: values, backgroundColor: ['#22c55e','#f97316','#3b82f6'], borderRadius: 4 }] },
+      options: { 
+        responsive: true, 
+        maintainAspectRatio: false, 
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false } },
+          y: { grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true }
+        }
+      }
     });
   }
 
@@ -781,7 +822,7 @@
   function closeAddUserModal() {
     document.getElementById('addUserModal').classList.add('hidden');
     document.getElementById('newUserEmail').disabled = false;
-    ['newUserName','newUserEmail','newUserPassword','newUserHourlyRate','editUserId'].forEach(id => {
+    ['newUserName','newUserEmail','newUserPassword','newUserHourlyRate','newUserMonthlyTarget','newUserRole','editUserId'].forEach(id => {
       const f = document.getElementById(id); if (f) f.value = '';
     });
   }
@@ -791,6 +832,8 @@
     document.getElementById('branchModal').classList.add('hidden');
     document.getElementById('branchName').value = '';
     document.getElementById('branchAddress').value = '';
+    document.getElementById('branchPhone').value = '';
+    document.getElementById('branchTarget').value = '';
   }
 
   async function loadBranches() {
@@ -812,6 +855,64 @@
     }
     document.getElementById('newUserBranchWrap').classList.remove('hidden');
     document.getElementById('addBranchBtn').classList.remove('hidden');
+
+    // Populate Analytics Branch Switcher
+    const anSwitcher = document.getElementById('analyticsBranchSwitcher');
+    if (anSwitcher) {
+      anSwitcher.innerHTML = '<option value="">All Branches</option>' + branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+      if (activeBranchId) anSwitcher.value = String(activeBranchId);
+    }
+    
+    // Populate Settings Branch Switcher
+    const setSwitcher = document.getElementById('settingsBranchSelector');
+    if (setSwitcher) {
+      setSwitcher.innerHTML = '<option value="">-- Select Branch --</option>' + branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+    }
+  }
+
+  async function handleAnalyticsBranchSwitch() {
+    const branchId = document.getElementById('analyticsBranchSwitcher').value;
+    if (branchId) {
+      await api('/api/branches/switch', 'POST', { branch_id: Number(branchId) });
+    } else {
+      await api('/api/branches/switch', 'POST', { branch_id: null }); // Wait, maybe null means all branches.
+    }
+    loadStats(currentPeriod);
+  }
+
+  function loadSelectedBranchSettings() {
+    const branchId = document.getElementById('settingsBranchSelector').value;
+    const form = document.getElementById('branchSettingsForm');
+    if (!branchId) {
+      form.classList.add('hidden');
+      return;
+    }
+    const branch = branches.find(b => b.id === Number(branchId));
+    if (branch) {
+      document.getElementById('settingsBranchName').value = branch.name || '';
+      document.getElementById('settingsBranchPhone').value = branch.phone || '';
+      document.getElementById('settingsBranchAddress').value = branch.address || '';
+      document.getElementById('settingsBranchTarget').value = branch.monthly_target || 0;
+      form.classList.remove('hidden');
+    }
+  }
+
+  async function saveBranchSettings() {
+    const branchId = document.getElementById('settingsBranchSelector').value;
+    if (!branchId) return;
+    const payload = {
+      name: document.getElementById('settingsBranchName').value,
+      phone: document.getElementById('settingsBranchPhone').value,
+      address: document.getElementById('settingsBranchAddress').value,
+      monthly_target: parseFloat(document.getElementById('settingsBranchTarget').value || 0)
+    };
+    const res = await api('/api/branches/' + branchId, 'PUT', payload);
+    if (!res.error) {
+      toast('Branch details saved', 'success');
+      loadBranches();
+    } else {
+      toast(res.error, 'error');
+    }
   }
 
   async function handleBranchSwitch() {
@@ -830,6 +931,7 @@
       email: document.getElementById('newUserEmail').value.trim(),
       role: document.getElementById('newUserRole').value,
       hourly_rate: parseFloat(document.getElementById('newUserHourlyRate').value || '0'),
+      monthly_target: parseFloat(document.getElementById('newUserMonthlyTarget').value || '0')
     };
     const password = document.getElementById('newUserPassword').value;
     if (DASHBOARD_CONTEXT.isSuperadmin) payload.branch_id = Number(document.getElementById('newUserBranch').value);
@@ -854,6 +956,7 @@
         <td class="py-4 px-4 text-gray-500">${user.email}</td>
         <td class="py-4 px-4"><span class="tag bg-brand-600/20 text-brand-600">${user.role}</span></td>
         <td class="py-4 px-4">${formatMoney(user.hourly_rate)}</td>
+        <td class="py-4 px-4">${formatMoney(user.monthly_target)}</td>
         <td class="py-4 px-4 text-gray-500">${user.branch_name||'—'}</td>
         <td class="py-4 px-4 text-gray-500">${new Date(user.created_at).toLocaleDateString()}</td>
         <td class="py-4 px-4">
@@ -873,6 +976,7 @@
     document.getElementById('newUserPassword').value = '';
     document.getElementById('newUserRole').value = user.role;
     document.getElementById('newUserHourlyRate').value = user.hourly_rate;
+    document.getElementById('newUserMonthlyTarget').value = user.monthly_target || 0;
     if (DASHBOARD_CONTEXT.isSuperadmin && user.branch_id) document.getElementById('newUserBranch').value = user.branch_id;
     document.getElementById('userModalTitle').textContent = 'Edit Staff Member';
     document.getElementById('userModalSaveBtn').textContent = 'Update Staff';

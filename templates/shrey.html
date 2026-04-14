@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>POS Cafe — Super Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#080a0c;
+  --s1:#0e1114;
+  --s2:#141820;
+  --s3:#1c2230;
+  --border:rgba(255,255,255,0.06);
+  --border2:rgba(255,255,255,0.11);
+  --text:#e8edf5;
+  --muted:#5a6478;
+  --muted2:#8494b0;
+  --cyan:#00d4ff;
+  --cyan-d:#0099bb;
+  --cyan-bg:rgba(0,212,255,0.08);
+  --cyan-bg2:rgba(0,212,255,0.14);
+  --green:#00e676;
+  --green-bg:rgba(0,230,118,0.08);
+  --red:#ff4757;
+  --red-bg:rgba(255,71,87,0.08);
+  --amber:#ffb300;
+  --amber-bg:rgba(255,179,0,0.08);
+  --purple:#a78bfa;
+  --purple-bg:rgba(167,139,250,0.08);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg)}
+body{font-family:'Sora',sans-serif;color:var(--text);display:flex;flex-direction:column}
+
+/* ── LOCK SCREEN ── */
+#lock{position:fixed;inset:0;z-index:999;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:0}
+.lock-logo{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.25em;color:var(--muted);margin-bottom:32px;text-transform:uppercase}
+.lock-icon{width:56px;height:56px;border-radius:16px;background:var(--s2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;margin-bottom:28px}
+.lock-icon svg{width:24px;height:24px;color:var(--cyan)}
+.lock-title{font-size:18px;font-weight:600;margin-bottom:6px;text-align:center}
+.lock-sub{font-size:12px;color:var(--muted);margin-bottom:32px;font-family:'JetBrains Mono',monospace}
+.lock-input-wrap{width:300px;position:relative}
+.lock-input{width:100%;background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:14px 48px 14px 16px;font-family:'JetBrains Mono',monospace;font-size:15px;color:var(--text);outline:none;letter-spacing:.2em;transition:border .2s}
+.lock-input:focus{border-color:rgba(0,212,255,.4)}
+.lock-eye{position:absolute;right:14px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--muted);font-size:14px;background:none;border:none}
+.lock-btn{width:100%;margin-top:10px;padding:13px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--cyan-d),var(--cyan));color:#000;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;font-family:'Sora',sans-serif;transition:all .2s}
+.lock-btn:hover{opacity:.9;transform:translateY(-1px)}
+.lock-err{font-size:11px;color:var(--red);margin-top:8px;text-align:center;font-family:'JetBrains Mono',monospace;min-height:16px}
+.lock-hint{font-size:10px;color:var(--muted);margin-top:20px;font-family:'JetBrains Mono',monospace;text-align:center;opacity:.5}
+#lock.hidden{display:none}
+
+/* ── TOP BAR ── */
+.topbar{height:52px;min-height:52px;background:var(--s1);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:16px;flex-shrink:0}
+.topbar-brand{display:flex;align-items:center;gap:10px}
+.brand-dot{width:8px;height:8px;border-radius:50%;background:var(--cyan);box-shadow:0 0 8px var(--cyan);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.brand-name{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;color:var(--cyan);letter-spacing:.06em}
+.brand-sep{font-family:'JetBrains Mono',monospace;color:var(--muted);font-size:12px;margin:0 4px}
+.brand-role{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:.08em}
+.topbar-stats{display:flex;gap:24px;margin-left:auto}
+.tstat{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace}
+.tstat-val{font-weight:500;color:var(--text)}
+.tstat-val.cyan{color:var(--cyan)}
+.tstat-val.green{color:var(--green)}
+.tstat-val.red{color:var(--red)}
+.topbar-right{display:flex;align-items:center;gap:8px;margin-left:16px}
+.tb-btn{height:30px;padding:0 12px;border-radius:7px;border:1px solid var(--border);background:var(--s2);color:var(--muted2);font-size:11px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .18s;white-space:nowrap;font-family:'Sora',sans-serif}
+.tb-btn:hover{border-color:var(--border2);color:var(--text)}
+.tb-btn.danger:hover{border-color:rgba(255,71,87,.4);color:var(--red);background:var(--red-bg)}
+
+/* ── LAYOUT ── */
+.layout{flex:1;display:flex;overflow:hidden}
+.sidebar{width:200px;min-width:200px;background:var(--s1);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:12px 8px}
+.nav-item{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:8px;font-size:12px;font-weight:500;color:var(--muted2);cursor:pointer;transition:all .18s;position:relative;user-select:none}
+.nav-item:hover{background:var(--s2);color:var(--text)}
+.nav-item.active{background:var(--cyan-bg2);color:var(--cyan)}
+.nav-item svg{width:14px;height:14px;flex-shrink:0}
+.nav-badge{margin-left:auto;background:var(--red);color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;font-family:'JetBrains Mono',monospace}
+.nav-badge.amber{background:var(--amber)}
+.nav-sep{height:1px;background:var(--border);margin:8px 4px}
+.nav-section{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:10px 12px 4px;font-family:'JetBrains Mono',monospace}
+.sidebar-footer{margin-top:auto;padding-top:12px;border-top:1px solid var(--border)}
+
+/* ── MAIN CONTENT ── */
+.main{flex:1;overflow-y:auto;padding:20px;scrollbar-width:thin;scrollbar-color:var(--s3) transparent}
+.main::-webkit-scrollbar{width:4px}
+.main::-webkit-scrollbar-thumb{background:var(--s3);border-radius:4px}
+
+.tab-content{display:none;animation:fadeIn .2s ease}
+.tab-content.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ── PAGE HEADER ── */
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.page-title{font-size:18px;font-weight:600;letter-spacing:-.3px}
+.page-title span{color:var(--cyan)}
+.page-sub{font-size:11px;color:var(--muted);margin-top:2px;font-family:'JetBrains Mono',monospace}
+
+/* ── STAT CARDS ── */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.stat-card{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:16px}
+.stat-label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-bottom:8px}
+.stat-val{font-size:28px;font-weight:700;font-family:'JetBrains Mono',monospace;letter-spacing:-1px}
+.stat-val.cyan{color:var(--cyan)}
+.stat-val.green{color:var(--green)}
+.stat-val.red{color:var(--red)}
+.stat-val.amber{color:var(--amber)}
+.stat-delta{font-size:10px;color:var(--muted);margin-top:4px;font-family:'JetBrains Mono',monospace}
+.stat-delta.up{color:var(--green)}
+.stat-delta.down{color:var(--red)}
+
+/* ── TABLE ── */
+.table-card{background:var(--s1);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.table-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)}
+.table-title{font-size:13px;font-weight:600}
+.table-actions{display:flex;gap:6px}
+.search-box{display:flex;align-items:center;gap:7px;background:var(--s2);border:1px solid var(--border);border-radius:7px;padding:0 10px;transition:border .18s}
+.search-box:focus-within{border-color:rgba(0,212,255,.3)}
+.search-box svg{width:12px;height:12px;color:var(--muted);flex-shrink:0}
+.search-box input{background:transparent;border:none;outline:none;font-size:12px;color:var(--text);padding:7px 0;width:160px;font-family:'Sora',sans-serif}
+.search-box input::placeholder{color:var(--muted)}
+table{width:100%;border-collapse:collapse}
+thead tr{border-bottom:1px solid var(--border)}
+th{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:10px 18px;text-align:left;font-family:'JetBrains Mono',monospace;font-weight:500}
+td{padding:13px 18px;font-size:12px;border-bottom:1px solid rgba(255,255,255,.03);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.015)}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:600;font-family:'JetBrains Mono',monospace;letter-spacing:.04em}
+.badge-pending{background:var(--amber-bg);color:var(--amber);border:1px solid rgba(255,179,0,.2)}
+.badge-active{background:var(--green-bg);color:var(--green);border:1px solid rgba(0,230,118,.2)}
+.badge-rejected{background:var(--red-bg);color:var(--red);border:1px solid rgba(255,71,87,.2)}
+.badge-suspended{background:var(--purple-bg);color:var(--purple);border:1px solid rgba(167,139,250,.2)}
+.badge-trial{background:var(--cyan-bg);color:var(--cyan);border:1px solid rgba(0,212,255,.2)}
+.action-btns{display:flex;gap:5px}
+.act-btn{padding:4px 10px;border-radius:6px;font-size:11px;font-weight:500;border:1px solid var(--border);background:var(--s2);color:var(--muted2);cursor:pointer;transition:all .15s;font-family:'Sora',sans-serif;white-space:nowrap}
+.act-btn:hover{border-color:var(--border2);color:var(--text)}
+.act-btn.approve{border-color:rgba(0,230,118,.25);color:var(--green);background:var(--green-bg)}
+.act-btn.approve:hover{background:rgba(0,230,118,.15)}
+.act-btn.reject{border-color:rgba(255,71,87,.25);color:var(--red);background:var(--red-bg)}
+.act-btn.reject:hover{background:rgba(255,71,87,.15)}
+.act-btn.suspend{border-color:rgba(167,139,250,.25);color:var(--purple);background:var(--purple-bg)}
+.act-btn.view{border-color:rgba(0,212,255,.25);color:var(--cyan);background:var(--cyan-bg)}
+.rest-name{font-weight:600;color:var(--text);font-size:13px}
+.rest-meta{font-size:10px;color:var(--muted);margin-top:1px;font-family:'JetBrains Mono',monospace}
+
+/* ── MODAL ── */
+.modal-bg{position:fixed;inset:0;background:rgba(8,10,12,.85);backdrop-filter:blur(6px);z-index:50;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s;padding:16px}
+.modal-bg.open{opacity:1;pointer-events:all}
+.modal{background:var(--s2);border:1px solid var(--border2);border-radius:16px;width:100%;max-width:520px;max-height:85vh;overflow-y:auto;transform:scale(.94) translateY(12px);transition:transform .3s cubic-bezier(.22,1,.36,1)}
+.modal-bg.open .modal{transform:none}
+.modal-head{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-size:15px;font-weight:600}
+.modal-close{width:28px;height:28px;border-radius:7px;border:1px solid var(--border);background:var(--s1);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .15s}
+.modal-close:hover{color:var(--text);border-color:var(--border2)}
+.modal-body{padding:20px 24px}
+.field-group{margin-bottom:16px}
+.field-label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-bottom:6px;display:block}
+.field-val{font-size:13px;color:var(--text);padding:9px 12px;background:var(--s1);border:1px solid var(--border);border-radius:8px;font-family:'JetBrains Mono',monospace}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field-input{width:100%;background:var(--s1);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;color:var(--text);outline:none;transition:border .18s;font-family:'Sora',sans-serif}
+.field-input:focus{border-color:rgba(0,212,255,.35)}
+.field-select{width:100%;background:var(--s1);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;color:var(--text);outline:none;cursor:pointer;font-family:'Sora',sans-serif}
+.field-textarea{width:100%;background:var(--s1);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:12px;color:var(--text);outline:none;resize:vertical;min-height:80px;font-family:'JetBrains Mono',monospace;transition:border .18s}
+.field-textarea:focus{border-color:rgba(0,212,255,.35)}
+.modal-foot{padding:14px 24px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+.btn-cancel{padding:9px 18px;border-radius:8px;border:1px solid var(--border);background:var(--s1);color:var(--muted2);font-size:12px;font-weight:500;cursor:pointer;transition:all .18s;font-family:'Sora',sans-serif}
+.btn-cancel:hover{color:var(--text);border-color:var(--border2)}
+.btn-confirm{padding:9px 18px;border-radius:8px;border:none;font-size:12px;font-weight:600;cursor:pointer;transition:all .18s;font-family:'Sora',sans-serif}
+.btn-confirm.green{background:var(--green);color:#000}
+.btn-confirm.red{background:var(--red);color:#fff}
+.btn-confirm.cyan{background:linear-gradient(135deg,var(--cyan-d),var(--cyan));color:#000}
+.btn-confirm:hover{opacity:.88;transform:translateY(-1px)}
+
+/* ── TIMELINE ── */
+.timeline{display:flex;flex-direction:column;gap:0}
+.tl-item{display:flex;gap:12px;padding:10px 0;border-left:1px solid var(--border);margin-left:8px;padding-left:20px;position:relative}
+.tl-item::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--muted);position:absolute;left:-4px;top:14px}
+.tl-item.green::before{background:var(--green);box-shadow:0 0 6px var(--green)}
+.tl-item.red::before{background:var(--red)}
+.tl-item.cyan::before{background:var(--cyan)}
+.tl-item.amber::before{background:var(--amber)}
+.tl-time{font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;white-space:nowrap;margin-top:1px;min-width:80px}
+.tl-text{font-size:12px;color:var(--muted2);line-height:1.5}
+.tl-text strong{color:var(--text);font-weight:500}
+
+/* ── METRICS ROW ── */
+.metrics-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px}
+.metric-card{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.metric-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.metric-title{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-family:'JetBrains Mono',monospace}
+.mini-chart{display:flex;align-items:flex-end;gap:3px;height:36px}
+.bar{border-radius:2px 2px 0 0;flex:1;background:var(--cyan-bg);transition:all .3s}
+.bar.active{background:var(--cyan)}
+.metric-vals{display:flex;justify-content:space-between;align-items:baseline}
+.metric-main{font-size:22px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--cyan)}
+.metric-change{font-size:10px;color:var(--green);font-family:'JetBrains Mono',monospace}
+
+/* ── ACTIVITY LOG ── */
+.log-item{display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid rgba(255,255,255,.03);font-size:11px;transition:background .15s}
+.log-item:hover{background:rgba(255,255,255,.02)}
+.log-item:last-child{border-bottom:none}
+.log-type{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.log-msg{flex:1;color:var(--muted2);font-family:'JetBrains Mono',monospace}
+.log-msg strong{color:var(--text)}
+.log-time{color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;white-space:nowrap}
+
+/* ── PLAN CARDS ── */
+.plan-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+.plan-card{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:16px}
+.plan-card.featured{border-color:rgba(0,212,255,.3);background:var(--cyan-bg)}
+.plan-name{font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
+.plan-price{font-size:24px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--text);margin-bottom:4px}
+.plan-price span{font-size:12px;font-weight:400;color:var(--muted)}
+.plan-count{font-size:11px;color:var(--muted2);margin-bottom:12px;font-family:'JetBrains Mono',monospace}
+.plan-bar{height:4px;background:var(--s2);border-radius:2px;overflow:hidden}
+.plan-bar-fill{height:100%;border-radius:2px;background:var(--cyan)}
+
+/* ── TOGGLE ── */
+.toggle-wrap{display:flex;align-items:center;gap:8px}
+.toggle{position:relative;width:36px;height:20px}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;inset:0;background:var(--s3);border-radius:20px;cursor:pointer;transition:.2s;border:1px solid var(--border)}
+.toggle-slider::before{content:'';position:absolute;width:14px;height:14px;left:2px;top:2px;background:var(--muted);border-radius:50%;transition:.2s}
+.toggle input:checked+.toggle-slider{background:rgba(0,212,255,.2);border-color:var(--cyan)}
+.toggle input:checked+.toggle-slider::before{transform:translateX(16px);background:var(--cyan)}
+.toggle-label{font-size:12px;color:var(--muted2)}
+
+/* misc */
+.empty-state{text-align:center;padding:48px;color:var(--muted);font-size:13px}
+.section-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+.info-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:12px}
+.info-row:last-child{border:none}
+.info-key{color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:11px}
+.info-val{color:var(--text);font-weight:500}
+.chip{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;background:var(--s3);color:var(--muted2);border:1px solid var(--border);margin:2px;cursor:pointer;transition:all .15s;font-family:'JetBrains Mono',monospace}
+.chip:hover{border-color:var(--cyan);color:var(--cyan)}
+</style>
+</head>
+<body>
+
+<!-- LOCK SCREEN -->
+<div id="lock">
+  <div class="lock-logo">pos.cafe / system</div>
+  <div class="lock-icon">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+  </div>
+  <div class="lock-title">Super Admin Access</div>
+  <div class="lock-sub">// restricted zone</div>
+  <div class="lock-input-wrap">
+    <input class="lock-input" type="password" id="lock-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')tryUnlock()">
+    <button class="lock-eye" onclick="togglePass()">👁</button>
+  </div>
+  <button class="lock-btn" onclick="tryUnlock()">ACCESS SYSTEM</button>
+  <div class="lock-err" id="lock-err"></div>
+  <div class="lock-hint">hint: admin</div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none;flex-direction:column;height:100%">
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-brand">
+    <div class="brand-dot"></div>
+    <div class="brand-name">POS.CAFE</div>
+    <div class="brand-sep">/</div>
+    <div class="brand-role">SUPER ADMIN</div>
+  </div>
+  <div class="topbar-stats">
+    <div class="tstat">Restaurants: <span class="tstat-val cyan" id="ts-total">24</span></div>
+    <div class="tstat">Active: <span class="tstat-val green" id="ts-active">18</span></div>
+    <div class="tstat">Pending: <span class="tstat-val amber" id="ts-pending">4</span></div>
+    <div class="tstat">Revenue: <span class="tstat-val">₹2.4L/mo</span></div>
+  </div>
+  <div class="topbar-right">
+    <button class="tb-btn" onclick="openTab('broadcast')">
+      <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
+      Broadcast
+    </button>
+    <button class="tb-btn" onclick="exportData()">
+      <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+      Export CSV
+    </button>
+    <button class="tb-btn danger" onclick="lockSystem()">
+      <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+      Lock
+    </button>
+  </div>
+</div>
+
+<div class="layout">
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="nav-section">Main</div>
+  <div class="nav-item active" onclick="openTab('overview')">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+    Overview
+  </div>
+  <div class="nav-item" onclick="openTab('requests')">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+    Requests
+    <span class="nav-badge amber" id="req-badge">4</span>
+  </div>
+  <div class="nav-item" onclick="openTab('restaurants')">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+    Restaurants
+  </div>
+  <div class="nav-item" onclick="openTab('plans')">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+    Plans & Billing
+  </div>
+  <div class="nav-sep"></div>
+  <div class="nav-section">System</div>
+  <div class="nav-item" onclick="openTab('activity')">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+    Activity Log
+  </div>
+  <div class="nav-item" onclick="openTab('broadcast')">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
+    Broadcast
+  </div>
+  <div class="nav-item" onclick="openTab('settings')">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+    Settings
+  </div>
+  <div class="sidebar-footer">
+    <div class="nav-item" style="font-size:11px;color:var(--muted)">
+      <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3"/></svg>
+      <span id="clock-display" style="font-family:'JetBrains Mono',monospace"></span>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+<!-- ═══ OVERVIEW ═══ -->
+<div class="tab-content active" id="tab-overview">
+  <div class="page-header">
+    <div>
+      <div class="page-title">System <span>Overview</span></div>
+      <div class="page-sub">// real-time platform health</div>
+    </div>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-label">Total Restaurants</div><div class="stat-val cyan" id="ov-total">24</div><div class="stat-delta up">+3 this month</div></div>
+    <div class="stat-card"><div class="stat-label">Active Today</div><div class="stat-val green" id="ov-active">18</div><div class="stat-delta up">75% uptime</div></div>
+    <div class="stat-card"><div class="stat-label">Pending Requests</div><div class="stat-val amber" id="ov-pending">4</div><div class="stat-delta">Needs review</div></div>
+    <div class="stat-card"><div class="stat-label">Monthly Revenue</div><div class="stat-val">2.4L</div><div class="stat-delta up">+18% vs last month</div></div>
+  </div>
+
+  <div class="metrics-row">
+    <div class="metric-card">
+      <div class="metric-header"><div class="metric-title">Orders Today</div></div>
+      <div class="mini-chart" id="chart-orders"></div>
+      <div class="metric-vals"><div class="metric-main">1,247</div><div class="metric-change">+12%</div></div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-header"><div class="metric-title">Avg Session Time</div></div>
+      <div class="mini-chart" id="chart-session"></div>
+      <div class="metric-vals"><div class="metric-main">4.2h</div><div class="metric-change">+0.3h</div></div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-header"><div class="metric-title">Active Sessions</div></div>
+      <div class="mini-chart" id="chart-sessions"></div>
+      <div class="metric-vals"><div class="metric-main" id="active-sessions">12</div><div class="metric-change">Live</div></div>
+    </div>
+  </div>
+
+  <div class="section-row">
+    <div class="table-card">
+      <div class="table-header"><div class="table-title">Recent Requests</div><button class="act-btn view" onclick="openTab('requests')">View all</button></div>
+      <div id="overview-requests"></div>
+    </div>
+    <div class="table-card">
+      <div class="table-header"><div class="table-title">Live Activity</div></div>
+      <div id="live-activity"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ REQUESTS ═══ -->
+<div class="tab-content" id="tab-requests">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Restaurant <span>Requests</span></div>
+      <div class="page-sub">// approve or reject onboarding applications</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="act-btn" onclick="filterReqs('all')" id="rf-all" style="border-color:rgba(0,212,255,.3);color:var(--cyan)">All</button>
+      <button class="act-btn" onclick="filterReqs('pending')" id="rf-pending">Pending</button>
+      <button class="act-btn" onclick="filterReqs('approved')" id="rf-approved">Approved</button>
+      <button class="act-btn" onclick="filterReqs('rejected')" id="rf-rejected">Rejected</button>
+    </div>
+  </div>
+  <div class="table-card">
+    <div class="table-header">
+      <div class="table-title">Applications</div>
+      <div class="table-actions">
+        <div class="search-box">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <input placeholder="Search restaurant..." oninput="searchReqs(this.value)">
+        </div>
+      </div>
+    </div>
+    <table>
+      <thead><tr>
+        <th>Restaurant</th><th>Owner</th><th>City</th><th>Plan</th><th>Applied</th><th>Status</th><th>Actions</th>
+      </tr></thead>
+      <tbody id="req-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ RESTAURANTS ═══ -->
+<div class="tab-content" id="tab-restaurants">
+  <div class="page-header">
+    <div>
+      <div class="page-title">All <span>Restaurants</span></div>
+      <div class="page-sub">// manage active restaurants on the platform</div>
+    </div>
+    <button class="act-btn cyan" onclick="openAddRestModal()">+ Add Restaurant</button>
+  </div>
+  <div class="table-card">
+    <div class="table-header">
+      <div class="table-title">Restaurant Directory</div>
+      <div class="table-actions">
+        <div class="search-box">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <input placeholder="Search..." oninput="searchRests(this.value)">
+        </div>
+      </div>
+    </div>
+    <table>
+      <thead><tr>
+        <th>Restaurant</th><th>Owner</th><th>Plan</th><th>Tables</th><th>Orders/day</th><th>Status</th><th>Actions</th>
+      </tr></thead>
+      <tbody id="rest-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ PLANS ═══ -->
+<div class="tab-content" id="tab-plans">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Plans <span>&amp; Billing</span></div>
+      <div class="page-sub">// subscription management</div>
+    </div>
+  </div>
+  <div class="plan-grid">
+    <div class="plan-card">
+      <div class="plan-name">Starter</div>
+      <div class="plan-price">₹999<span>/mo</span></div>
+      <div class="plan-count" id="pc-starter">8 restaurants</div>
+      <div class="plan-bar"><div class="plan-bar-fill" style="width:33%"></div></div>
+    </div>
+    <div class="plan-card featured">
+      <div class="plan-name">Pro</div>
+      <div class="plan-price">₹2,499<span>/mo</span></div>
+      <div class="plan-count" id="pc-pro">12 restaurants</div>
+      <div class="plan-bar"><div class="plan-bar-fill" style="width:50%"></div></div>
+    </div>
+    <div class="plan-card">
+      <div class="plan-name">Enterprise</div>
+      <div class="plan-price">₹5,999<span>/mo</span></div>
+      <div class="plan-count" id="pc-ent">4 restaurants</div>
+      <div class="plan-bar"><div class="plan-bar-fill" style="width:17%"></div></div>
+    </div>
+  </div>
+  <div class="table-card">
+    <div class="table-header"><div class="table-title">Billing Overview</div></div>
+    <table>
+      <thead><tr><th>Restaurant</th><th>Plan</th><th>Amount</th><th>Status</th><th>Next Due</th><th>Actions</th></tr></thead>
+      <tbody id="billing-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ ACTIVITY LOG ═══ -->
+<div class="tab-content" id="tab-activity">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Activity <span>Log</span></div>
+      <div class="page-sub">// all admin actions and system events</div>
+    </div>
+    <button class="act-btn" onclick="clearLog()">Clear Log</button>
+  </div>
+  <div class="table-card">
+    <div id="activity-log" style="max-height:500px;overflow-y:auto"></div>
+  </div>
+</div>
+
+<!-- ═══ BROADCAST ═══ -->
+<div class="tab-content" id="tab-broadcast">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Broadcast <span>Message</span></div>
+      <div class="page-sub">// send notifications to all or selected restaurants</div>
+    </div>
+  </div>
+  <div class="section-row" style="grid-template-columns:1fr 1fr">
+    <div class="table-card" style="padding:20px">
+      <div class="field-group">
+        <label class="field-label">Target</label>
+        <select class="field-select" id="bc-target">
+          <option value="all">All Restaurants (24)</option>
+          <option value="active">Active Only (18)</option>
+          <option value="pending">Pending Only (4)</option>
+          <option value="pro">Pro Plan (12)</option>
+          <option value="starter">Starter Plan (8)</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Message Type</label>
+        <select class="field-select" id="bc-type">
+          <option value="info">Info</option>
+          <option value="warning">Warning</option>
+          <option value="maintenance">Maintenance Notice</option>
+          <option value="feature">New Feature</option>
+          <option value="billing">Billing Alert</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Subject</label>
+        <input class="field-input" id="bc-subject" placeholder="Message subject line...">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Message Body</label>
+        <textarea class="field-textarea" id="bc-body" rows="5" placeholder="Write your message here..."></textarea>
+      </div>
+      <button class="btn-confirm cyan" style="width:100%;padding:12px;border-radius:10px;margin-top:4px" onclick="sendBroadcast()">Send Broadcast</button>
+    </div>
+    <div class="table-card" style="padding:20px">
+      <div class="table-title" style="margin-bottom:16px;font-size:13px">Broadcast History</div>
+      <div id="bc-history" class="timeline"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SETTINGS ═══ -->
+<div class="tab-content" id="tab-settings">
+  <div class="page-header">
+    <div>
+      <div class="page-title">System <span>Settings</span></div>
+      <div class="page-sub">// platform configuration</div>
+    </div>
+  </div>
+  <div class="section-row">
+    <div class="table-card" style="padding:20px">
+      <div class="table-title" style="margin-bottom:16px;font-size:13px">Access Control</div>
+      <div class="field-group">
+        <label class="field-label">Admin Password</label>
+        <input class="field-input" type="password" id="new-pass" placeholder="New admin password">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Confirm Password</label>
+        <input class="field-input" type="password" id="confirm-pass" placeholder="Confirm password">
+      </div>
+      <button class="btn-confirm cyan" style="padding:10px 20px;border-radius:8px" onclick="changePassword()">Update Password</button>
+      <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">
+        <div class="table-title" style="font-size:12px;margin-bottom:12px">Platform Toggles</div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">New restaurant registrations open</span></div>
+          <div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">Email notifications enabled</span></div>
+          <div class="toggle-wrap"><label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label><span class="toggle-label">Maintenance mode</span></div>
+          <div class="toggle-wrap"><label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label><span class="toggle-label">Auto-approve trial accounts</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="table-card" style="padding:20px">
+      <div class="table-title" style="margin-bottom:16px;font-size:13px">Platform Info</div>
+      <div class="info-row"><span class="info-key">Version</span><span class="info-val">v1.4.2</span></div>
+      <div class="info-row"><span class="info-key">Environment</span><span class="info-val" style="color:var(--green)">Production</span></div>
+      <div class="info-row"><span class="info-key">Database</span><span class="info-val">SQLite / Flask-SQLAlchemy</span></div>
+      <div class="info-row"><span class="info-key">Real-time</span><span class="info-val">Socket.io v4</span></div>
+      <div class="info-row"><span class="info-key">Uptime</span><span class="info-val" style="color:var(--green)">99.4% (30d)</span></div>
+      <div class="info-row"><span class="info-key">Last Backup</span><span class="info-val">2h ago</span></div>
+      <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">
+        <div class="table-title" style="font-size:12px;margin-bottom:12px">Danger Zone</div>
+        <button class="btn-confirm red" style="padding:9px 18px;border-radius:8px;margin-right:8px" onclick="if(confirm('This will clear all logs. Continue?'))clearLog()">Clear All Logs</button>
+        <button class="btn-confirm red" style="padding:9px 18px;border-radius:8px;opacity:.6" onclick="alert('Disabled in demo')">Reset Platform</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+</div><!-- /layout -->
+</div><!-- /app -->
+
+<!-- DETAIL MODAL -->
+<div class="modal-bg" id="modal-detail" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="modal-title">Restaurant Details</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-foot" id="modal-foot"></div>
+  </div>
+</div>
+
+<script>
+const PASS = 'admin';
+let restaurants = [
+  {id:1,name:'Spice Garden',owner:'Amit Shah',email:'amit@spicegarden.com',city:'Ahmedabad',phone:'9876543210',plan:'pro',tables:12,ordersDay:87,status:'active',applied:'2025-03-10',type:'Dine-in',gst:'24AABCU9603R1ZX'},
+  {id:2,name:'The Brew House',owner:'Priya Mehta',email:'priya@brewhouse.com',city:'Surat',phone:'9123456780',plan:'starter',tables:8,ordersDay:43,status:'active',applied:'2025-02-20',type:'Cafe',gst:'24AABCU9603R1ZY'},
+  {id:3,name:'Biryani Express',owner:'Rahul Patel',email:'rahul@biryani.com',city:'Vadodara',phone:'9988776655',plan:'enterprise',tables:20,ordersDay:210,status:'active',applied:'2024-12-01',type:'QSR',gst:'24AABCU9603R1ZZ'},
+  {id:4,name:'Cafe Monsoon',owner:'Sneha Joshi',email:'sneha@monsoon.com',city:'Rajkot',phone:'9665544332',plan:'pro',tables:10,ordersDay:56,status:'suspended',applied:'2025-01-15',type:'Cafe',gst:''},
+  {id:5,name:'The Pizza Factory',owner:'Karan Desai',email:'karan@pizza.com',city:'Ahmedabad',phone:'9554433221',plan:'starter',tables:6,ordersDay:34,status:'active',applied:'2025-04-02',type:'QSR',gst:''},
+  {id:6,name:'Royal Thali',owner:'Meera Sharma',email:'meera@royalthali.com',city:'Gandhinagar',phone:'9443322110',plan:'pro',tables:15,ordersDay:95,status:'active',applied:'2025-03-28',type:'Dine-in',gst:'24AABCU9603R1ZW'},
+];
+let requests = [
+  {id:101,name:'Chai Pe Charcha',owner:'Vikas Nair',email:'vikas@chai.com',city:'Ahmedabad',phone:'9332211009',plan:'starter',applied:'2025-04-10',status:'pending',note:'Small chai stall, 4 tables',type:'Cafe'},
+  {id:102,name:'Dosa Delight',owner:'Anand Kumar',email:'anand@dosa.com',city:'Surat',phone:'9221100998',plan:'pro',applied:'2025-04-09',status:'pending',note:'South Indian chain, 3 branches',type:'Dine-in'},
+  {id:103,name:'Night Owl Bar',owner:'Ravi Kapoor',email:'ravi@nightowl.com',city:'Vadodara',phone:'9110099887',plan:'enterprise',applied:'2025-04-08',status:'pending',note:'Bar + restaurant combo',type:'Bar'},
+  {id:104,name:'Momo Corner',owner:'Tenzin Dorje',email:'tenzin@momo.com',city:'Rajkot',phone:'9009988776',plan:'starter',applied:'2025-04-05',status:'pending',note:'Tibetan food stall',type:'QSR'},
+  {id:105,name:'Punjabi Tadka',owner:'Gurpreet Singh',email:'gurpreet@punjabi.com',city:'Ahmedabad',phone:'8998877665',plan:'pro',applied:'2025-03-30',status:'approved',note:'North Indian restaurant',type:'Dine-in'},
+  {id:106,name:'Green Bowl',owner:'Ayesha Khan',email:'ayesha@green.com',city:'Surat',phone:'8887766554',plan:'starter',applied:'2025-03-28',status:'rejected',note:'Health food, rejected due to docs',type:'Cafe'},
+];
+let logs = [];
+let bcHistory = [];
+let reqFilter = 'all';
+let reqSearch = '';
+let restSearch = '';
+let currentAction = null;
+
+function tryUnlock(){
+  const v=document.getElementById('lock-pass').value;
+  const err=document.getElementById('lock-err');
+  if(v===PASS){
+    document.getElementById('lock').classList.add('hidden');
+    document.getElementById('app').style.display='flex';
+    initApp();
+  } else {
+    err.textContent='// access denied — invalid credentials';
+    document.getElementById('lock-pass').style.borderColor='rgba(255,71,87,.5)';
+    setTimeout(()=>err.textContent='',2500);
+  }
+}
+function togglePass(){
+  const i=document.getElementById('lock-pass');
+  i.type=i.type==='password'?'text':'password';
+}
+function lockSystem(){
+  document.getElementById('app').style.display='none';
+  document.getElementById('lock').classList.remove('hidden');
+  document.getElementById('lock-pass').value='';
+  document.getElementById('lock-err').textContent='';
+}
+
+function initApp(){
+  startClock();
+  renderMiniCharts();
+  renderOverviewRequests();
+  renderLiveActivity();
+  renderRequests();
+  renderRestaurants();
+  renderBilling();
+  renderActivityLog();
+  renderBcHistory();
+  setInterval(tickLiveActivity,4000);
+  setInterval(()=>{
+    document.getElementById('active-sessions').textContent=Math.floor(10+Math.random()*6);
+  },5000);
+}
+
+function startClock(){
+  const el=document.getElementById('clock-display');
+  function tick(){ el.textContent=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
+  tick(); setInterval(tick,1000);
+}
+
+function renderMiniCharts(){
+  ['chart-orders','chart-session','chart-sessions'].forEach(id=>{
+    const el=document.getElementById(id);
+    const vals=[40,55,35,70,60,80,65,90,75,100].map(v=>v*Math.random()*0.4+v*0.6);
+    const max=Math.max(...vals);
+    el.innerHTML=vals.map((v,i)=>`<div class="bar ${i===vals.length-1?'active':''}" style="height:${(v/max*100).toFixed(0)}%"></div>`).join('');
+  });
+}
+
+const EVENTS=['opened a new session','processed payment','sent order to kitchen','added new product','closed session','completed 50 orders','updated menu','generated report'];
+const COLORS=['cyan','green','amber','green','muted','green','cyan','amber'];
+function renderLiveActivity(){
+  const el=document.getElementById('live-activity');
+  const items=restaurants.slice(0,5).map((r,i)=>`
+    <div class="log-item">
+      <div class="log-type" style="background:var(--${COLORS[i]})"></div>
+      <div class="log-msg"><strong>${r.name}</strong> ${EVENTS[i]}</div>
+      <div class="log-time">${Math.floor(Math.random()*59)+1}m ago</div>
+    </div>`).join('');
+  el.innerHTML=items;
+}
+function tickLiveActivity(){
+  const r=restaurants[Math.floor(Math.random()*restaurants.length)];
+  const e=EVENTS[Math.floor(Math.random()*EVENTS.length)];
+  const c=COLORS[Math.floor(Math.random()*COLORS.length)];
+  const el=document.getElementById('live-activity');
+  const div=document.createElement('div');
+  div.className='log-item';
+  div.style.animation='fadeIn .3s ease';
+  div.innerHTML=`<div class="log-type" style="background:var(--${c})"></div><div class="log-msg"><strong>${r.name}</strong> ${e}</div><div class="log-time">just now</div>`;
+  el.insertBefore(div,el.firstChild);
+  if(el.children.length>6) el.removeChild(el.lastChild);
+  addLog(r.name,e,'cyan');
+}
+
+function renderOverviewRequests(){
+  const el=document.getElementById('overview-requests');
+  const pending=requests.filter(r=>r.status==='pending').slice(0,3);
+  if(!pending.length){el.innerHTML='<div class="empty-state">No pending requests</div>';return;}
+  el.innerHTML=pending.map(r=>`
+    <div class="log-item">
+      <div class="log-type" style="background:var(--amber)"></div>
+      <div class="log-msg"><strong>${r.name}</strong> — ${r.city} <span class="badge badge-pending" style="margin-left:6px">${r.plan}</span></div>
+      <div style="display:flex;gap:4px">
+        <button class="act-btn approve" onclick="quickApprove(${r.id})">✓</button>
+        <button class="act-btn reject" onclick="quickReject(${r.id})">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+function renderRequests(){
+  const el=document.getElementById('req-tbody');
+  let data=requests;
+  if(reqFilter!=='all') data=data.filter(r=>r.status===reqFilter);
+  if(reqSearch) data=data.filter(r=>r.name.toLowerCase().includes(reqSearch)||r.owner.toLowerCase().includes(reqSearch)||r.city.toLowerCase().includes(reqSearch));
+  if(!data.length){el.innerHTML='<tr><td colspan="7"><div class="empty-state">No results found</div></td></tr>';return;}
+  el.innerHTML=data.map(r=>`
+    <tr>
+      <td><div class="rest-name">${r.name}</div><div class="rest-meta">${r.type} · ${r.email}</div></td>
+      <td>${r.owner}</td>
+      <td>${r.city}</td>
+      <td><span class="badge badge-trial">${r.plan}</span></td>
+      <td><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted)">${r.applied}</span></td>
+      <td><span class="badge badge-${r.status}">${r.status}</span></td>
+      <td><div class="action-btns">
+        <button class="act-btn view" onclick="viewRequest(${r.id})">View</button>
+        ${r.status==='pending'?`<button class="act-btn approve" onclick="quickApprove(${r.id})">Approve</button><button class="act-btn reject" onclick="quickReject(${r.id})">Reject</button>`:''}
+        ${r.status==='approved'?`<button class="act-btn suspend" onclick="suspendReq(${r.id})">Suspend</button>`:''}
+      </div></td>
+    </tr>`).join('');
+  document.getElementById('req-badge').textContent=requests.filter(r=>r.status==='pending').length;
+}
+
+function filterReqs(f){
+  reqFilter=f;
+  ['all','pending','approved','rejected'].forEach(x=>{
+    const b=document.getElementById('rf-'+x);
+    b.style.borderColor=x===f?'rgba(0,212,255,.3)':'';
+    b.style.color=x===f?'var(--cyan)':'';
+  });
+  renderRequests();
+}
+function searchReqs(v){ reqSearch=v.toLowerCase(); renderRequests(); }
+
+function quickApprove(id){
+  const r=requests.find(x=>x.id===id)||restaurants.find(x=>x.id===id);
+  if(!r) return;
+  if(r.status!==undefined) r.status='approved';
+  addLog(r.name,'was approved','green');
+  updateStats();
+  renderRequests(); renderOverviewRequests(); renderRestaurants();
+  showToast(r.name+' approved!','green');
+}
+function quickReject(id){
+  const r=requests.find(x=>x.id===id);
+  if(!r) return;
+  r.status='rejected';
+  addLog(r.name,'was rejected','red');
+  updateStats();
+  renderRequests(); renderOverviewRequests();
+  showToast(r.name+' rejected','red');
+}
+function suspendReq(id){
+  const r=requests.find(x=>x.id===id)||restaurants.find(x=>x.id===id);
+  if(r) r.status='suspended';
+  addLog(r?.name||'Restaurant','was suspended','amber');
+  renderRequests(); renderRestaurants();
+  showToast('Restaurant suspended','amber');
+}
+
+function viewRequest(id){
+  const r=requests.find(x=>x.id===id);
+  if(!r) return;
+  document.getElementById('modal-title').textContent=r.name+' — Application';
+  document.getElementById('modal-body').innerHTML=`
+    <div class="field-row" style="margin-bottom:12px">
+      <div class="field-group"><label class="field-label">Status</label><div class="field-val"><span class="badge badge-${r.status}">${r.status}</span></div></div>
+      <div class="field-group"><label class="field-label">Applied</label><div class="field-val">${r.applied}</div></div>
+    </div>
+    <div class="field-row" style="margin-bottom:12px">
+      <div class="field-group"><label class="field-label">Owner Name</label><div class="field-val">${r.owner}</div></div>
+      <div class="field-group"><label class="field-label">Email</label><div class="field-val">${r.email}</div></div>
+    </div>
+    <div class="field-row" style="margin-bottom:12px">
+      <div class="field-group"><label class="field-label">City</label><div class="field-val">${r.city}</div></div>
+      <div class="field-group"><label class="field-label">Phone</label><div class="field-val">${r.phone}</div></div>
+    </div>
+    <div class="field-row" style="margin-bottom:12px">
+      <div class="field-group"><label class="field-label">Type</label><div class="field-val">${r.type}</div></div>
+      <div class="field-group"><label class="field-label">Plan Requested</label><div class="field-val">${r.plan}</div></div>
+    </div>
+    <div class="field-group" style="margin-bottom:12px"><label class="field-label">Notes from Applicant</label><div class="field-val">${r.note||'—'}</div></div>
+    <div class="field-group"><label class="field-label">Admin Note (optional)</label><textarea class="field-textarea" id="admin-note" placeholder="Add internal note..."></textarea></div>
+  `;
+  const foot=document.getElementById('modal-foot');
+  if(r.status==='pending'){
+    foot.innerHTML=`
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-confirm red" onclick="quickReject(${r.id});closeModal()">Reject</button>
+      <button class="btn-confirm green" onclick="quickApprove(${r.id});closeModal()">Approve</button>
+    `;
+  } else {
+    foot.innerHTML=`<button class="btn-cancel" onclick="closeModal()">Close</button>`;
+  }
+  document.getElementById('modal-detail').classList.add('open');
+}
+
+function renderRestaurants(){
+  const el=document.getElementById('rest-tbody');
+  let data=[...restaurants,...requests.filter(r=>r.status==='approved').map(r=>({...r,tables:Math.floor(4+Math.random()*12),ordersDay:Math.floor(20+Math.random()*80)}))];
+  if(restSearch) data=data.filter(r=>r.name.toLowerCase().includes(restSearch)||r.owner.toLowerCase().includes(restSearch));
+  el.innerHTML=data.map(r=>`
+    <tr>
+      <td><div class="rest-name">${r.name}</div><div class="rest-meta">${r.email}</div></td>
+      <td>${r.owner}<div class="rest-meta">${r.city}</div></td>
+      <td><span class="badge badge-${r.plan==='enterprise'?'active':r.plan==='pro'?'trial':'pending'}">${r.plan}</span></td>
+      <td style="font-family:'JetBrains Mono',monospace">${r.tables||'—'}</td>
+      <td style="font-family:'JetBrains Mono',monospace">${r.ordersDay||'—'}</td>
+      <td><span class="badge badge-${r.status||'active'}">${r.status||'active'}</span></td>
+      <td><div class="action-btns">
+        <button class="act-btn view" onclick="viewRestaurant(${r.id})">Details</button>
+        <button class="act-btn suspend" onclick="suspendRest(${r.id})">Suspend</button>
+      </div></td>
+    </tr>`).join('');
+}
+function searchRests(v){ restSearch=v.toLowerCase(); renderRestaurants(); }
+
+function viewRestaurant(id){
+  const r=restaurants.find(x=>x.id===id);
+  if(!r) return;
+  document.getElementById('modal-title').textContent=r.name;
+  document.getElementById('modal-body').innerHTML=`
+    <div class="field-row" style="margin-bottom:12px">
+      <div class="field-group"><label class="field-label">Status</label><div class="field-val"><span class="badge badge-${r.status}">${r.status}</span></div></div>
+      <div class="field-group"><label class="field-label">Plan</label><div class="field-val">${r.plan}</div></div>
+    </div>
+    <div class="field-row" style="margin-bottom:12px">
+      <div class="field-group"><label class="field-label">Owner</label><div class="field-val">${r.owner}</div></div>
+      <div class="field-group"><label class="field-label">City</label><div class="field-val">${r.city}</div></div>
+    </div>
+    <div class="field-row" style="margin-bottom:12px">
+      <div class="field-group"><label class="field-label">Email</label><div class="field-val">${r.email}</div></div>
+      <div class="field-group"><label class="field-label">Phone</label><div class="field-val">${r.phone}</div></div>
+    </div>
+    <div class="field-row" style="margin-bottom:12px">
+      <div class="field-group"><label class="field-label">Tables</label><div class="field-val">${r.tables}</div></div>
+      <div class="field-group"><label class="field-label">Avg Orders/day</label><div class="field-val">${r.ordersDay}</div></div>
+    </div>
+    <div class="field-row" style="margin-bottom:12px">
+      <div class="field-group"><label class="field-label">Type</label><div class="field-val">${r.type}</div></div>
+      <div class="field-group"><label class="field-label">GST Number</label><div class="field-val">${r.gst||'Not provided'}</div></div>
+    </div>
+    <div class="field-group"><label class="field-label">Change Plan</label>
+      <select class="field-select" id="change-plan">
+        <option ${r.plan==='starter'?'selected':''}>starter</option>
+        <option ${r.plan==='pro'?'selected':''}>pro</option>
+        <option ${r.plan==='enterprise'?'selected':''}>enterprise</option>
+      </select>
+    </div>
+  `;
+  document.getElementById('modal-foot').innerHTML=`
+    <button class="btn-cancel" onclick="closeModal()">Close</button>
+    <button class="btn-confirm red" onclick="suspendRest(${r.id});closeModal()">Suspend</button>
+    <button class="btn-confirm cyan" onclick="savePlan(${r.id})">Save Changes</button>
+  `;
+  document.getElementById('modal-detail').classList.add('open');
+}
+function savePlan(id){
+  const r=restaurants.find(x=>x.id===id);
+  if(r){ r.plan=document.getElementById('change-plan').value; }
+  addLog(r?.name,'plan updated to '+r?.plan,'cyan');
+  closeModal(); renderRestaurants(); renderBilling();
+  showToast('Plan updated!','cyan');
+}
+function suspendRest(id){
+  const r=restaurants.find(x=>x.id===id);
+  if(r){ r.status=r.status==='suspended'?'active':'suspended'; }
+  addLog(r?.name,r?.status==='suspended'?'suspended':'reactivated','amber');
+  renderRestaurants();
+  showToast(r?.name+' '+(r?.status==='suspended'?'suspended':'reactivated'),'amber');
+}
+
+function openAddRestModal(){
+  document.getElementById('modal-title').textContent='Add Restaurant Manually';
+  document.getElementById('modal-body').innerHTML=`
+    <div class="field-row"><div class="field-group"><label class="field-label">Restaurant Name</label><input class="field-input" id="nr-name" placeholder="Name"></div><div class="field-group"><label class="field-label">Type</label><select class="field-select" id="nr-type"><option>Dine-in</option><option>Cafe</option><option>QSR</option><option>Bar</option><option>Cloud Kitchen</option></select></div></div>
+    <div class="field-row"><div class="field-group"><label class="field-label">Owner Name</label><input class="field-input" id="nr-owner" placeholder="Owner"></div><div class="field-group"><label class="field-label">City</label><input class="field-input" id="nr-city" placeholder="City"></div></div>
+    <div class="field-row"><div class="field-group"><label class="field-label">Email</label><input class="field-input" id="nr-email" placeholder="Email"></div><div class="field-group"><label class="field-label">Phone</label><input class="field-input" id="nr-phone" placeholder="Phone"></div></div>
+    <div class="field-row"><div class="field-group"><label class="field-label">Plan</label><select class="field-select" id="nr-plan"><option>starter</option><option>pro</option><option>enterprise</option></select></div><div class="field-group"><label class="field-label">Tables</label><input class="field-input" id="nr-tables" type="number" placeholder="8"></div></div>
+  `;
+  document.getElementById('modal-foot').innerHTML=`
+    <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+    <button class="btn-confirm cyan" onclick="addRestaurant()">Add Restaurant</button>
+  `;
+  document.getElementById('modal-detail').classList.add('open');
+}
+function addRestaurant(){
+  const n=document.getElementById('nr-name').value;
+  if(!n){ showToast('Name required','red'); return; }
+  const newR={
+    id:Date.now(),name:n,owner:document.getElementById('nr-owner').value,
+    email:document.getElementById('nr-email').value,city:document.getElementById('nr-city').value,
+    phone:document.getElementById('nr-phone').value,plan:document.getElementById('nr-plan').value,
+    tables:parseInt(document.getElementById('nr-tables').value)||6,ordersDay:0,status:'active',
+    applied:new Date().toISOString().split('T')[0],type:document.getElementById('nr-type').value,gst:''
+  };
+  restaurants.push(newR);
+  addLog(n,'was added manually as '+newR.plan+' restaurant','green');
+  updateStats(); closeModal(); renderRestaurants(); renderBilling();
+  showToast(n+' added!','green');
+}
+
+function renderBilling(){
+  const el=document.getElementById('billing-tbody');
+  const prices={starter:999,pro:2499,enterprise:5999};
+  const statuses=['paid','paid','due','paid','overdue','paid'];
+  el.innerHTML=restaurants.map((r,i)=>`
+    <tr>
+      <td><div class="rest-name">${r.name}</div></td>
+      <td><span class="badge badge-${r.plan==='enterprise'?'active':r.plan==='pro'?'trial':'pending'}">${r.plan}</span></td>
+      <td style="font-family:'JetBrains Mono',monospace;color:var(--cyan)">₹${prices[r.plan]?.toLocaleString()}</td>
+      <td><span class="badge badge-${statuses[i%6]==='paid'?'active':statuses[i%6]==='due'?'pending':'rejected'}">${statuses[i%6]}</span></td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted)">2025-05-${String(10+i).padStart(2,'0')}</td>
+      <td><div class="action-btns"><button class="act-btn view" onclick="showToast('Invoice sent to '+${JSON.stringify(r.email)},'cyan')">Send Invoice</button></div></td>
+    </tr>`).join('');
+}
+
+function addLog(name,action,color){
+  const now=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+  logs.unshift({name,action,color,time:now});
+  if(logs.length>50) logs.pop();
+  renderActivityLog();
+}
+function renderActivityLog(){
+  const el=document.getElementById('activity-log');
+  if(!logs.length){ el.innerHTML='<div class="empty-state">No activity yet</div>'; return; }
+  el.innerHTML=logs.map(l=>`
+    <div class="log-item">
+      <div class="log-type" style="background:var(--${l.color})"></div>
+      <div class="log-msg"><strong>${l.name}</strong> ${l.action}</div>
+      <div class="log-time">${l.time}</div>
+    </div>`).join('');
+}
+function clearLog(){ logs=[]; renderActivityLog(); }
+
+function sendBroadcast(){
+  const subj=document.getElementById('bc-subject').value;
+  const body=document.getElementById('bc-body').value;
+  if(!subj||!body){ showToast('Fill subject and message','red'); return; }
+  const target=document.getElementById('bc-target').value;
+  const type=document.getElementById('bc-type').value;
+  const now=new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+  bcHistory.unshift({subj,body,target,type,time:now});
+  addLog('Broadcast',`sent to "${target}": ${subj}`,'purple');
+  renderBcHistory();
+  document.getElementById('bc-subject').value='';
+  document.getElementById('bc-body').value='';
+  showToast('Broadcast sent to '+target+'!','cyan');
+}
+function renderBcHistory(){
+  const el=document.getElementById('bc-history');
+  if(!bcHistory.length){ el.innerHTML='<div style="color:var(--muted);font-size:12px;font-family:\'JetBrains Mono\',monospace">No broadcasts yet</div>'; return; }
+  el.innerHTML=bcHistory.map(b=>`
+    <div class="tl-item cyan">
+      <div class="tl-time">${b.time}</div>
+      <div class="tl-text"><strong>${b.subj}</strong><br>${b.target} · ${b.type}</div>
+    </div>`).join('');
+}
+
+function changePassword(){
+  const p=document.getElementById('new-pass').value;
+  const c=document.getElementById('confirm-pass').value;
+  if(!p||p!==c){ showToast('Passwords do not match','red'); return; }
+  PASS=p;
+  document.getElementById('new-pass').value='';
+  document.getElementById('confirm-pass').value='';
+  addLog('Admin','changed the system password','amber');
+  showToast('Password updated!','green');
+}
+
+function updateStats(){
+  const active=restaurants.filter(r=>r.status==='active').length;
+  const pending=requests.filter(r=>r.status==='pending').length;
+  const total=restaurants.length+requests.filter(r=>r.status==='approved').length;
+  ['ts-total','ov-total'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=total;});
+  ['ts-active','ov-active'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=active;});
+  ['ts-pending','ov-pending'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=pending;});
+  document.getElementById('req-badge').textContent=pending;
+}
+
+function exportData(){
+  const rows=[['Name','Owner','City','Plan','Status','Email'],...restaurants.map(r=>[r.name,r.owner,r.city,r.plan,r.status,r.email])];
+  const csv=rows.map(r=>r.join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download='pos-cafe-restaurants-'+new Date().toISOString().split('T')[0]+'.csv';
+  a.click();
+  addLog('Admin','exported restaurant data to CSV','cyan');
+  showToast('CSV exported!','cyan');
+}
+
+function openTab(name){
+  document.querySelectorAll('.tab-content').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
+  document.getElementById('tab-'+name)?.classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(el=>{
+    if(el.textContent.trim().toLowerCase().startsWith(name.charAt(0).toUpperCase()+name.slice(1).toLowerCase().substring(0,4))||
+       el.getAttribute('onclick')?.includes("'"+name+"'")){
+      el.classList.add('active');
+    }
+  });
+}
+
+function closeModal(){ document.getElementById('modal-detail').classList.remove('open'); }
+
+let toastTimer;
+function showToast(msg,color){
+  let t=document.getElementById('toast');
+  if(!t){
+    t=document.createElement('div');
+    t.id='toast';
+    t.style.cssText='position:fixed;bottom:24px;right:24px;z-index:999;background:var(--s2);border:1px solid var(--border2);border-radius:10px;padding:12px 18px;font-size:12px;font-family:"JetBrains Mono",monospace;color:var(--text);transition:all .3s;transform:translateY(20px);opacity:0;min-width:200px';
+    document.body.appendChild(t);
+  }
+  const cols={green:'var(--green)',red:'var(--red)',cyan:'var(--cyan)',amber:'var(--amber)',purple:'var(--purple)'};
+  t.style.borderLeftColor=cols[color]||'var(--cyan)';
+  t.style.borderLeftWidth='3px';
+  t.textContent=msg;
+  t.style.transform='translateY(0)';
+  t.style.opacity='1';
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>{t.style.transform='translateY(20px)';t.style.opacity='0';},3000);
+}
+
+document.getElementById('lock-pass').addEventListener('keydown',e=>{if(e.key==='Enter')tryUnlock();});
+</script>
+</body>
+</html>
