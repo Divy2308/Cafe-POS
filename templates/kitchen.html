@@ -3,61 +3,116 @@
 {% block extra_head %}
 <style>
   body { background:#080808; }
-  .ticket { transition:all .2s; cursor:pointer; min-height:44px; display:flex; align-items:center; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
-  .ticket:hover { transform:translateY(-2px); box-shadow:0 12px 40px rgba(0,0,0,0.4); }
-  .ticket:active { transform:scale(.98); }
-  .ticket.to_cook { border-top:3px solid #ef4444; }
-  .ticket.preparing { border-top:3px solid #f97316; }
-  .ticket.completed { border-top:3px solid #22c55e; opacity:0.7; }
-  .ticket.overdue { border-top:3px solid #dc2626 !important; animation:flash-overdue 1.2s infinite; }
-  @keyframes flash-overdue {
-    0%,100%{ box-shadow:0 0 0 0 rgba(220,38,38,0); }
-    50%{ box-shadow:0 0 0 6px rgba(220,38,38,0.25); }
-  }
-  .item-line { cursor:pointer; transition:all .15s; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.06); min-height:36px; display:flex; align-items:center; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
-  .item-line:hover { background:rgba(255,255,255,0.04); }
-  .item-line:active { background:rgba(255,255,255,0.08); transform:scale(.99); }
-  .item-line.done { text-decoration:line-through; color:#4a4a4a; }
-  .item-notes { font-size:11px; color:#f97316; font-style:italic; margin-top:2px; }
-  .items-container { max-height:600px; overflow-y:auto; overflow-x:hidden; padding-right:6px; }
-  .items-container::-webkit-scrollbar { width:6px; }
-  .items-container::-webkit-scrollbar-track { background:rgba(255,255,255,0.03); border-radius:3px; }
-  .items-container::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.25); border-radius:3px; }
-  .items-container::-webkit-scrollbar-thumb:hover { background:rgba(255,255,255,0.4); }
-  .ticket { max-height:none; overflow:visible; }
-  .stage-col { min-height:200px; }
+  body.bright { background:#f0f0f0; color:#111; }
+  body.bright .card { background:#fff; border-color:#ddd; }
+  body.bright .col-header { background:rgba(255,255,255,0.9); }
+  body.bright .to-cook-header { background:rgba(239,68,68,0.08); border-color:rgba(239,68,68,0.3); }
+  body.bright .preparing-header { background:rgba(249,115,22,0.08); border-color:rgba(249,115,22,0.3); }
+  body.bright .completed-header { background:rgba(34,197,94,0.08); border-color:rgba(34,197,94,0.3); }
+  body.bright #topbar { background:#fff; border-color:#ddd; }
+  body.bright .items-container { border-color:#eee; }
+  body.bright .item-line { border-color:#eee; }
+  body.bright .item-qty { background:#eee; color:#555; }
+  body.bright .total-badge { background:#eee; color:#444; }
+  body.bright .action-hint { border-color:#eee; color:#999; }
+
+  /* ── Cards ── */
+  .card { background:#141414; border:1px solid #2a2a2a; border-radius:14px; padding:14px; transition:all .2s; cursor:pointer; user-select:none; }
+  .card:hover { transform:translateY(-2px); box-shadow:0 12px 40px rgba(0,0,0,0.4); }
+  .card:active { transform:scale(.98); }
+  .card.to_cook   { border-top:3px solid #ef4444; }
+  .card.preparing { border-top:3px solid #f97316; }
+  .card.completed { border-top:3px solid #22c55e; opacity:.7; }
+  .card.overdue   { border-top:3px solid #dc2626 !important; animation:flash-overdue 1.2s infinite; }
+  .card.urgent    { border-top:3px solid #f59e0b; }
+  .card.dragging  { opacity:.4; }
+  .card.drag-over { outline:2px dashed #f97316; outline-offset:2px; }
+  @keyframes flash-overdue { 0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,0)} 50%{box-shadow:0 0 0 8px rgba(220,38,38,0.3)} }
+
+  /* ── Layout ── */
+  .stage-col { overflow-y:auto; overflow-x:hidden; height:calc(100vh - 66px); padding:4px 6px 20px; }
+  .stage-col::-webkit-scrollbar { width:4px; }
+  .stage-col::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.15); border-radius:2px; }
+  .space-y > * + * { margin-top:10px; }
+
+  /* ── Column headers ── */
+  .col-header { position:sticky; top:0; z-index:10; backdrop-filter:blur(12px); padding:14px; margin-bottom:10px; border-radius:12px; border:1px solid transparent; }
+  .to-cook-header   { background:rgba(239,68,68,0.08); border-color:rgba(239,68,68,0.2); }
+  .preparing-header { background:rgba(249,115,22,0.08); border-color:rgba(249,115,22,0.2); }
+  .completed-header { background:rgba(34,197,94,0.08); border-color:rgba(34,197,94,0.2); }
+
+  /* ── Items ── */
+  .items-container { border-top:1px solid #222; border-bottom:1px solid #222; padding:4px 0; margin:8px 0; }
+  .item-line { padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.06); cursor:pointer; transition:all .15s; min-height:40px; display:flex; flex-direction:column; justify-content:center; }
+  .item-line:hover { background:rgba(255,255,255,0.04); border-radius:6px; padding-left:6px; }
+  .item-line:active { transform:scale(.99); }
+  .item-line.done .item-name { text-decoration:line-through; color:#4a4a4a; }
+  .item-line.done .item-qty  { color:#333; }
+  .item-name { font-size:16px; font-weight:600; }
+  .item-qty  { background:#1e1e1e; border-radius:4px; padding:1px 7px; font-size:13px; font-weight:700; color:#888; }
+  .item-notes { font-size:11px; color:#f97316; font-style:italic; margin-top:3px; }
+
+  /* ── Badges ── */
+  .tag        { padding:2px 8px; border-radius:6px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:3px; }
   .badge-cook { background:rgba(239,68,68,0.15); color:#ef4444; }
   .badge-prep { background:rgba(249,115,22,0.15); color:#f97316; }
   .badge-done { background:rgba(34,197,94,0.15); color:#22c55e; }
-  .ping-dot { width:8px;height:8px;border-radius:50%;background:#22c55e;animation:ping 1.5s infinite; }
+  .eta-badge  { border-radius:6px; padding:2px 8px; font-size:11px; font-weight:600; }
+  .eta-good   { background:rgba(34,197,94,0.15); color:#22c55e; }
+  .eta-mid    { background:rgba(249,115,22,0.15); color:#f97316; }
+  .eta-late   { background:rgba(239,68,68,0.15); color:#ef4444; }
+  .overdue-badge { background:rgba(220,38,38,0.2); color:#ef4444; border:1px solid rgba(220,38,38,0.4); border-radius:6px; padding:2px 8px; font-size:11px; font-weight:700; }
+  .total-badge   { background:#1e1e1e; border-radius:6px; padding:3px 10px; font-size:13px; font-weight:700; color:#aaa; display:inline-block; }
+
+  /* ── Source badges ── */
+  .source-dine     { background:rgba(59,130,246,0.15); color:#60a5fa; border:1px solid rgba(59,130,246,0.25); border-radius:4px; padding:1px 7px; font-size:10px; font-weight:700; }
+  .source-takeaway { background:rgba(139,92,246,0.15); color:#a78bfa; border:1px solid rgba(139,92,246,0.25); border-radius:4px; padding:1px 7px; font-size:10px; font-weight:700; }
+  .source-swiggy   { background:rgba(249,115,22,0.15); color:#fb923c; border:1px solid rgba(249,115,22,0.25); border-radius:4px; padding:1px 7px; font-size:10px; font-weight:700; }
+  .source-zomato   { background:rgba(239,68,68,0.15); color:#f87171; border:1px solid rgba(239,68,68,0.25); border-radius:4px; padding:1px 7px; font-size:10px; font-weight:700; }
+
+  /* ── Order number & misc ── */
+  .order-num  { font-weight:800; font-size:22px; color:#f97316; letter-spacing:-0.5px; }
+  .age-label  { font-size:12px; color:#666; }
+  .prep-label { font-size:12px; color:#f97316; font-weight:700; }
+  .ready-at   { font-size:12px; font-weight:600; }
+  .action-hint { font-size:11px; color:#555; margin-top:10px; padding-top:8px; border-top:1px solid #222; }
+
+  /* ── Topbar ── */
+  #topbar { background:#0f0f0f; border-bottom:1px solid #1e1e1e; padding:8px 16px; display:flex; align-items:center; justify-content:space-between; height:54px; }
+  .toggle-btn { background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); color:#aaa; border-radius:8px; padding:4px 10px; font-size:12px; cursor:pointer; transition:all .15s; }
+  .toggle-btn:hover { background:rgba(255,255,255,0.12); }
+  body.bright .toggle-btn { background:rgba(0,0,0,0.05); border-color:rgba(0,0,0,0.12); color:#555; }
+
+  /* ── Live dot ── */
+  .ping-dot { width:8px; height:8px; border-radius:50%; background:#22c55e; animation:ping 1.5s infinite; }
   @keyframes ping { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.4)} }
-  .col-header { position:sticky; top:0; z-index:10; backdrop-filter:blur(12px); padding:16px; margin-bottom:12px; border-radius:12px; }
-  .to-cook-header { background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.2); }
-  .preparing-header { background:rgba(249,115,22,0.08); border:1px solid rgba(249,115,22,0.2); }
-  .completed-header { background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.2); }
-  .overdue-badge { background:rgba(220,38,38,0.2); color:#ef4444; border:1px solid rgba(220,38,38,0.4); border-radius:6px; padding:2px 8px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:4px; }
-  .eta-badge { border-radius:6px; padding:2px 8px; font-size:11px; font-weight:600; }
-  .eta-good { background:rgba(34,197,94,0.15); color:#22c55e; }
-  .eta-mid  { background:rgba(249,115,22,0.15); color:#f97316; }
-  .eta-late { background:rgba(239,68,68,0.15); color:#ef4444; }
-  .takeaway-tag { background:rgba(139,92,246,0.18); color:#a78bfa; border:1px solid rgba(139,92,246,0.3); border-radius:4px; padding:1px 7px; font-size:10px; font-weight:700; }
+
+  /* ── Toast ── */
+  #toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#1e1e1e; border:1px solid #333; color:#e5e5e5; padding:10px 20px; border-radius:10px; font-size:13px; font-weight:600; z-index:999; opacity:0; transition:opacity .3s; pointer-events:none; }
+  #toast.show { opacity:1; }
+
+  /* ── Auto-clear fade ── */
+  .completed-fade { animation:fade-out 2s forwards 28s; }
+  @keyframes fade-out { 0%{opacity:.7} 100%{opacity:0;height:0;margin:0;padding:0;overflow:hidden} }
 </style>
 {% endblock %}
+
 {% block body %}
 <div class="flex flex-col h-screen">
-  <!-- Header -->
-  <div class="border-b border-border px-6 py-3 flex items-center justify-between" style="background:#0f0f0f">
+
+  <!-- Topbar -->
+  <div id="topbar">
     <div class="flex items-center gap-3">
       <div class="w-8 h-8 brand-gradient rounded-lg flex items-center justify-center">
-        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"/></svg>
+        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"/>
+        </svg>
       </div>
       <span class="font-display font-700 text-lg">Kitchen Display</span>
     </div>
     <div class="flex items-center gap-4">
-      <div class="flex items-center gap-2 text-xs text-gray-500">
-        <span>Avg prep:</span>
-        <span id="avg-prep-badge" class="eta-badge eta-mid">~15m</span>
-      </div>
+      <div class="text-xs text-gray-500">Avg prep: <span id="avg-prep-badge" class="eta-badge eta-mid">~15m</span></div>
+      <button class="toggle-btn" onclick="toggleBright()" id="bright-btn">☀️ Bright</button>
       <div class="flex items-center gap-2">
         <div class="ping-dot"></div>
         <span class="text-xs text-gray-500">Live</span>
@@ -68,42 +123,58 @@
 
   <!-- Columns -->
   <div class="flex-1 overflow-hidden grid grid-cols-3 gap-4 p-4" style="grid-template-columns:1fr 1fr 1fr">
+
     <!-- To Cook -->
-    <div class="stage-col overflow-auto">
+    <div class="stage-col">
       <div class="col-header to-cook-header">
         <div class="flex items-center justify-between">
-          <span class="font-display font-700 text-red-400">To Cook</span>
-          <span id="count-to_cook" class="tag badge-cook">0</span>
+          <span class="font-display font-700 text-red-400 text-base">To Cook</span>
+          <div class="flex items-center gap-2">
+            <span id="items-to_cook" class="text-xs text-red-400 opacity-70"></span>
+            <span id="count-to_cook" class="tag badge-cook">0</span>
+          </div>
         </div>
-        <div class="text-xs text-gray-600 mt-1">Oldest order on top · Tap to start</div>
+        <div class="text-xs text-gray-600 mt-1">Oldest first · Tap to start</div>
       </div>
-      <div id="col-to_cook" class="space-y-3 px-1"></div>
+      <div id="col-to_cook" class="space-y"></div>
     </div>
+
     <!-- Preparing -->
-    <div class="stage-col overflow-auto">
+    <div class="stage-col">
       <div class="col-header preparing-header">
         <div class="flex items-center justify-between">
-          <span class="font-display font-700 text-orange-400">Preparing</span>
-          <span id="count-preparing" class="tag badge-prep">0</span>
+          <span class="font-display font-700 text-orange-400 text-base">Preparing</span>
+          <div class="flex items-center gap-2">
+            <span id="items-preparing" class="text-xs text-orange-400 opacity-70"></span>
+            <span id="count-preparing" class="tag badge-prep">0</span>
+          </div>
         </div>
-        <div class="text-xs text-gray-600 mt-1">Click item to mark done · ⚠️ Red = overdue</div>
+        <div class="text-xs text-gray-600 mt-1">Tap item to cross off · Red = overdue</div>
       </div>
-      <div id="col-preparing" class="space-y-3 px-1"></div>
+      <div id="col-preparing" class="space-y"></div>
     </div>
+
     <!-- Completed -->
-    <div class="stage-col overflow-auto">
+    <div class="stage-col">
       <div class="col-header completed-header">
         <div class="flex items-center justify-between">
-          <span class="font-display font-700 text-green-400">Completed</span>
-          <span id="count-completed" class="tag badge-done">0</span>
+          <span class="font-display font-700 text-green-400 text-base">Completed</span>
+          <div class="flex items-center gap-2">
+            <span id="items-completed" class="text-xs text-green-400 opacity-70"></span>
+            <span id="count-completed" class="tag badge-done">0</span>
+          </div>
         </div>
-        <div class="text-xs text-gray-600 mt-1">Ready to serve</div>
+        <div class="text-xs text-gray-600 mt-1">Auto-clears in 30s</div>
       </div>
-      <div id="col-completed" class="space-y-3 px-1"></div>
+      <div id="col-completed" class="space-y"></div>
     </div>
+
   </div>
 </div>
+
+<div id="toast"></div>
 {% endblock %}
+
 {% block scripts %}
 <script>
 let tickets = [];
@@ -117,166 +188,104 @@ let audioContext = null;
 let audioUnlocked = false;
 let hasHydratedTickets = false;
 let knownActiveTicketIds = new Set();
+let bright = false;
+let completedClearTimers = {};
+let dragSrcId = null;
+let toastTimer = null;
 
-function getKitchenAudioContext() {
+// ── Audio ──────────────────────────────────────────────────────────────
+function getAudioCtx() {
   if (!AudioContextClass) return null;
-  if (!audioContext) {
-    audioContext = new AudioContextClass();
-  }
+  if (!audioContext) audioContext = new AudioContextClass();
   return audioContext;
 }
 
-async function unlockKitchenAudio() {
-  const ctx = getKitchenAudioContext();
-  if (!ctx) return;
-  if (ctx.state === 'suspended') {
-    await ctx.resume();
-  }
+async function unlockAudio() {
+  const ctx = getAudioCtx(); if (!ctx) return;
+  if (ctx.state === 'suspended') await ctx.resume();
   audioUnlocked = ctx.state === 'running';
 }
 
 function playKitchenChime() {
-  const ctx = getKitchenAudioContext();
-  if (!ctx || (!audioUnlocked && ctx.state !== 'running')) return;
-  if (ctx.state === 'suspended') {
-    ctx.resume().catch(() => {});
-    if (ctx.state !== 'running') return;
-  }
-
+  const ctx = getAudioCtx(); if (!ctx) return;
+  if (ctx.state === 'suspended') { ctx.resume().catch(() => {}); if (ctx.state !== 'running') return; }
   const now = ctx.currentTime;
-  const masterGain = ctx.createGain();
-  masterGain.gain.setValueAtTime(0.12, now);
-  masterGain.connect(ctx.destination);
-
-  const scheduleTone = (frequency, startOffset, duration, peakGain) => {
-    const startAt = now + startOffset;
-    const oscillator = ctx.createOscillator();
-    const gainNode = ctx.createGain();
-    const filter = ctx.createBiquadFilter();
-
-    oscillator.type = 'sine';
-    oscillator.frequency.setValueAtTime(frequency, startAt);
-    oscillator.frequency.exponentialRampToValueAtTime(frequency * 1.012, startAt + duration);
-
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(2400, startAt);
-    filter.Q.setValueAtTime(0.7, startAt);
-
-    gainNode.gain.setValueAtTime(0.0001, startAt);
-    gainNode.gain.linearRampToValueAtTime(peakGain, startAt + 0.018);
-    gainNode.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
-
-    oscillator.connect(filter);
-    filter.connect(gainNode);
-    gainNode.connect(masterGain);
-
-    oscillator.start(startAt);
-    oscillator.stop(startAt + duration + 0.05);
-  };
-
-  scheduleTone(880, 0, 0.22, 0.85);
-  scheduleTone(1174.66, 0.16, 0.3, 0.6);
-}
-
-function findNewTicketIds(nextTickets) {
-  const nextIds = new Set(nextTickets.map(ticket => ticket.id));
-  const newIds = [];
-
-  nextIds.forEach(id => {
-    if (!knownActiveTicketIds.has(id)) {
-      newIds.push(id);
-    }
+  const mg = ctx.createGain(); mg.gain.setValueAtTime(0.12, now); mg.connect(ctx.destination);
+  [[880, 0, 0.22, 0.85], [1174.66, 0.16, 0.3, 0.6]].forEach(([freq, off, dur, peak]) => {
+    const o = ctx.createOscillator(), g = ctx.createGain(), f = ctx.createBiquadFilter();
+    o.type = 'sine'; o.frequency.setValueAtTime(freq, now + off);
+    f.type = 'lowpass'; f.frequency.setValueAtTime(2400, now + off);
+    g.gain.setValueAtTime(0.0001, now + off);
+    g.gain.linearRampToValueAtTime(peak, now + off + 0.018);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + off + dur);
+    o.connect(f); f.connect(g); g.connect(mg);
+    o.start(now + off); o.stop(now + off + dur + 0.05);
   });
-
-  knownActiveTicketIds = nextIds;
-  return newIds;
 }
 
-document.addEventListener('click', () => {
-  unlockKitchenAudio().catch(() => {});
-}, { once: true, capture: true });
+document.addEventListener('click', () => unlockAudio().catch(() => {}), { once: true, capture: true });
 
-socket.on('new_ticket', t => {
-  const alreadyKnown = knownActiveTicketIds.has(t.id);
-  knownActiveTicketIds = new Set([...knownActiveTicketIds, t.id]);
-  if (!tickets.some(ticket => ticket.id === t.id)) {
-    // Insert so oldest stays at top: append to end (render will sort)
-    tickets.push(t);
-  }
-  render();
-  if (hasHydratedTickets && !alreadyKnown) {
-    toast('🍳 New order: ' + t.order_number);
-    playKitchenChime();
-  }
-});
+// ── Toast ──────────────────────────────────────────────────────────────
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
 
-socket.on('ticket_update', d => {
-  const t = tickets.find(t=>t.id===d.id);
-  if (t) {
-    t.status = d.status;
-    if (d.started_at) t.started_at = d.started_at;
-    if (Array.isArray(d.items)) {
-      const itemsById = new Map((t.items || []).map(i => [i.id, i]));
-      d.items.forEach(i => itemsById.set(i.id, { ...(itemsById.get(i.id) || {}), ...i }));
-      t.items = Array.from(itemsById.values());
-      if (typeof d.total === 'number') t.total = d.total;
-    }
+// ── Bright mode ────────────────────────────────────────────────────────
+function toggleBright() {
+  bright = !bright;
+  document.body.classList.toggle('bright', bright);
+  document.getElementById('bright-btn').textContent = bright ? '🌙 Dark' : '☀️ Bright';
+}
+
+// ── Auto-clear completed ───────────────────────────────────────────────
+function scheduleAutoClear(id) {
+  if (completedClearTimers[id]) return;
+  completedClearTimers[id] = setTimeout(() => {
+    tickets = tickets.filter(t => t.id !== id);
+    delete completedClearTimers[id];
     render();
-  }
-});
-
-async function loadTickets() {
-  const data = await api(KITCHEN_ORDERS_ENDPOINT);
-  const newTicketIds = findNewTicketIds(data);
-  tickets = data;
-  // Update avg prep badge from first ticket (all have same avg)
-  if (tickets.length > 0 && tickets[0].avg_prep_minutes) {
-    updateAvgBadge(tickets[0].avg_prep_minutes);
-  }
-  if (hasHydratedTickets && newTicketIds.length > 0) {
-    const latestNewTicket = tickets.find(ticket => newTicketIds.includes(ticket.id));
-    toast(latestNewTicket ? '🍳 New order: ' + latestNewTicket.order_number : '🍳 New order received');
-    playKitchenChime();
-  }
-  hasHydratedTickets = true;
-  render();
+  }, 30000);
 }
 
-function updateAvgBadge(mins) {
-  const el = document.getElementById('avg-prep-badge');
-  if (!el) return;
-  el.textContent = `~${mins}m`;
-  el.className = 'eta-badge ' + (mins < 10 ? 'eta-good' : mins < 20 ? 'eta-mid' : 'eta-late');
-  document.getElementById('avg-prep-badge').textContent = `~${mins}m`;
+// ── Source badge ───────────────────────────────────────────────────────
+function sourceBadge(t) {
+  if (t.is_takeaway) return `<span class="source-takeaway">🛵 Takeaway${t.customer_name ? ' · ' + t.customer_name : ''}</span>`;
+  const src = (t.source || 'dine').toLowerCase();
+  if (src === 'swiggy') return `<span class="source-swiggy">🧡 Swiggy</span>`;
+  if (src === 'zomato') return `<span class="source-zomato">🔴 Zomato</span>`;
+  return `<span class="source-dine">🪑 Table ${t.table}</span>`;
 }
 
-function render() {
-  ['to_cook','preparing','completed'].forEach(stage=>{
-    const col = document.getElementById('col-'+stage);
-    // Sort oldest first (ascending sent_at) within each stage
-    const stageTix = tickets
-      .filter(t=>t.status===stage)
-      .sort((a,b)=> new Date(a.sent_at) - new Date(b.sent_at));
-    document.getElementById('count-'+stage).textContent = stageTix.length;
-    col.innerHTML = stageTix.map(t=>renderTicket(t)).join('');
-  });
-}
-
+// ── Render ticket ──────────────────────────────────────────────────────
 function renderTicket(t) {
   const now = Date.now();
-  const age = Math.floor((now - new Date(t.sent_at+'Z').getTime()) / 60000);
-  const prepTime = t.started_at ? Math.floor((now - new Date(t.started_at+'Z').getTime()) / 60000) : 0;
+  const age = Math.floor((now - new Date(t.sent_at + 'Z').getTime()) / 60000);
+  const prepTime = t.started_at ? Math.floor((now - new Date(t.started_at + 'Z').getTime()) / 60000) : 0;
   const isOverdue = t.status === 'preparing' && prepTime > OVERDUE_MINUTES;
+  const isUrgent = t.status === 'to_cook' && age >= 10;
   const eta = t.eta_minutes || 15;
+
+  // Ready-by clock time
+  let readyAt = '';
+  if (t.status === 'to_cook') {
+    const r = new Date(now + eta * 60000);
+    readyAt = `Ready ~${r.getHours().toString().padStart(2,'0')}:${r.getMinutes().toString().padStart(2,'0')}`;
+  } else if (t.status === 'preparing') {
+    const rem = Math.max(0, eta - prepTime);
+    const r = new Date(now + rem * 60000);
+    readyAt = rem > 0 ? `Ready ~${r.getHours().toString().padStart(2,'0')}:${r.getMinutes().toString().padStart(2,'0')}` : 'Overdue';
+  }
 
   // ETA badge
   let etaBadgeHtml = '';
   if (t.status === 'to_cook') {
-    const cls = eta < 10 ? 'eta-good' : eta < 20 ? 'eta-mid' : 'eta-late';
-    etaBadgeHtml = `<span class="eta-badge ${cls}">⏱ ~${eta}m</span>`;
+    const cls = age < 5 ? 'eta-good' : age < 10 ? 'eta-mid' : 'eta-late';
+    etaBadgeHtml = `<span class="eta-badge ${cls}">⏱ ${age}m old</span>`;
   } else if (t.status === 'preparing') {
     if (isOverdue) {
-      etaBadgeHtml = `<span class="overdue-badge">⚠️ OVERDUE: ${prepTime}m</span>`;
+      etaBadgeHtml = `<span class="overdue-badge">⚠️ OVERDUE ${prepTime}m</span>`;
     } else {
       const rem = Math.max(0, eta - prepTime);
       const cls = rem > 5 ? 'eta-good' : rem > 0 ? 'eta-mid' : 'eta-late';
@@ -284,78 +293,189 @@ function renderTicket(t) {
     }
   }
 
-  // Items HTML
-  const itemsHtml = (t.items || []).map(i=>`
-    <div class="item-line flex flex-col ${i.status==='completed'?'done':''}" onclick="event.stopPropagation();markItem(${t.id},${i.id})">
-      <div class="flex items-center justify-between">
-        <div class="flex-1">
-          <span class="text-sm font-500">${i.name}</span>
-          <span class="text-xs text-gray-600 ml-2">₹${(i.price||0).toFixed(0)} × ${i.qty}</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="text-xs font-700 text-gray-400 px-2 py-0.5 rounded bg-gray-900">${i.qty}</span>
-          <span class="text-xs">${i.status==='to_cook'?'📋':i.status==='preparing'?'👨‍🍳':'✓'}</span>
+  const itemsHtml = (t.items || []).map(i => `
+    <div class="item-line ${i.status === 'completed' ? 'done' : ''}" onclick="event.stopPropagation();markItem(${t.id},${i.id})">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span class="item-name">${i.name}</span>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+          <span class="item-qty">×${i.qty}</span>
+          <span style="font-size:14px">${i.status === 'completed' ? '✓' : i.status === 'preparing' ? '👨‍🍳' : '📋'}</span>
         </div>
       </div>
       ${i.notes ? `<div class="item-notes">📝 ${i.notes}</div>` : ''}
     </div>`).join('');
 
-  // Takeaway / table label
-  const tableLabel = t.is_takeaway
-    ? `<span class="takeaway-tag">🛵 Takeaway</span>${t.customer_name ? ` <span class="text-xs text-gray-400">${t.customer_name}</span>` : ''}`
-    : `🪑 Table ${t.table}`;
+  const cls = [
+    'card', t.status,
+    isOverdue ? 'overdue' : '',
+    isUrgent && !isOverdue ? 'urgent' : '',
+    t.status === 'completed' ? 'completed-fade' : ''
+  ].filter(Boolean).join(' ');
+
+  const readyAtColorCls = isOverdue ? 'eta-late' : age < 10 ? 'eta-good' : 'eta-mid';
 
   return `
-    <div class="ticket card p-4 ${t.status}${isOverdue?' overdue':''}" onclick="advanceTicket(${t.id})" style="border-radius:14px;cursor:pointer">
-      <div class="flex items-start justify-between mb-2">
+    <div class="${cls}" id="ticket-${t.id}"
+      onclick="advanceTicket(${t.id})"
+      draggable="true"
+      ondragstart="onDragStart(event,${t.id})"
+      ondragover="onDragOver(event,${t.id})"
+      ondrop="onDrop(event,${t.id})"
+      ondragend="onDragEnd()">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">
         <div>
-          <div class="font-display font-800 text-lg text-brand-500">${t.order_number}</div>
-          <div class="text-xs text-gray-500 mt-0.5">${tableLabel}</div>
+          <div class="order-num">${t.order_number}</div>
+          <div style="margin-top:4px">${sourceBadge(t)}</div>
         </div>
-        <div class="text-right space-y-1">
-          <div class="text-xs text-gray-600">${age}m ago</div>
-          ${t.status==='preparing'?`<div class="text-xs text-orange-400 font-700">${prepTime}m prep</div>`:''}
-          ${etaBadgeHtml}
+        <div style="text-align:right">
+          <div class="age-label">${age}m ago</div>
+          ${t.status === 'preparing' ? `<div class="prep-label">${prepTime}m prep</div>` : ''}
+          <div style="margin-top:3px">${etaBadgeHtml}</div>
+          ${readyAt ? `<div class="ready-at ${readyAtColorCls}" style="margin-top:3px">${readyAt}</div>` : ''}
         </div>
       </div>
-
-      <div class="bg-gray-900 rounded px-2 py-1 text-xs mb-2 inline-block">
-        <span class="font-700">₹${(t.total||0).toFixed(0)}</span>
-      </div>
-
-      <div class="items-container space-y-1.5 my-2 border-t border-b border-gray-800 py-1">${itemsHtml}</div>
-
-      <div class="mt-3 pt-2 border-t border-border">
-        <div class="text-xs text-gray-400 font-500">${
-          t.status==='to_cook'?'🔴 Awaiting → Tap to start preparing':
-          t.status==='preparing'?'🟠 In preparation → Tap to mark ready':
-          '✅ Ready to serve'
-        }</div>
-      </div>
+      <div class="total-badge">₹${(t.total || 0).toFixed(0)}</div>
+      <div class="items-container">${itemsHtml}</div>
+      <div class="action-hint">${
+        t.status === 'to_cook'    ? '🔴 Tap to start preparing' :
+        t.status === 'preparing'  ? '🟠 Tap card to mark ready · Tap item to cross off' :
+                                    '✅ Ready to serve · Auto-clears in 30s'
+      }</div>
     </div>`;
 }
 
+// ── Render ─────────────────────────────────────────────────────────────
+function render() {
+  ['to_cook', 'preparing', 'completed'].forEach(stage => {
+    const stg = tickets.filter(t => t.status === stage)
+      .sort((a, b) => new Date(a.sent_at) - new Date(b.sent_at));
+    document.getElementById('count-' + stage).textContent = stg.length;
+    const pendingItems = stg.reduce((s, t) => s + (t.items || []).filter(i => i.status !== 'completed').length, 0);
+    const itemEl = document.getElementById('items-' + stage);
+    itemEl.textContent = pendingItems > 0 ? pendingItems + ' items' : '';
+    document.getElementById('col-' + stage).innerHTML = stg.map(t => renderTicket(t)).join('');
+  });
+}
+
+// ── Advance ticket ─────────────────────────────────────────────────────
 async function advanceTicket(id) {
-  const r = await api('/api/kitchen/tickets/'+id+'/advance','POST');
-  const t = tickets.find(t=>t.id===id);
+  const r = await api('/api/kitchen/tickets/' + id + '/advance', 'POST');
+  const t = tickets.find(t => t.id === id);
   if (t && r.status) {
     t.status = r.status;
     if (r.started_at) t.started_at = r.started_at;
+    if (t.status === 'completed') scheduleAutoClear(id);
     render();
   }
 }
 
+// ── Mark item ──────────────────────────────────────────────────────────
 async function markItem(ticketId, itemId) {
-  const t = tickets.find(t=>t.id===ticketId);
-  if (!t) return;
-  const item = t.items.find(i=>i.id===itemId);
-  if (item) { item.status = item.status==='completed'?'to_cook':'completed'; render(); }
+  const t = tickets.find(t => t.id === ticketId); if (!t) return;
+  const item = t.items.find(i => i.id === itemId); if (!item) return;
+  item.status = item.status === 'completed' ? 'to_cook' : 'completed';
+  render();
+  // Optionally POST to server: await api('/api/kitchen/items/' + itemId + '/toggle', 'POST');
 }
 
-// Clock & reload
-setInterval(()=>{
+// ── Drag & drop ────────────────────────────────────────────────────────
+function onDragStart(e, id) {
+  dragSrcId = id;
+  e.dataTransfer.effectAllowed = 'move';
+  setTimeout(() => { const el = document.getElementById('ticket-' + id); if (el) el.classList.add('dragging'); }, 0);
+}
+
+function onDragOver(e, id) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.card').forEach(c => c.classList.remove('drag-over'));
+  const el = document.getElementById('ticket-' + id);
+  if (el && id !== dragSrcId) el.classList.add('drag-over');
+}
+
+function onDrop(e, targetId) {
+  e.preventDefault(); e.stopPropagation();
+  document.querySelectorAll('.card').forEach(c => { c.classList.remove('drag-over'); c.classList.remove('dragging'); });
+  if (dragSrcId === null || dragSrcId === targetId) return;
+  const src = tickets.find(t => t.id === dragSrcId);
+  const tgt = tickets.find(t => t.id === targetId);
+  if (!src || !tgt) return;
+  const newStatus = tgt.status;
+  if (src.status !== newStatus) {
+    src.status = newStatus;
+    if (newStatus === 'preparing' && !src.started_at) src.started_at = new Date().toISOString();
+    if (newStatus === 'completed') scheduleAutoClear(src.id);
+    toast(`↕️ Moved ${src.order_number} → ${newStatus.replace('_', ' ')}`);
+    // Optionally POST: await api('/api/kitchen/tickets/' + src.id + '/set-status', 'POST', { status: newStatus });
+  } else {
+    const si = tickets.indexOf(src), ti = tickets.indexOf(tgt);
+    tickets.splice(si, 1); tickets.splice(ti, 0, src);
+  }
+  dragSrcId = null;
+  render();
+}
+
+function onDragEnd() {
+  document.querySelectorAll('.card').forEach(c => { c.classList.remove('drag-over'); c.classList.remove('dragging'); });
+  dragSrcId = null;
+}
+
+// ── Socket events ──────────────────────────────────────────────────────
+function findNewTicketIds(nextTickets) {
+  const nextIds = new Set(nextTickets.map(t => t.id));
+  const newIds = [];
+  nextIds.forEach(id => { if (!knownActiveTicketIds.has(id)) newIds.push(id); });
+  knownActiveTicketIds = nextIds;
+  return newIds;
+}
+
+socket.on('new_ticket', t => {
+  const alreadyKnown = knownActiveTicketIds.has(t.id);
+  knownActiveTicketIds = new Set([...knownActiveTicketIds, t.id]);
+  if (!tickets.some(ticket => ticket.id === t.id)) tickets.push(t);
+  render();
+  if (hasHydratedTickets && !alreadyKnown) { toast('🍳 New order: ' + t.order_number); playKitchenChime(); }
+});
+
+socket.on('ticket_update', d => {
+  const t = tickets.find(t => t.id === d.id); if (!t) return;
+  t.status = d.status;
+  if (d.started_at) t.started_at = d.started_at;
+  if (Array.isArray(d.items)) {
+    const itemsById = new Map((t.items || []).map(i => [i.id, i]));
+    d.items.forEach(i => itemsById.set(i.id, { ...(itemsById.get(i.id) || {}), ...i }));
+    t.items = Array.from(itemsById.values());
+    if (typeof d.total === 'number') t.total = d.total;
+  }
+  if (t.status === 'completed') scheduleAutoClear(t.id);
+  render();
+});
+
+// ── Load & poll ────────────────────────────────────────────────────────
+async function loadTickets() {
+  const data = await api(KITCHEN_ORDERS_ENDPOINT);
+  const newIds = findNewTicketIds(data);
+  tickets = data;
+  if (tickets.length > 0 && tickets[0].avg_prep_minutes) {
+    const mins = tickets[0].avg_prep_minutes;
+    const el = document.getElementById('avg-prep-badge');
+    el.textContent = `~${mins}m`;
+    el.className = 'eta-badge ' + (mins < 10 ? 'eta-good' : mins < 20 ? 'eta-mid' : 'eta-late');
+  }
+  // Schedule auto-clear for any already-completed tickets
+  tickets.filter(t => t.status === 'completed').forEach(t => scheduleAutoClear(t.id));
+  if (hasHydratedTickets && newIds.length > 0) {
+    const newest = tickets.find(t => newIds.includes(t.id));
+    toast(newest ? '🍳 New order: ' + newest.order_number : '🍳 New order received');
+    playKitchenChime();
+  }
+  hasHydratedTickets = true;
+  render();
+}
+
+// Clock + re-render every second (keeps overdue timers + ages live)
+setInterval(() => {
   document.getElementById('clock').textContent = new Date().toLocaleTimeString();
-  // Re-render every second to update overdue status and timers
   render();
 }, 1000);
 

@@ -18,13 +18,16 @@
     flex-direction: column;
     justify-content: space-between;
     min-height: 140px;
-    padding: 14px !important;
+    padding: 16px !important;
     border-radius: 12px;
+    border: 1px solid var(--border);
+    color: var(--text);
   }
 
   .table-card:hover {
-    transform: translateY(-2px);
+    transform: translateY(-4px);
     border-color: #f97316;
+    box-shadow: 0 8px 16px rgba(249, 115, 22, 0.1);
   }
 
   .table-card.occupied {
@@ -33,33 +36,35 @@
   }
 
   .table-card.free {
-    border-color: #2a2a2a;
+    border-color: var(--border);
+    background: transparent;
   }
 
   .table-card .table-header {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    margin-bottom: 10px;
+    gap: 8px;
+    margin-bottom: 12px;
   }
 
   .table-card .table-number {
-    font-size: 24px;
-    font-weight: 800;
+    font-size: 32px;
+    font-weight: 900;
     line-height: 1;
-    letter-spacing: -0.5px;
+    letter-spacing: -1px;
+    color: var(--text);
   }
 
   .table-card .table-seats {
     font-size: 13px;
-    color: #9ca3af;
+    color: var(--muted);
     font-weight: 500;
   }
 
   .table-card .table-footer {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
     margin-top: auto;
   }
 
@@ -71,40 +76,175 @@
 
   .table-card .table-status .tag {
     font-size: 11px;
-    padding: 5px 10px;
+    padding: 6px 12px;
     border-radius: 6px;
     font-weight: 600;
+    display: inline-block;
+  }
+
+  .table-card .table-status .tag.free {
+    background: rgba(34, 197, 94, 0.1);
+    color: #22c55e;
+  }
+
+  .table-card .table-status .tag.occupied {
+    background: #f97316;
+    color: #fff;
   }
 
   .table-card .table-hint {
     font-size: 10px;
-    color: #6b7280;
+    color: var(--muted);
     font-weight: 500;
+  }
+
+  .table-free-btn {
+    display: none;
+    border: 1px solid var(--border);
+    background: var(--ghost-bg);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  #mobile-floor-select {
+    background: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--text);
+  }
+
+  body[data-theme="light"] .table-card.free {
+    background: rgba(255, 255, 255, 0.45);
+  }
+
+  .table-total {
+    font-size: 14px;
+    font-weight: 600;
+    color: #f97316;
+    margin-top: 4px;
   }
 
   .product-btn {
     transition: all .15s;
     cursor: pointer;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    text-align: left;
+    background: transparent;
+    min-height: 160px;
   }
 
   .product-btn:hover {
     border-color: #f97316;
     background: rgba(249, 115, 22, 0.08);
-    transform: translateY(-1px);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.1);
   }
 
   .product-btn:active {
-    transform: scale(.97);
+    transform: scale(.98);
+  }
+
+  .product-image {
+    aspect-ratio: 1;
+    background: var(--card);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    margin-bottom: 8px;
+    opacity: 0.6;
+    transition: all .2s;
+  }
+
+  .product-btn:hover .product-image {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+
+  .product-name {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--text);
+  }
+
+  .product-category {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 8px;
+    text-transform: capitalize;
+  }
+
+  .product-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: auto;
+  }
+
+  .product-price {
+    font-size: 14px;
+    font-weight: bold;
+    color: #f97316;
+  }
+
+  .add-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: #f97316;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    transition: all .2s;
+    flex-shrink: 0;
+  }
+
+  .add-btn:hover {
+    background: #ea580c;
+    transform: scale(1.1);
+  }
+
+  .add-btn:active {
+    transform: scale(.95);
   }
 
   .cat-pill {
     cursor: pointer;
     transition: all .2s;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    background: var(--card);
+    color: var(--muted);
+    border: none;
+    flex-shrink: 0;
+  }
+
+  .cat-pill:hover {
+    background: var(--card-2);
+    color: var(--text);
   }
 
   .cat-pill.active {
     background: #f97316;
     color: white;
+    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
   }
 
   .modal-bg {
@@ -162,8 +302,8 @@
     flex-shrink: 0;
     display: flex !important;
     flex-direction: column;
-    background: #111;
-    border-left: 1px solid #2a2a2a;
+    background: var(--card-2);
+    border-left: 1px solid var(--border);
     z-index: 30;
   }
 
@@ -253,20 +393,31 @@
     .mobile-cart-bar {
       display: flex !important;
       position: fixed;
-      bottom: calc(70px + 12px);
-      left: 12px;
-      right: 12px;
+      bottom: calc(70px + 16px);
+      left: 16px;
+      right: 16px;
       background: linear-gradient(135deg, #f97316, #ea580c);
-      height: 54px;
+      height: 56px;
       border-radius: 16px;
       align-items: center;
       justify-content: space-between;
-      padding: 0 16px;
+      padding: 0 20px;
       color: white;
       font-weight: 700;
       box-shadow: 0 8px 24px rgba(249, 115, 22, 0.4);
       z-index: 90;
       border: 1px solid rgba(255,255,255,0.1);
+      font-size: 15px;
+      transition: all .2s;
+    }
+
+    .mobile-cart-bar:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px rgba(249, 115, 22, 0.5);
+    }
+
+    .mobile-cart-bar:active {
+      transform: scale(.98);
     }
   }
 
@@ -289,8 +440,8 @@
     right: 0;
     width: 100%;
     height: 70px;
-    background: #0a0a0a;
-    border-top: 1px solid #2a2a2a;
+    background: var(--card-2);
+    border-top: 1px solid var(--border);
     z-index: 1000;
     padding: 0 4px;
     padding-bottom: env(safe-area-inset-bottom);
@@ -326,7 +477,7 @@
     align-items: center;
     justify-content: center;
     gap: 4px;
-    color: #6b7280;
+    color: var(--muted);
     text-decoration: none;
     font-size: 10px;
     font-weight: 700;
@@ -372,7 +523,7 @@
     padding: 8px;
     background: transparent;
     border: none;
-    color: #f0f0f0;
+    color: var(--text);
     cursor: pointer;
     z-index: 50;
     flex-shrink: 0;
@@ -421,30 +572,44 @@
     }
 
     .table-card {
-      min-height: 100px !important;
-      padding: 10px !important;
-      border-radius: 10px;
+      min-height: 110px !important;
+      padding: 12px !important;
+      border-radius: 12px;
     }
 
     .table-card .table-number {
-      font-size: 18px !important;
+      font-size: 28px !important;
     }
 
     .table-card .table-seats {
-      font-size: 11px !important;
+      font-size: 12px !important;
     }
 
     .table-card .table-status .tag {
-      padding: 3px 6px;
-      font-size: 9px;
+      padding: 4px 8px;
+      font-size: 10px;
+    }
+
+    .product-btn {
+      padding: 10px 6px !important;
+      min-height: 44px;
+    }
+
+    .table-card {
+      padding: 12px 8px !important;
+      min-height: 48px;
     }
   }
 
   @media (max-width: 480px) {
     #tables-grid {
-      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-      gap: 6px;
-      padding: 12px !important;
+      grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
+      gap: 8px;
+      padding: 10px !important;
+    }
+
+    .table-card .table-number {
+      font-size: 24px !important;
     }
   }
 
@@ -571,19 +736,24 @@
 
   .order-type-btn {
     flex: 1;
-    padding: 12px 8px;
-    font-size: 12px;
-    font-weight: 600;
+    padding: 12px 16px;
+    font-size: 13px;
+    font-weight: 700;
     cursor: pointer;
-    border: none;
+    border: 1px solid var(--border);
     transition: all .2s;
     text-align: center;
-    min-height: 44px;
+    min-height: 48px;
     display: flex;
     align-items: center;
     justify-content: center;
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
+    border-radius: 10px;
+  }
+
+  .order-type-btn:hover {
+    border-color: #f97316;
   }
 
   .order-type-btn:active {
@@ -598,16 +768,20 @@
   .order-type-btn.active-dine {
     background: #f97316;
     color: #fff;
+    border-color: #f97316;
+    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
   }
 
   .order-type-btn.active-take {
     background: #8b5cf6;
     color: #fff;
+    border-color: #8b5cf6;
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
   }
 
   .order-type-btn:not(.active-dine):not(.active-take) {
-    background: #1a1a1a;
-    color: #6b7280;
+    background: var(--card);
+    color: var(--muted);
   }
 
   .item-notes-input {
@@ -615,19 +789,262 @@
     margin-top: 4px;
     padding: 3px 8px;
     font-size: 11px;
-    background: #1a1a1a;
-    border: 1px solid #333;
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
     border-radius: 6px;
-    color: #ccc;
+    color: var(--text);
   }
 
   .item-notes-input::placeholder {
-    color: #555;
+    color: var(--muted);
   }
 
   .item-notes-input:focus {
     outline: none;
     border-color: #f97316;
+  }
+
+  .cart-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    margin: 0 4px 12px;
+  }
+
+  .cart-item-header,
+  .cart-item-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .cart-item-header {
+    margin-bottom: 8px;
+  }
+
+  .cart-item-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .cart-item-meta {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .cart-item-price {
+    font-size: 14px;
+    font-weight: 700;
+    color: #f97316;
+  }
+
+  .quantity-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .qty-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    background: var(--ghost-bg);
+    color: var(--text);
+  }
+
+  .qty-btn.plus {
+    background: #f97316;
+    color: #fff;
+  }
+
+  .quantity {
+    font-size: 14px;
+    font-weight: 600;
+    width: 24px;
+    text-align: center;
+    color: var(--text);
+  }
+
+  .remove-btn {
+    padding: 6px;
+    background: none;
+    border: none;
+    color: #ef4444;
+    cursor: pointer;
+    border-radius: 4px;
+    font-weight: 700;
+  }
+
+  .pos-res-filter {
+    padding: 6px 16px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    transition: all .2s;
+  }
+
+  .pos-res-filter.active {
+    background: #f97316;
+    border-color: #f97316;
+    color: #fff;
+  }
+
+  .review-input {
+    width: 100%;
+    min-height: 88px;
+    resize: vertical;
+    margin-bottom: 12px;
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    color: var(--text);
+    border-radius: 12px;
+    padding: 12px 14px;
+  }
+
+  .review-submit {
+    border: none;
+    border-radius: 12px;
+    background: #f97316;
+    color: #fff;
+    font-weight: 700;
+    padding: 12px 16px;
+    cursor: pointer;
+  }
+
+  .note-presets {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+
+  .note-chip {
+    border: 1px solid var(--border);
+    background: var(--ghost-bg);
+    color: var(--muted);
+    border-radius: 999px;
+    padding: 4px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .waiter-alert {
+    position: fixed;
+    z-index: 9999;
+    background: var(--card);
+    border: 2px solid #f97316;
+    color: var(--text);
+    box-shadow: 0 12px 40px rgba(249,115,22,0.35);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: all .3s;
+  }
+
+  .waiter-alert.desktop {
+    top: 24px;
+    right: 24px;
+    max-width: 320px;
+    border-radius: 14px;
+    padding: 16px 22px;
+  }
+
+  .waiter-alert.mobile {
+    bottom: 80px;
+    left: 20px;
+    right: 20px;
+    border-radius: 18px;
+    padding: 14px 18px;
+  }
+
+  .waiter-alert-title {
+    font-weight: 800;
+    color: var(--text);
+    font-size: 14px;
+    letter-spacing: -0.01em;
+  }
+
+  .waiter-alert-message {
+    font-size: 12px;
+    color: #f97316;
+    margin-top: 1px;
+    font-weight: 600;
+  }
+
+  .waiter-alert-close {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-size: 22px;
+    cursor: pointer;
+    padding: 4px;
+    line-height: 1;
+  }
+
+  body[data-theme="light"] .bg-gray-900,
+  body[data-theme="light"] .bg-gray-800 {
+    background: var(--input-bg) !important;
+  }
+
+  body[data-theme="light"] .text-gray-300 {
+    color: #374151 !important;
+  }
+
+  body[data-theme="light"] .text-amber-200 {
+    color: #92400e !important;
+  }
+
+  body[data-theme="light"] .border-white\/5,
+  body[data-theme="light"] .border-white\/10 {
+    border-color: var(--border) !important;
+  }
+
+  body[data-theme="light"] .bg-white\/5,
+  body[data-theme="light"] .bg-black\/40 {
+    background: rgba(15,23,42,0.04) !important;
+  }
+
+  body[data-theme="light"] .hover\:bg-white\/5:hover {
+    background: rgba(15,23,42,0.06) !important;
+  }
+
+  #more-actions-modal .modal-content {
+    max-height: min(640px, calc(100vh - 32px));
+    overflow-y: auto;
+  }
+
+  @media (max-width: 640px) {
+    #more-actions-modal {
+      align-items: flex-end;
+      padding: 12px 12px calc(88px + env(safe-area-inset-bottom));
+    }
+
+    #more-actions-modal .modal-content {
+      max-height: calc(100vh - 120px);
+      border-radius: 20px;
+    }
+  }
+
+  @media (max-width: 1024px) {
+    .table-free-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
   }
 </style>
 {% endblock %}
@@ -792,8 +1209,8 @@
         
         <div class="px-4 pt-4 pb-2 border-b border-border flex flex-col gap-3" style="background:#0a0a0a">
           <div class="flex gap-2">
-            <input type="text" id="product-search" placeholder="Search products..." oninput="filterProducts()" 
-              class="flex-1 bg-card-2 border border-border rounded-xl px-4 py-2.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition">
+            <input type="text" id="product-search" placeholder="🔍 Search products..." oninput="filterProducts()" 
+              class="flex-1 bg-card-2 border border-border rounded-xl px-4 py-3 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition font-500" style="background:#1a1a1a;border:1px solid #2a2a2a;">
           </div>
           <div id="cat-pills-wrap" class="flex overflow-x-auto no-scrollbar pb-1">
             <div id="cat-pills" class="flex gap-2"></div>
@@ -805,7 +1222,7 @@
         </div>
 
         <!-- Floating Mobile Cart Bar -->
-        <button class="mobile-cart-bar" onclick="toggleCartDrawer()">
+        <button class="mobile-cart-bar" onclick="toggleCartDrawer('open')">
            <div class="flex items-center gap-3">
              <span class="bg-white/20 px-2 py-0.5 rounded-lg text-xs" id="mobile-cart-count">0</span>
              <span>View Order</span>
@@ -815,11 +1232,11 @@
       </div>
 
       <!-- Cart Panel Overlay (Mobile) -->
-      <div class="mobile-cart-backdrop" id="cart-backdrop" onclick="toggleCartDrawer()"></div>
+      <div class="mobile-cart-backdrop" id="cart-backdrop" onclick="toggleCartDrawer('close')"></div>
       <div id="cart-panel-overlay" class="bg-card">
          <div class="p-4 border-b border-border flex items-center justify-between">
             <h3 class="font-700">Order Summary</h3>
-            <button onclick="toggleCartDrawer()" class="p-2 text-gray-500">
+            <button onclick="toggleCartDrawer('close')" class="p-2 text-gray-500">
                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l18 18" /></svg>
             </button>
          </div>
@@ -835,7 +1252,7 @@
             <h3 class="font-display font-700 text-base">Order <span id="cart-order-num"
                 class="text-gray-500 font-400 text-sm"></span></h3>
           </div>
-          <button onclick="toggleCartDrawer()" class="p-2 text-gray-500 hidden md:block">
+          <button onclick="toggleCartDrawer('close')" class="p-2 text-gray-500 lg:hidden" title="Back to menu" aria-label="Back to menu">
              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
@@ -925,15 +1342,15 @@
       <!-- Filter pills -->
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
         <button class="pos-res-filter active" data-f="all" onclick="filterPosRes('all',this)"
-          style="padding:6px 16px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #333;background:#f97316;color:#fff;transition:all .2s;">All</button>
+          >All</button>
         <button class="pos-res-filter" data-f="pending" onclick="filterPosRes('pending',this)"
-          style="padding:6px 16px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #333;background:transparent;color:#888;transition:all .2s;">🟡
+          >🟡
           Pending</button>
         <button class="pos-res-filter" data-f="confirmed" onclick="filterPosRes('confirmed',this)"
-          style="padding:6px 16px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #333;background:transparent;color:#888;transition:all .2s;">🟢
+          >🟢
           Confirmed</button>
         <button class="pos-res-filter" data-f="seated" onclick="filterPosRes('seated',this)"
-          style="padding:6px 16px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #333;background:transparent;color:#888;transition:all .2s;">🟣
+          >🟣
           Seated</button>
       </div>
       <div id="pos-res-grid" class="grid gap-4"
@@ -1110,6 +1527,9 @@
   let lastPaidOrder = null, confirmReviewRating = 0, confirmReviewSubmitted = false;
   let isTakeaway = false;
   let lookupTimeout = null;
+  const POS_USER_NAME = {{ user_name|tojson }};
+  let attendanceState = { clocked_in: false, current_shift_started_at: null };
+  const NOTE_PRESETS = ['No ice', 'Parcel', 'Urgent', 'Birthday', 'VIP'];
 
 
   async function checkCustomerPhone(phone) {
@@ -1230,22 +1650,41 @@
 
     const grid = document.getElementById('tables-grid');
     grid.innerHTML = floor.tables.map(t => `
-    <div class="table-card card ${t.status === 'occupied' ? 'occupied' : 'free'}" onclick="selectTable(${t.id},'${t.number}','${t.status}')" oncontextmenu="toggleTableStatus(event,${t.id},'${t.status}')">
+    <div class="table-card ${t.status === 'occupied' ? 'occupied' : 'free'}" onclick="selectTable(${t.id},'${t.number}','${t.status}')" oncontextmenu="toggleTableStatus(event,${t.id},'${t.status}')">
       <div class="table-header">
-        <div class="table-number">T${t.number}</div>
+        <div class="table-number">${t.number}</div>
         <div class="table-seats">${t.seats} seats</div>
       </div>
       <div class="table-footer">
         <div class="table-status">
-          <span class="tag ${t.status === 'occupied' ? 'bg-orange-900/40 text-orange-400' : 'bg-gray-800 text-gray-500'}">${t.status === 'occupied' ? '🔴 Occupied' : '🟢 Free'}</span>
+          <span class="tag ${t.status === 'occupied' ? 'occupied' : 'free'}">${t.status === 'occupied' ? 'Occupied' : 'Free'}</span>
+          ${t.status === 'occupied' ? `<button class="table-free-btn" onclick="event.stopPropagation(); freeTable(${t.id}, '${String(t.number).replace(/'/g, "\\'")}')">Free</button>` : ''}
         </div>
-        <div class="table-hint">right-click ⟲</div>
+        <div class="table-hint">right-click to toggle</div>
       </div>
     </div>`).join('');
   }
 
+  async function freeTable(tableId, number) {
+    const r = await api('/api/tables/' + tableId + '/status', 'PUT', { status: 'free' });
+    if (r.ok) {
+      if (currentTable && currentTable.id === tableId) {
+        currentTable = null;
+        currentBill = null;
+        currentOrder = null;
+        cart = [];
+        renderCart();
+      }
+      toast(`Table ${number} freed`, 'success');
+      await reloadData();
+    } else {
+      toast(r.error || 'Error freeing table', 'error');
+    }
+  }
+
   async function selectTable(id, number, status) {
     currentTable = { id, number };
+    isTakeaway = false;
     document.getElementById('cart-table-name').textContent = 'Table ' + number;
     // Always start fresh when opening a table so a previous sent order
     // cannot leak into the next ticket for the same table.
@@ -1254,6 +1693,7 @@
     document.getElementById('cart-order-num').textContent = '';
     const billResp = await api('/api/bills/table/' + id);
     currentBill = billResp.bill || null;
+    setCartDrawerOpen(false);
     renderCart();
     showView('order');
   }
@@ -1261,6 +1701,7 @@
   function startTakeaway() {
     isTakeaway = true;
     currentTable = null;
+    currentBill = null;
     currentOrder = null;
     cart = [];
     document.getElementById('cart-table-name').textContent = '🛵 Takeaway Order';
@@ -1270,6 +1711,7 @@
       btn.className = 'order-type-btn w-full active-take';
       btn.textContent = '🛵 Takeaway';
     }
+    setCartDrawerOpen(false);
     renderCart();
     showView('order');
   }
@@ -1287,6 +1729,7 @@
       btn.className = 'order-type-btn w-full active-take';
       btn.textContent = '📱 Online Order';
     }
+    setCartDrawerOpen(false);
     renderCart();
     showView('order');
   }
@@ -1335,16 +1778,26 @@
     cats.forEach(c => {
       c.products.forEach(p => {
         const imgHtml = p.image_b64
-          ? `<img src="${p.image_b64}" alt="${p.name}" style="width:100%;height:64px;object-fit:cover;border-radius:8px;margin-bottom:6px;">`
-          : `<div class="text-2xl mb-2">${getCatEmoji(c.name)}</div>`;
-        html += `<div class="product-btn card p-3 rounded-xl" onclick="addToCart(${p.id},'${p.name.replace(/'/g, "\\'")}',${p.price})">
-        ${imgHtml}
-        <div class="text-sm font-medium leading-tight">${p.name}</div>
-        <div class="text-brand-500 font-700 text-sm mt-1">₹${p.price}</div>
+          ? `<img src="${p.image_b64}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`
+          : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px;opacity:0.6;">${getCatEmoji(c.name)}</div>`;
+        html += `<div class="product-btn" role="button" tabindex="0" onclick="addToCart(${p.id},'${p.name.replace(/'/g, "\\'")}',${p.price})" onkeydown="handleProductCardKeydown(event, ${p.id}, '${p.name.replace(/'/g, "\\'")}', ${p.price})">
+        <div class="product-image">${imgHtml}</div>
+        <div class="product-name">${p.name}</div>
+        <div class="product-category">${c.name}</div>
+        <div class="product-footer">
+          <span class="product-price">₹${p.price}</span>
+          &nbsp;&nbsp; <button class="add-btn" onclick="event.stopPropagation(); addToCart(${p.id},'${p.name.replace(/'/g, "\\'")}',${p.price})">+</button>
+        </div>
       </div>`;
       });
     });
     grid.innerHTML = html;
+  }
+
+  function handleProductCardKeydown(event, id, name, price) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    addToCart(id, name, price);
   }
 
   function getCatEmoji(name) {
@@ -1371,23 +1824,29 @@
     
     let cartHtml = '';
     if (!cart.length) { 
-      cartHtml = '<div class="text-gray-600 text-sm text-center mt-8">No items yet</div>'; 
+      cartHtml = '<div class="text-gray-600 text-sm text-center mt-8 px-4">🛒 No items yet</div>'; 
     } else {
       cartHtml = cart.map((i, idx) => `
-      <div class="py-2 border-b border-border/50 px-4 lg:px-0">
-        <div class="flex items-center gap-2">
-          <div class="flex-1 min-w-0">
-            <div class="text-sm font-medium truncate">${i.name}</div>
-            <div class="text-xs text-gray-500">₹${i.price} each</div>
+      <div class="cart-item">
+        <div class="cart-item-header">
+          <div>
+            <div class="cart-item-name">${i.name}</div>
+            <div class="cart-item-meta">₹${i.price} × ${i.qty}</div>
           </div>
-          <div class="flex items-center gap-1">
-            <button onclick="updateQty(${idx},-1)" class="w-8 h-8 lg:w-6 lg:h-6 rounded-md bg-gray-800 text-gray-400 text-xs flex items-center justify-center hover:bg-gray-700">−</button>
-            <span class="text-sm w-6 text-center font-medium">${i.qty}</span>
-            <button onclick="updateQty(${idx},1)" class="w-8 h-8 lg:w-6 lg:h-6 rounded-md bg-gray-800 text-gray-400 text-xs flex items-center justify-center hover:bg-gray-700">+</button>
+          <div class="cart-item-price">₹${(i.price * i.qty).toFixed(0)}</div>
+        </div>
+        <div class="cart-item-controls">
+          <div class="quantity-controls">
+            <button class="qty-btn" onclick="updateQty(${idx},-1)">−</button>
+            <span class="quantity">${i.qty}</span>
+            <button class="qty-btn plus" onclick="updateQty(${idx},1)">+</button>
           </div>
-          <div class="text-sm font-700 text-brand-500 w-14 text-right">₹${(i.price * i.qty).toFixed(0)}</div>
+          <button class="remove-btn" onclick="cart.splice(${idx}, 1); renderCart();">✕</button>
         </div>
         <input type="text" class="item-notes-input" placeholder="📝 Note (e.g. no onion)" value="${escapeAttr(i.notes || '')}" oninput="updateItemNote(${idx}, this.value)" />
+        <div class="note-presets">
+          ${NOTE_PRESETS.map(preset => `<button type="button" class="note-chip" onclick="addNotePreset(${idx}, '${preset.replace(/'/g, "\\'")}')">${preset}</button>`).join('')}
+        </div>
       </div>`).join('');
     }
     
@@ -1429,63 +1888,48 @@
     
     // If cart becomes empty, close drawer
     if (cart.length === 0 && document.querySelector('.cart-panel-standard')?.classList.contains('mobile-open')) {
-       toggleCartDrawer();
+       setCartDrawerOpen(false);
     }
   }
 
-  function toggleCartDrawer() {
+  function setCartDrawerOpen(open) {
      const cartPanel = document.querySelector('#view-order .cart-panel-standard');
      const backdrop = document.querySelector('#view-order .mobile-cart-backdrop');
-     
+     if (!cartPanel) return;
+     cartPanel.classList.toggle('mobile-open', open);
+     backdrop?.classList.toggle('active', open);
+  }
+
+  function toggleCartDrawer(action = 'toggle') {
+     const cartPanel = document.querySelector('#view-order .cart-panel-standard');
+
      // If we're not in the order view, navigate there first (desktop behavior)
      const orderView = document.getElementById('view-order');
      if (!orderView || orderView.classList.contains('hidden')) {
         showView('order');
         return;
      }
-     
-     // Check cart is not empty (mobile only)
+
+     if (!cartPanel) return;
+
+     const isOpen = cartPanel.classList.contains('mobile-open');
+     const shouldOpen = action === 'open' ? true : action === 'close' ? false : !isOpen;
+
+     if (!shouldOpen) {
+        setCartDrawerOpen(false);
+        return;
+     }
+
+     // Check cart is not empty only when opening on mobile
      const isMobile = window.innerWidth <= 1024;
      if (isMobile && !cart.length) {
         toast('Cart is empty', 'info');
         return;
      }
-     
-     // Toggle drawer on mobile
-     if (isMobile && cartPanel) {
-        cartPanel.classList.toggle('mobile-open');
-        backdrop?.classList.toggle('active');
+
+     if (isMobile) {
+        setCartDrawerOpen(true);
      }
-  }
-
-  function openMoreActions() {
-    document.getElementById('more-actions-modal').classList.remove('hidden');
-    updateAttendanceLabel();
-  }
-
-  function closeMoreActions() {
-    document.getElementById('more-actions-modal').classList.add('hidden');
-  }
-
-  async function updateAttendanceLabel() {
-    // Check current status if possible, or just toggle locally
-    // For now we'll just show "Clock In" by default or based on a session var if available
-    const label = document.getElementById('attendance-label');
-    if (label) label.textContent = localStorage.getItem('isClockedIn') === 'true' ? 'Clock Out' : 'Clock In';
-  }
-
-  async function handleAttendance() {
-    const isClockedIn = localStorage.getItem('isClockedIn') === 'true';
-    const action = isClockedIn ? 'check-out' : 'check-in';
-    const r = await api(`/api/attendance/${action}`, 'POST');
-    if (r.ok) {
-        localStorage.setItem('isClockedIn', !isClockedIn);
-        toast(isClockedIn ? 'Clocked out successfully' : 'Clocked in successfully', 'success');
-        updateAttendanceLabel();
-        closeMoreActions();
-    } else {
-        toast(r.error || 'Attendance error', 'error');
-    }
   }
 
   async function logout() {
@@ -1500,6 +1944,17 @@
 
   function updateItemNote(idx, val) {
     if (cart[idx]) cart[idx].notes = val;
+  }
+
+  function addNotePreset(idx, preset) {
+    const item = cart[idx];
+    if (!item) return;
+    const existing = (item.notes || '').trim();
+    const next = existing
+      ? (existing.toLowerCase().includes(preset.toLowerCase()) ? existing : `${existing}, ${preset}`)
+      : preset;
+    item.notes = next;
+    renderCart();
   }
 
   function updatePayButtonState() {
@@ -2027,7 +2482,7 @@
       const waMsg = encodeURIComponent(`\uD83E\uDDFE POS Cafe \u2014 Bill\nOrder: ${b.order_number} | Table ${b.table}\nTotal: \u20b9${b.total.toFixed(0)}`);
       
       return `
-      <div class="card p-5 rounded-3xl transition-all hover:scale-[1.01] ${isCurrent ? 'ring-2 ring-brand-500 bg-brand-500/5' : 'bg-card-2'}" style="border: 1px solid rgba(255,255,255,0.05)">
+      <div class="card p-5 rounded-3xl border border-white/5 transition-all hover:scale-[1.01] ${isCurrent ? 'ring-2 ring-brand-500 bg-brand-500/5' : 'bg-card-2'}">
         <div class="flex justify-between items-start mb-4">
           <div>
             <div class="text-[10px] font-800 text-gray-500 uppercase tracking-widest mb-1">#${String(b.order_number).includes('-') ? b.order_number.split('-')[1] : b.order_number}</div>
@@ -2124,18 +2579,15 @@
     // Show a persistent loud toast
     const el = document.createElement('div');
     const isMobile = window.innerWidth < 768;
-    
-    el.style.cssText = isMobile 
-      ? 'position:fixed;bottom:80px;left:20px;right:20px;z-index:9999;background:#1a1a1a;border:2px solid #f97316;border-radius:18px;padding:14px 18px;box-shadow:0 12px 40px rgba(249,115,22,0.4);display:flex;align-items:center;gap:12px;cursor:pointer;transition:all .3s;'
-      : 'position:fixed;top:24px;right:24px;z-index:9999;background:#1a1a1a;border:2px solid #f97316;border-radius:14px;padding:16px 22px;box-shadow:0 8px 32px rgba(249,115,22,0.35);display:flex;align-items:center;gap:12px;cursor:pointer;transition:all .3s;max-width:320px;';
-    
+
+    el.className = `waiter-alert ${isMobile ? 'mobile' : 'desktop'}`;
     el.innerHTML = `
       <span style="font-size:24px;">\uD83D\uDD14</span>
       <div style="flex:1">
-        <div style="font-weight:800;color:#fff;font-size:14px;letter-spacing:-0.01em">Waiter Requested</div>
-        <div style="font-size:12px;color:#f97316;margin-top:1px;font-weight:600">${msg}</div>
+        <div class="waiter-alert-title">Waiter Requested</div>
+        <div class="waiter-alert-message">${msg}</div>
       </div>
-      <button onclick="this.parentElement.remove()" style="background:transparent;border:none;color:#555;font-size:22px;cursor:pointer;padding:4px;line-height:1">&times;</button>
+      <button onclick="this.parentElement.remove()" class="waiter-alert-close">&times;</button>
     `;
     el.onclick = (e) => { if (!e.target.closest('button')) el.remove(); };
     document.body.appendChild(el);
@@ -2164,9 +2616,9 @@
   function filterPosRes(f, btn) {
     posResFilter = f;
     document.querySelectorAll('.pos-res-filter').forEach(b => {
-      b.style.background = 'transparent'; b.style.color = '#888';
+      b.classList.remove('active');
     });
-    btn.style.background = '#f97316'; btn.style.color = '#fff';
+    btn.classList.add('active');
     renderPosReservations(f);
   }
 
@@ -2209,6 +2661,7 @@
             </div>
             <div>
               <div class="text-sm font-800 text-white">${r.customer_name || 'Guest'}</div>
+              <div class="text-xs text-orange-500 font-700">${r.customer_phone || ''}</div>
               <div class="text-xs text-gray-500 font-600">${timeStr} &middot; ${r.party_size} pax</div>
             </div>
           </div>
@@ -2288,7 +2741,7 @@
       const tableLabel = o.table === 'Takeaway' ? '🛵 Takeaway' : '🪑 Table ' + o.table;
       
       return `
-      <div class="card p-4 rounded-2xl bg-card-2 border border-white/5 transition-all active:scale-[0.98]">
+      <button type="button" class="card w-full p-4 rounded-2xl bg-card-2 border border-white/5 transition-all active:scale-[0.98] text-left cursor-pointer" onclick="openHistoryOrder(${o.id})">
         <div class="flex items-center justify-between mb-2">
           <div class="flex items-center gap-3">
              <div class="px-2 py-1 bg-white/5 rounded text-[10px] font-800 text-gray-500 uppercase tracking-tighter border border-white/5">${String(o.order_number).includes('-') ? o.order_number.split('-')[1] : o.order_number}</div>
@@ -2304,8 +2757,13 @@
           ${o.customer_name ? `<span class="text-gray-600">&middot;</span> <span class="text-gray-500">${o.customer_name}</span>` : ''}
         </div>
         <div class="text-[11px] text-gray-600 truncate">${itemsSummary}</div>
-      </div>`;
+      </button>`;
     }).join('');
+  }
+
+  function openHistoryOrder(orderId) {
+    if (!orderId) return;
+    window.open(`/receipt/${orderId}`, '_blank');
   }
 
   // ─── Attendance & More Actions ─────────────────────────
@@ -2315,7 +2773,7 @@
       modal.classList.remove('hidden');
       modal.querySelector('.modal-content')?.classList.add('animate-slide-up');
     }
-    updateAttendanceLabel();
+    refreshAttendanceStatus();
   }
 
   function closeMoreActions() {
@@ -2323,11 +2781,31 @@
     if (modal) modal.classList.add('hidden');
   }
 
-  async function updateAttendanceLabel() {
-    const isClockedIn = localStorage.getItem('isClockedIn') === 'true';
+  function formatAttendanceTime(isoString) {
+    if (!isoString) return '';
+    const dt = new Date(isoString);
+    if (Number.isNaN(dt.getTime())) return '';
+    return dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  async function refreshAttendanceStatus() {
+    const status = await api('/api/attendance/status');
+    if (!status || status.error) return;
+    attendanceState = status;
+    updateAttendanceLabel();
+  }
+
+  function updateAttendanceLabel() {
+    const isClockedIn = Boolean(attendanceState.clocked_in);
     const label = document.getElementById('attendance-label');
+    const meta = document.getElementById('attendance-meta');
     const btn = document.getElementById('attendance-btn');
-    if (label) label.textContent = isClockedIn ? 'CLOCK OUT' : 'Clock In';
+    if (label) label.textContent = isClockedIn ? 'Clock Out' : 'Clock In';
+    if (meta) {
+      meta.textContent = isClockedIn && attendanceState.current_shift_started_at
+        ? `Started at ${formatAttendanceTime(attendanceState.current_shift_started_at)}`
+        : 'Tap to start staff duty';
+    }
     if (btn) {
       if (isClockedIn) {
         btn.style.background = 'rgba(239,68,68,0.15)';
@@ -2344,12 +2822,21 @@
   }
 
   async function handleAttendance() {
-    const isClockedIn = localStorage.getItem('isClockedIn') === 'true';
+    const isClockedIn = Boolean(attendanceState.clocked_in);
     const action = isClockedIn ? 'out' : 'in';
     const r = await api('/api/attendance/clock', 'POST', { action });
     if (r.ok || r.message) {
-        localStorage.setItem('isClockedIn', !isClockedIn);
-        toast(isClockedIn ? 'Checked out (Duty End) \u2705' : 'Checked in (Duty Start) \u23f0', 'success');
+        attendanceState = {
+          clocked_in: Boolean(r.clocked_in),
+          current_shift_started_at: action === 'in' ? r.timestamp : null
+        };
+        const when = formatAttendanceTime(r.timestamp);
+        toast(
+          action === 'in'
+            ? `${POS_USER_NAME} started duty${when ? ' at ' + when : ''}`
+            : `${POS_USER_NAME} ended duty${when ? ' at ' + when : ''}`,
+          'success'
+        );
         updateAttendanceLabel();
         closeMoreActions();
     } else {
@@ -2372,6 +2859,7 @@
     } catch (e) { }
   }
   loadPosCafeBranding();
+  refreshAttendanceStatus();
 
   init();
 </script>
@@ -2388,7 +2876,7 @@
         <span class="text-xl">📅</span>
         <div class="text-left">
           <div id="attendance-label" class="font-700 text-sm">Clock In</div>
-          <div class="text-[10px] text-gray-500 uppercase">Staff Duty Status</div>
+          <div id="attendance-meta" class="text-[10px] text-gray-500 uppercase">Tap to start staff duty</div>
         </div>
       </button>
       
@@ -2416,47 +2904,4 @@
     </div>
   </div>
 </div>
-
-
-<!-- ═══ MORE ACTIONS MODAL ═══ -->
-<div id="more-actions-modal" class="hidden fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-4 modal-bg">
-  <div class="modal-content w-full max-w-sm bg-card border border-border rounded-2xl shadow-2xl overflow-hidden">
-    <div class="p-4 border-b border-border flex items-center justify-between">
-      <h3 class="font-700">More Actions</h3>
-      <button onclick="closeMoreActions()" class="p-2 text-gray-500">&times;</button>
-    </div>
-    <div class="p-4 space-y-3">
-      <button id="attendance-btn" onclick="handleAttendance()" class="w-full flex items-center gap-3 p-4 rounded-xl border border-border hover:bg-white/5 transition">
-        <span class="text-xl">📅</span>
-        <div class="text-left">
-          <div id="attendance-label" class="font-700 text-sm">Clock In</div>
-          <div class="text-[10px] text-gray-500 uppercase">Staff Duty Status</div>
-        </div>
-      </button>
-      
-      <a href="/backend" class="w-full flex items-center gap-3 p-4 rounded-xl border border-border hover:bg-white/5 transition">
-        <span class="text-xl">🟧</span>
-        <div class="text-left">
-          <div class="font-700 text-sm">Open Backend</div>
-          <div class="text-[10px] text-gray-500 uppercase">Manage Products & Settings</div>
-        </div>
-      </a>
-
-      <button onclick="closeSession()" class="w-full flex items-center gap-3 p-4 rounded-xl border border-border hover:bg-white/5 transition">
-        <span class="text-xl">💰</span>
-        <div class="text-left">
-          <div class="font-700 text-sm">Close Register</div>
-          <div class="text-[10px] text-gray-500 uppercase">Finalize Today's Session</div>
-        </div>
-      </button>
-
-      <div class="pt-4 border-t border-border">
-        <button onclick="logout()" class="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-red-500/10 text-red-500 font-700 text-sm border border-red-500/20 hover:bg-red-500/20 transition">
-          ↩ Logout Account
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
 {% endblock %}

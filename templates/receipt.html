@@ -63,9 +63,9 @@
 
 <button class="no-print" onclick="window.print()">Print Receipt</button>
 
-<div class="receipt">
-  <div class="r-center">
-    <div class="r-bold r-invoice-header">RETAIL INVOICE</div>
+<div class="receipt {{ 'compact' if cafe_settings.receipt_layout == 'compact' else '' }}" style="text-align: {{ cafe_settings.receipt_alignment or 'center' }}">
+  <div class="{{ 'r-center' if cafe_settings.receipt_alignment != 'left' else '' }}">
+    <div class="r-bold r-invoice-header">{{ cafe_settings.invoice_title or 'RETAIL INVOICE' }}</div>
     <div class="r-shop-title r-bold">{{ cafe_settings.name }}</div>
     {% if cafe_settings.address %}
     <div class="r-shop-address">{{ cafe_settings.address }}</div>
@@ -84,7 +84,9 @@
   <div class="r-border-top r-border-bottom">
     <div class="r-meta-row">
        <span>Name: {{ order.customer_name or 'Walk-in' }}</span>
+       {% if cafe_settings.show_customer_phone !== false %}
        <span>{{ '(M: ' ~ order.customer_phone ~ ')' if order.customer_phone else '' }}</span>
+       {% endif %}
     </div>
   </div>
 
@@ -97,12 +99,18 @@
     <span></span>
   </div>
   <div class="r-meta-row">
+    {% if cafe_settings.show_cashier !== false %}
     <span>Cashier: {{ order.user.name if order.user else 'biller' }}</span>
+    {% else %}
+    <span></span>
+    {% endif %}
     <span>Bill No.: {{ order.order_number[-4:] }}</span>
   </div>
+  {% if cafe_settings.show_token_number !== false %}
   <div class="r-bold" style="font-size: 13px; margin-top: 3px;">
     Token No.: {{ order.order_number[-2:] }}
   </div>
+  {% endif %}
 
   <table>
     <thead>
@@ -135,10 +143,7 @@
       <div class="r-totals-val">{{ "%.2f"|format(order.subtotal) }}</div>
     </div>
     
-    {% if order.tax_breakdown_json %}
-      {% set breakdown = [] %}
-      {# Use a simple hack to parse JSON in jinja if no filter available, though here we passed it as dict via backend usually #}
-      {# But serialize_bill gives dict, so it should be fine if cafe_settings is passed from backend route #}
+    {% if cafe_settings.show_tax_rows !== false and order.tax_breakdown_json %}
       {% set data = order.tax_breakdown_json|from_json %}
       {% for label, amt in data.items() %}
       <div class="r-totals-row">
@@ -148,10 +153,12 @@
       {% endfor %}
     {% endif %}
 
+    {% if cafe_settings.show_round_off !== false %}
     <div class="r-totals-row">
       <div class="r-totals-label">Round off</div>
       <div class="r-totals-val">{{ "%.2f"|format(order.round_off) }}</div>
     </div>
+    {% endif %}
 
     <div class="r-grand r-totals-row">
       <div class="r-totals-label r-bold">Grand Total</div>
@@ -159,10 +166,12 @@
     </div>
   </div>
 
-  <div class="r-center r-footer">
+  {% if cafe_settings.show_footer !== false %}
+  <div class="{{ 'r-center' if cafe_settings.receipt_alignment != 'left' else '' }} r-footer">
     <div class="r-bold" style="margin-bottom: 10px;">{{ cafe_settings.footer_note or 'Thanks. Visit Again!!!' }}</div>
     <div class="r-bold">Order Once Placed can not Be cancelled.</div>
   </div>
+  {% endif %}
 
 </div>
 

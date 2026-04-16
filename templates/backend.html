@@ -352,14 +352,81 @@
                 <p class="text-[10px] text-gray-500 mt-1">Global service tax added to the whole bill total.</p>
               </div>
               <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Bill Footer Note</label><input id="s-footer" placeholder="Thanks. Visit Again!!!"></div>
+              
+              <div class="border-t border-border pt-4 mt-4">
+                <h3 class="text-sm font-bold text-white mb-3">Bill Customization</h3>
+                <div class="space-y-4">
+                  <div>
+                    <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Invoice Title</label>
+                    <input id="s-invoice-title" placeholder="RETAIL INVOICE">
+                  </div>
+                  <div class="grid grid-cols-2 gap-4">
+                    <div class="flex items-center gap-3">
+                      <label class="toggle"><input type="checkbox" id="s-show-cashier" checked><span class="toggle-slider"></span></label>
+                      <span class="text-xs text-gray-400">Show Cashier</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                      <label class="toggle"><input type="checkbox" id="s-show-phone" checked><span class="toggle-slider"></span></label>
+                      <span class="text-xs text-gray-400">Show Customer Phone</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                      <label class="toggle"><input type="checkbox" id="s-show-token" checked><span class="toggle-slider"></span></label>
+                      <span class="text-xs text-gray-400">Show Token No.</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                      <label class="toggle"><input type="checkbox" id="s-show-tax" checked><span class="toggle-slider"></span></label>
+                      <span class="text-xs text-gray-400">Show Tax Breakdown</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                      <label class="toggle"><input type="checkbox" id="s-show-roundoff" checked><span class="toggle-slider"></span></label>
+                      <span class="text-xs text-gray-400">Show Round Off</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                      <label class="toggle"><input type="checkbox" id="s-show-footer" checked><span class="toggle-slider"></span></label>
+                      <span class="text-xs text-gray-400">Show Footer</span>
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Layout Choice</label>
+                      <select id="s-layout" class="w-full text-xs">
+                        <option value="standard">Standard (58mm)</option>
+                        <option value="compact">Compact (Narrow)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Alignment</label>
+                      <select id="s-alignment" class="w-full text-xs">
+                        <option value="center">Center Aligned</option>
+                        <option value="left">Left Aligned</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div class="border-t border-border pt-4 mt-4">
                 <h3 class="text-sm font-bold text-white mb-3">Loyalty Program</h3>
                 <div class="grid settings-grid gap-4" style="grid-template-columns:1fr 1fr">
                   <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Points per ₹100 spent</label><input id="s-loyalty-ratio" type="number" step="0.1" placeholder="10.0"></div>
                   <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">1 Point Value (₹)</label><input id="s-point-value" type="number" step="0.1" placeholder="0.5"></div>
                 </div>
-                <p class="text-[10px] text-gray-500 mt-2">Example: 10 points per 100 means 1 point per 10 spent.</p>
               </div>
+
+              <div class="border-t border-border pt-4 mt-4">
+                <h3 class="text-sm font-bold text-white mb-3">Restaurant Reservation QR</h3>
+                <div class="flex flex-col items-center gap-4 bg-black/20 p-6 rounded-xl border border-dashed border-border">
+                  <div id="reservation-qr-container" class="bg-white p-2 rounded-lg">
+                    <div class="w-40 h-40 flex items-center justify-center text-gray-400 text-xs">Generating...</div>
+                  </div>
+                  <div class="text-center">
+                    <div id="reservation-url" class="text-[10px] text-gray-500 break-all mb-3 max-w-[240px]"></div>
+                    <button onclick="downloadReservationQR()" class="btn-ghost px-4 py-2 rounded-lg text-xs font-bold text-brand-500">Download QR Code</button>
+                  </div>
+                  <p class="text-[10px] text-gray-500 max-w-[200px] text-center">Give this QR to customers to let them reserve tables directly for your restaurant.</p>
+                </div>
+              </div>
+
               <div class="pt-4">
                 <button onclick="saveSettings()" class="btn-primary w-full py-3 rounded-xl text-white font-medium">Save Settings</button>
               </div>
@@ -535,8 +602,22 @@ function fillSettings(st) {
   document.getElementById('s-fssai').value=st.fssai_no||'';
   document.getElementById('s-tax-rate').value=st.tax_rate||5.0;
   document.getElementById('s-footer').value=st.footer_note||'';
+  
+  // Bill Customization
+  document.getElementById('s-invoice-title').value=st.invoice_title||'RETAIL INVOICE';
+  document.getElementById('s-show-cashier').checked=st.show_cashier!==false;
+  document.getElementById('s-show-phone').checked=st.show_customer_phone!==false;
+  document.getElementById('s-show-token').checked=st.show_token_number!==false;
+  document.getElementById('s-show-tax').checked=st.show_tax_rows!==false;
+  document.getElementById('s-show-roundoff').checked=st.show_round_off!==false;
+  document.getElementById('s-show-footer').checked=st.show_footer!==false;
+  document.getElementById('s-layout').value=st.receipt_layout||'standard';
+  document.getElementById('s-alignment').value=st.receipt_alignment||'center';
+
   document.getElementById('s-loyalty-ratio').value=st.loyalty_points_per_100||10.0;
   document.getElementById('s-point-value').value=st.points_redemption_value||0.5;
+  
+  if (st.tenant_id) loadReservationQR(st.tenant_id);
 }
 
 async function saveSettings() {
@@ -548,12 +629,42 @@ async function saveSettings() {
     fssai_no:document.getElementById('s-fssai').value.trim(),
     tax_rate:document.getElementById('s-tax-rate').value,
     footer_note:document.getElementById('s-footer').value.trim(),
+    
+    // Bill Customization
+    invoice_title:document.getElementById('s-invoice-title').value.trim(),
+    show_cashier:document.getElementById('s-show-cashier').checked,
+    show_customer_phone:document.getElementById('s-show-phone').checked,
+    show_token_number:document.getElementById('s-show-token').checked,
+    show_tax_rows:document.getElementById('s-show-tax').checked,
+    show_round_off:document.getElementById('s-show-roundoff').checked,
+    show_footer:document.getElementById('s-show-footer').checked,
+    receipt_layout:document.getElementById('s-layout').value,
+    receipt_alignment:document.getElementById('s-alignment').value,
+
     loyalty_points_per_100:document.getElementById('s-loyalty-ratio').value,
     points_redemption_value:document.getElementById('s-point-value').value
   };
   const r=await api('/api/cafe-settings','POST',d);
   if (r.ok) toast('Settings saved successfully!');
   else toast(r.error||'Failed to save settings','error');
+}
+
+let currentReservationQR = '';
+async function loadReservationQR(tenantId) {
+  const r = await api(`/api/qr/reservation/${tenantId}`);
+  if (r.qr) {
+    currentReservationQR = r.qr;
+    document.getElementById('reservation-qr-container').innerHTML = `<img src="${r.qr}" class="w-full h-full object-contain">`;
+    document.getElementById('reservation-url').textContent = r.url;
+  }
+}
+
+function downloadReservationQR() {
+  if (!currentReservationQR) return;
+  const link = document.createElement('a');
+  link.href = currentReservationQR;
+  link.download = `reservation_qr_${document.getElementById('s-name').value.replace(/\s+/g, '_').toLowerCase()}.png`;
+  link.click();
 }
 
 function switchTab(name,btn) {

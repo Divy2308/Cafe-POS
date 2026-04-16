@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}Choose a Restaurant — POS Cafe{% endblock %}
+{% block extra_head %}
+<style>
+    body {
+        background: radial-gradient(circle at top right, #111, #000);
+        min-height: 100vh;
+        color: #fff;
+    }
+    .hero-section {
+        padding: 60px 20px;
+        text-align: center;
+    }
+    .hero-title {
+        font-size: clamp(2rem, 5vw, 3.5rem);
+        font-weight: 900;
+        background: linear-gradient(to right, #fff, #888);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 10px;
+    }
+    .hero-subtitle {
+        color: #888;
+        font-size: 1.1rem;
+        max-width: 600px;
+        margin: 0 auto 40px;
+    }
+    .restaurant-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 30px;
+        padding: 0 20px 60px;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    .restaurant-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 24px;
+        padding: 30px;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+        backdrop-filter: blur(10px);
+    }
+    .restaurant-card:hover {
+        transform: translateY(-10px);
+        background: rgba(255, 255, 255, 0.05);
+        border-color: #f97316;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.4), 0 0 20px rgba(249, 115, 22, 0.1);
+    }
+    .restaurant-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: radial-gradient(circle at 50% 0%, rgba(249, 115, 22, 0.1), transparent);
+        opacity: 0;
+        transition: opacity 0.4s;
+    }
+    .restaurant-card:hover::before {
+        opacity: 1;
+    }
+    .logo-container {
+        width: 80px;
+        height: 80px;
+        background: #1a1a1a;
+        border-radius: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 20px;
+        font-size: 2rem;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .logo-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 20px;
+    }
+    .res-name {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 8px;
+        color: #fff;
+    }
+    .res-slug {
+        font-size: 0.9rem;
+        color: #f97316;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+    }
+    .visit-btn {
+        margin-top: 25px;
+        width: 100%;
+        padding: 12px;
+        border-radius: 12px;
+        background: #f97316;
+        color: #fff;
+        font-weight: 700;
+        border: none;
+        transition: all 0.3s;
+    }
+    .restaurant-card:hover .visit-btn {
+        background: #fff;
+        color: #000;
+    }
+    .loader {
+        grid-column: 1 / -1;
+        text-align: center;
+        padding: 60px;
+        color: #555;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-in {
+        animation: fadeIn 0.6s ease forwards;
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="hero-section animate-in">
+    <h1 class="hero-title">Select Your Restaurant</h1>
+    <p class="hero-subtitle">Experience fine dining and seamless reservations across all our premium locations.</p>
+</div>
+
+<div class="restaurant-grid" id="restaurant-grid">
+    <div class="loader">Loading premium experiences...</div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadRestaurants() {
+        try {
+            const res = await fetch('/api/restaurants');
+            const data = await res.json();
+            const grid = document.getElementById('restaurant-grid');
+            
+            if (data.length === 0) {
+                grid.innerHTML = '<div class="loader">No restaurants found. Check back soon!</div>';
+                return;
+            }
+            
+            grid.innerHTML = data.map((t, idx) => `
+                <div class="restaurant-card animate-in" style="animation-delay: ${idx * 0.1}s" onclick="window.location.href='/r/${t.slug}/reservations'">
+                    <div class="logo-container">
+                        ${t.logo_b64 ? `<img src="${t.logo_b64}" class="logo-img" alt="${t.name}">` : `🍽️`}
+                    </div>
+                    <div>
+                        <div class="res-slug">${t.slug}</div>
+                        <div class="res-name">${t.name}</div>
+                    </div>
+                    <button class="visit-btn">Visit Restaurant</button>
+                </div>
+            `).join('');
+            
+        } catch (e) {
+            console.error(e);
+            document.getElementById('restaurant-grid').innerHTML = '<div class="loader">Error loading restaurants. Please try again.</div>';
+        }
+    }
+    
+    document.addEventListener('DOMContentLoaded', loadRestaurants);
+</script>
+{% endblock %}

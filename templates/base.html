@@ -73,7 +73,8 @@
   input:disabled, select:disabled, textarea:disabled { opacity:.6; cursor:not-allowed; }
   /* Remove default iOS/Android styling */
   input[type="checkbox"], input[type="radio"] { -webkit-appearance:checkbox; appearance:checkbox; width:20px; height:20px; min-width:20px; min-height:20px; cursor:pointer; }
-  select { cursor:pointer; padding-right:30px; background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"><path fill="white" d="M6 9L1 4h10z"/></svg>'); background-position:right 10px center; background-repeat:no-repeat; background-size:12px; padding-right:35px; }
+  select { cursor:pointer; padding-right:30px; background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"><path fill="%23f0f0f0" d="M6 9L1 4h10z"/></svg>'); background-position:right 10px center; background-repeat:no-repeat; background-size:12px; padding-right:35px; }
+  body[data-theme="light"] select { background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"><path fill="%231f2937" d="M6 9L1 4h10z"/></svg>'); }
   /* Mobile optimizations */
   @media (max-width:768px) {
     html { padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom) 0; }
@@ -83,17 +84,17 @@
     input, select, textarea { min-height:48px; padding:12px 14px; font-size:16px; }
     input:focus, select:focus, textarea:focus { font-size:16px; }
     .toast { 
-      bottom: 24px; 
+      top: calc(env(safe-area-inset-top) + 12px);
       left: 50%; 
       right: auto; 
-      top: auto; 
-      transform: translate(-50%, 100px); 
-      width: auto; 
-      min-width: 200px;
-      max-width: 90vw; 
-      padding: 12px 20px; 
-      font-size: 14px; 
-      border-radius: 100px; /* Pill style on mobile */
+      bottom: auto; 
+      transform: translate(-50%, -120%); 
+      width: fit-content;
+      min-width: 0;
+      max-width: min(240px, calc(100vw - 40px)); 
+      padding: 10px 14px; 
+      font-size: 13px; 
+      border-radius: 12px;
       text-align: center;
       line-height: 1.4;
     }
@@ -104,7 +105,12 @@
   @media (max-width:480px) {
     .btn-primary, .btn-ghost, .btn-orange { min-height:44px; padding:10px 14px; font-size:13px; }
     .nav-link { min-height:44px; padding:10px 12px !important; }
-    .toast { min-width: 280px; font-size: 13px; padding: 10px 16px; bottom: 20px; }
+    .toast {
+      width: fit-content;
+      max-width: min(220px, calc(100vw - 32px));
+      padding: 9px 12px;
+      font-size: 12px;
+    }
   }
   .card { background:var(--card); border:1px solid var(--border); border-radius:12px; transition:background .2s ease,border-color .2s ease,color .2s ease; }
   .tag { display:inline-block; padding:2px 10px; border-radius:20px; font-size:11px; font-weight:500; }
@@ -129,6 +135,33 @@
   .toast.show { transform:translateX(0); }
   .toast.success { border-left:4px solid #22c55e; }
   .toast.error { border-left:4px solid #ef4444; }
+  .toast.info { border-left:4px solid #60a5fa; }
+  @media (max-width:768px) {
+    .toast {
+      top: calc(env(safe-area-inset-top) + 12px);
+      left: 50%;
+      right: auto;
+      bottom: auto;
+      transform: translate(-50%, -120%);
+      width: fit-content;
+      min-width: 0;
+      max-width: min(240px, calc(100vw - 40px));
+      padding: 10px 14px;
+      font-size: 13px;
+      border-radius: 12px;
+      text-align: center;
+      line-height: 1.4;
+    }
+    .toast.show { transform: translate(-50%, 0); }
+  }
+  @media (max-width:480px) {
+    .toast {
+      width: fit-content;
+      max-width: min(220px, calc(100vw - 32px));
+      padding: 9px 12px;
+      font-size: 12px;
+    }
+  }
   body[data-theme="light"] .text-white { color:#111827 !important; }
   body[data-theme="light"] .text-gray-400,
   body[data-theme="light"] .text-gray-500,
@@ -168,10 +201,17 @@ function toggleTheme() {
   applyTheme(current === 'light' ? 'dark' : 'light');
 }
 
+let toastTimer = null;
 function toast(msg, type='success') {
   const t = document.getElementById('toast');
-  t.textContent = msg; t.className = `toast ${type} show`;
-  setTimeout(()=>t.className='toast',3000);
+  if (!t) return;
+  if (toastTimer) clearTimeout(toastTimer);
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  toastTimer = setTimeout(() => {
+    t.classList.remove('show', 'success', 'error', 'info');
+    toastTimer = null;
+  }, 3000);
 }
 async function api(url, method='GET', data=null) {
   try {

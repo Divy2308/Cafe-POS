@@ -143,6 +143,17 @@
         <label>Date & Time</label>
         <input type="datetime-local" id="res-datetime" />
       </div>
+
+      <div id="reservation-customer-info" style="margin-top:16px;">
+        <div class="form-group" style="margin-bottom:12px;">
+          <label>Your Name</label>
+          <input type="text" id="res-name" placeholder="Enter your full name" />
+        </div>
+        <div class="form-group">
+          <label>Phone Number</label>
+          <input type="tel" id="res-phone" placeholder="Enter phone for confirmation" />
+        </div>
+      </div>
       <div class="form-group">
         <label>Party Size</label>
         <select id="res-party">
@@ -166,7 +177,7 @@
       </div>
       <input type="hidden" id="res-table-id" value="" />
 
-      <button onclick="submitReservation()" class="btn-orange" id="res-submit-btn" disabled>Confirm Reservation</button>
+      <button onclick="submitReservation()" class="btn-orange" id="res-submit-btn" disabled>Request Reservation</button>
       <p style="font-size:11px; color:#555; margin-top:8px; text-align:center;">You can also add a pre-order on the Pre-Order tab before confirming.</p>
     </div>
   </div>
@@ -220,12 +231,23 @@
 {% block scripts %}
 <script>
 const socket = io();
+const isPublic = {{ 'true' if is_public else 'false' }};
+const isLoggedIn = {{ 'true' if is_logged_in else 'false' }};
+const tenantId = {{ tenant_id or 'null' }};
 let orders = {}, orderTimestamps = {}, latestReviewRating = 5, latestReviewOrderId = null;
 const reviewedOrderIds = new Set();
 let menuData = [], preorderCart = [], activeReservationId = null;
 
+// Helper to add tenantId to API URLs
+function api(path) {
+    const url = new URL(path, window.location.origin);
+    if (tenantId) url.searchParams.set('tenant_id', tenantId);
+    return url.toString();
+}
+
 // ─── Socket events ─────────────────────────────────────────
 socket.on('new_ticket', t => {
+  if (tenantId && t.tenant_id != tenantId) return; // Ignore updates for other tenants
   if (!orders[t.order_number]) {
     orders[t.order_number] = {
       id: t.order_id, order_number: t.order_number, table: t.table,
@@ -237,6 +259,7 @@ socket.on('new_ticket', t => {
 });
 
 socket.on('ticket_update', d => {
+  if (tenantId && d.tenant_id != tenantId) return;
   for (let on in orders) {
     // Match by ticket id or order id
     if (orders[on]) {
@@ -249,6 +272,7 @@ socket.on('ticket_update', d => {
 });
 
 socket.on('order_update', d => {
+  if (tenantId && d.tenant_id != tenantId) return;
   if (orders[d.order_number]) {
     orders[d.order_number].status = d.status;
     if (d.started_at) orders[d.order_number].started_at = d.started_at;
@@ -262,15 +286,29 @@ socket.on('order_update', d => {
 });
 
 socket.on('order_paid', d => {
+  if (tenantId && d.tenant_id != tenantId) return;
   if (orders[d.order_number]) orders[d.order_number].status = 'paid';
   renderOrders();
 });
 
+
 // ─── Init ──────────────────────────────────────────────────
 async function init() {
-  document.getElementById('user-greeting').textContent = '{{ user_name or "Customer" }}';
-  await loadOrders();
+  document.getElementById('user-greeting').textContent = '{{ tenant_name or user_name or "Customer" }}';
+  if (isPublic && !isLoggedIn) {
+    showTab('reserve');
+  } else {
+    await loadOrders();
+    if (isLoggedIn) {
+      await loadReservations();
+      // Pre-fill name and phone
+      document.getElementById('res-name').value = decodeURIComponent("{{ user_name|urlencode }}").replace(/\+/g, ' ') || '';
+      // If we had the phone in template context, we'd fill it. 
+      // For now, let's fetch it or just leave it blank if not available directly.
+    }
+  }
   await loadMenu();
+
   setupPushNotifications();
   // Set min datetime to now
   const now = new Date();
@@ -280,8 +318,9 @@ async function init() {
 }
 
 async function loadOrders() {
+  if (isPublic && !isLoggedIn) return;
   try {
-    const res = await fetch('/api/kitchen/tickets');
+    const res = await fetch(api('/api/kitchen/tickets'));
     const tickets = await res.json();
     orders = {};
     tickets.forEach(t => {
@@ -389,9 +428,10 @@ async function submitReview(orderId) {
 // ─── Reserve Tab ───────────────────────────────────────────
 async function checkAvailability() {
   const dt = document.getElementById('res-datetime').value;
-  if (!dt) { showInPageAlert('Please pick a date and time first.'); return; }
+  if (!dt) { toast('Please pick a date and time first.', 'warning'); return; }
   document.getElementById('avail-loading').style.display = 'inline';
-  const res = await fetch(`/api/tables/availability?datetime=${encodeURIComponent(dt)}`);
+  const res = await fetch(api(`/api/tables/availability?datetime=${encodeURIComponent(dt)}`));
+
   const floors = await res.json();
   document.getElementById('avail-loading').style.display = 'none';
   const picker = document.getElementById('table-picker');
@@ -423,28 +463,43 @@ async function submitReservation() {
   const party = document.getElementById('res-party').value;
   const notes = document.getElementById('res-notes').value;
   const tableId = document.getElementById('res-table-id').value;
-  if (!dt) { showInPageAlert('Please pick a date and time.'); return; }
-  const btn = document.getElementById('res-submit-btn');
-  btn.disabled = true; btn.textContent = 'Saving…';
-  // Convert local datetime to ISO (treat as local)
+  
   const payload = {
-    reserved_at: dt,  // Send datetime-local value as-is (no UTC conversion to avoid tz mismatch)
+    reserved_at: dt,
     party_size: parseInt(party),
     notes,
     table_id: tableId ? parseInt(tableId) : null,
     items: preorderCart.map(i => ({product_id:i.product_id,name:i.name,qty:i.qty,price:i.price,notes:i.notes||''}))
   };
-  const res = await fetch('/api/reservations', {
+
+  const rName = document.getElementById('res-name').value.trim();
+  const rPhone = document.getElementById('res-phone').value.trim();
+  if (!rName || !rPhone) {
+    showInPageAlert('Please enter your name and phone number for the reservation.');
+    return;
+  }
+  payload.customer_name = rName;
+  payload.customer_phone = rPhone;
+
+  if (!dt) { showInPageAlert('Please pick a date and time.'); return; }
+  const btn = document.getElementById('res-submit-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  
+  const res = await fetch(api('/api/reservations'), {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify(payload)
   });
+
   const data = await res.json();
-  btn.disabled = false; btn.textContent = 'Confirm Reservation';
+  btn.disabled = false; btn.textContent = 'Request Reservation';
   if (data.ok) {
     activeReservationId = data.id;
-    showInPageAlert('✅ Reservation confirmed! We\'ll see you then.');
+    showInPageAlert('✅ Reservation request for {{ tenant_name }} sent! We\'ll confirm it shortly.');
     document.getElementById('preorder-res-label').textContent = `Linked to Reservation #${data.id}`;
     document.getElementById('preorder-attach-btn').disabled = false;
+    
+    // Make tab visible for guests just for this session
+    document.getElementById('tab-btn-myres').style.display = 'block';
     showTab('myres');
     loadReservations();
   } else {
@@ -454,7 +509,8 @@ async function submitReservation() {
 
 // ─── Pre-order Tab ─────────────────────────────────────────
 async function loadMenu() {
-  const res = await fetch('/api/products');
+  const res = await fetch(api('/api/products'));
+
   menuData = await res.json();
   renderMenu(menuData);
   renderMenuPills(menuData);
@@ -519,13 +575,18 @@ function renderPreorderCart() {
 }
 
 async function attachPreorderToReservation() {
-  if (!activeReservationId || !preorderCart.length) {
-    showInPageAlert('Create a reservation first in the Reserve tab.'); return;
+  if (isPublic && !{{ 'true' if is_logged_in else 'false' }}) {
+     window.location.href = `/auth?next=${encodeURIComponent(window.location.pathname)}`;
+     return;
   }
-  const res = await fetch(`/api/reservations/${activeReservationId}`, {
+  if (!activeReservationId || !preorderCart.length) {
+    toast('Create a reservation first in the Reserve tab.', 'warning'); return;
+  }
+  const res = await fetch(api(`/api/reservations/${activeReservationId}`), {
     method:'PUT', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ items: preorderCart.map(i=>({product_id:i.product_id,name:i.name,qty:i.qty,price:i.price,notes:i.notes||''})) })
   });
+
   if (res.ok) {
     showInPageAlert('✅ Pre-order saved to your reservation!');
     loadReservations();
@@ -535,7 +596,9 @@ async function attachPreorderToReservation() {
 
 // ─── My Reservations Tab ───────────────────────────────────
 async function loadReservations() {
-  const res = await fetch('/api/reservations');
+  if (isPublic && !isLoggedIn) return;
+  const res = await fetch(api('/api/reservations'));
+
   const reservations = await res.json();
   const el = document.getElementById('reservations-list');
   const empty = document.getElementById('reservations-empty');

@@ -3,6 +3,31 @@
 {% block extra_head %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
+  .dash-select {
+    width: 100%;
+    min-height: 46px;
+    background-color: var(--input-bg);
+    border: 1px solid var(--input-border);
+    color: var(--text);
+    border-radius: 14px;
+    padding: 12px 42px 12px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.2;
+    appearance: none;
+    -webkit-appearance: none;
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    background-size: 14px;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14"><path fill="%236b7280" d="M2 5.25h10L7 10.25z"/></svg>');
+  }
+
+  .dash-select:focus {
+    outline: none;
+    border-color: #f97316;
+    box-shadow: 0 0 0 3px rgba(249,115,22,0.12);
+  }
+
   .stat-card { transition: transform .2s; }
   .stat-card:hover { transform: translateY(-2px); }
 
@@ -177,6 +202,18 @@
     /* Staff header */
     .staff-header { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
     .staff-header button { width: 100%; }
+
+    .staff-toolbar {
+      width: 100%;
+      flex-direction: column;
+      align-items: stretch !important;
+      gap: 10px !important;
+    }
+
+    .staff-toolbar > div,
+    .staff-toolbar .card {
+      width: 100%;
+    }
   }
 
   @media (max-width: 480px) {
@@ -250,7 +287,7 @@
       <div class="border-b border-border dash-header flex items-center justify-between" style="background:#111;position:sticky;top:0;z-index:10;">
         <h2 class="font-display text-xl font-700">Reports &amp; Analytics</h2>
         <div class="header-actions">
-          <select id="analyticsBranchSwitcher" onchange="handleAnalyticsBranchSwitch()" class="bg-[#1a1a1a] border border-border rounded-lg text-sm text-white px-3 py-1.5 min-w-[140px]">
+          <select id="analyticsBranchSwitcher" onchange="handleAnalyticsBranchSwitch()" class="dash-select min-w-[140px]">
             <option value="">All Branches</option>
           </select>
           <button class="period-btn active border border-border rounded-lg text-sm" onclick="setPeriod('today',this)">Today</button>
@@ -332,45 +369,6 @@
           <div id="reservations-mgmt-empty" class="hidden text-center py-10 text-gray-500">No upcoming reservations.</div>
         </div>
 
-        <!-- Sample Data Overview -->
-        <div class="card p-5" style="border-radius:16px;background:linear-gradient(135deg,rgba(34,197,94,0.1),rgba(22,163,74,0.05));border:1px solid rgba(34,197,94,0.2)">
-          <div class="flex items-center justify-between gap-4 mb-4">
-            <div>
-              <div class="font-display font-700">📊 System Status & Sample Data</div>
-              <div class="text-xs text-gray-500 mt-1">Complete test data loaded for all features</div>
-            </div>
-            <img src="/static/img/delivery-man.png" alt="Ready" style="width:60px;height:60px;opacity:0.8">
-          </div>
-          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
-            <div class="card p-3 text-center" style="border-radius:12px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.2)">
-              <div class="text-2xl font-bold text-blue-400">4</div>
-              <div class="text-xs text-gray-500 mt-1">Branches</div>
-            </div>
-            <div class="card p-3 text-center" style="border-radius:12px;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.2)">
-              <div class="text-2xl font-bold text-purple-400">6</div>
-              <div class="text-xs text-gray-500 mt-1">Staff</div>
-            </div>
-            <div class="card p-3 text-center" style="border-radius:12px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2)">
-              <div class="text-2xl font-bold text-green-400">3</div>
-              <div class="text-xs text-gray-500 mt-1">Orders</div>
-            </div>
-            <div class="card p-3 text-center" style="border-radius:12px;background:rgba(249,115,22,0.1);border:1px solid rgba(249,115,22,0.2)">
-              <div class="text-2xl font-bold text-orange-400">3</div>
-              <div class="text-xs text-gray-500 mt-1">Reservations</div>
-            </div>
-            <div class="card p-3 text-center" style="border-radius:12px;background:rgba(236,72,153,0.1);border:1px solid rgba(236,72,153,0.2)">
-              <div class="text-2xl font-bold text-pink-400">10</div>
-              <div class="text-xs text-gray-500 mt-1">Tables</div>
-            </div>
-            <div class="card p-3 text-center" style="border-radius:12px;background:rgba(14,165,233,0.1);border:1px solid rgba(14,165,233,0.2)">
-              <div class="text-2xl font-bold text-sky-400">6</div>
-              <div class="text-xs text-gray-500 mt-1">Inventory</div>
-            </div>
-          </div>
-          <div class="text-xs text-gray-600 mt-4 p-3 rounded-lg bg-gray-900/30">
-            ✅ All features seeded with realistic test data • Staff credentials: <code>raj@cafe.local</code> / <code>Cafe@1234</code> • Check Staff, OrderHistory & Reservations tabs for demo data
-          </div>
-        </div>
       </div>
     </div>
 
@@ -381,10 +379,10 @@
           <h2 class="font-display text-xl font-700">Staff Management</h2>
           <div class="text-sm text-gray-500 mt-1">Manage staff, rates, and branch assignments.</div>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 staff-toolbar">
           <div class="hidden" id="branchSwitcherWrap">
             <label class="text-xs text-gray-500 block mb-1">Active Branch</label>
-            <select id="branchSwitcher" class="min-w-[180px]" onchange="handleBranchSwitch()"></select>
+            <select id="branchSwitcher" class="dash-select min-w-[180px]" onchange="handleBranchSwitch()"></select>
           </div>
           <div class="card px-4 py-3">
             <div class="text-[11px] uppercase tracking-wider text-gray-500">Scope</div>
@@ -510,7 +508,7 @@
           <h3 class="text-xl font-bold mb-4">🌿 Select Branch</h3>
           <div class="mb-4">
             <label class="block text-sm text-gray-500 mb-2">Active Branch</label>
-            <select id="settingsBranchSelector" class="w-full bg-[#1a1a1a] border border-border rounded-lg text-sm text-white px-3 py-2.5" onchange="loadSelectedBranchSettings()"></select>
+            <select id="settingsBranchSelector" class="dash-select" onchange="loadSelectedBranchSettings()"></select>
           </div>
           <div id="branchSettingsForm" class="space-y-4 hidden">
             <div><label class="block text-sm text-gray-500 mb-2">Branch Name</label><input type="text" id="settingsBranchName" class="w-full"></div>
@@ -1082,26 +1080,31 @@
     const reader = new FileReader();
     reader.onload = function(e) {
       currentLogo = e.target.result;
-      document.getElementById('cafeLogo').value = currentLogo;
-      document.getElementById('logoPreview').innerHTML = `<img src="${currentLogo}" alt="Logo" class="w-full h-full object-cover">`;
+      const logoInput = document.getElementById('cafeLogo');
+      const logoPreview = document.getElementById('logoPreview');
+      if (logoInput) logoInput.value = currentLogo;
+      if (logoPreview) logoPreview.innerHTML = `<img src="${currentLogo}" alt="Logo" class="w-full h-full object-cover">`;
     };
     reader.readAsDataURL(file);
   }
   function removeLogo() {
     currentLogo = '';
-    document.getElementById('cafeLogo').value = '';
-    document.getElementById('logoPreview').innerHTML = '<span class="text-2xl">☕</span>';
+    const logoInput = document.getElementById('cafeLogo');
+    const logoPreview = document.getElementById('logoPreview');
+    if (logoInput) logoInput.value = '';
+    if (logoPreview) logoPreview.innerHTML = '<span class="text-2xl">☕</span>';
   }
   async function saveCafeSettings() {
+    const valueOf = (id, fallback = '') => document.getElementById(id)?.value ?? fallback;
     const payload = {
-      name: document.getElementById('cafeName').value,
-      phone: document.getElementById('cafePhone').value,
-      email: document.getElementById('cafeEmail').value,
-      address: document.getElementById('cafeAddress').value,
-      logo_b64: document.getElementById('cafeLogo').value,
-      open_time: document.getElementById('openTime').value,
-      close_time: document.getElementById('closeTime').value,
-      tax_rate: parseFloat(document.getElementById('taxRate').value||'0'),
+      name: valueOf('cafeName'),
+      phone: valueOf('cafePhone'),
+      email: valueOf('cafeEmail'),
+      address: valueOf('cafeAddress'),
+      logo_b64: valueOf('cafeLogo'),
+      open_time: valueOf('openTime'),
+      close_time: valueOf('closeTime'),
+      tax_rate: parseFloat(valueOf('taxRate', '0') || '0'),
     };
     const result = await api('/api/cafe-settings', 'POST', payload);
     if (result.error) { toast(result.error, 'error'); return; }
@@ -1111,16 +1114,24 @@
   async function loadCafeSettings() {
     const settings = await api('/api/cafe-settings');
     if (settings.error) return;
-    document.getElementById('cafeName').value = settings.name||'';
-    document.getElementById('cafePhone').value = settings.phone||'';
-    document.getElementById('cafeEmail').value = settings.email||'';
-    document.getElementById('cafeAddress').value = settings.address||'';
-    document.getElementById('openTime').value = settings.open_time||'';
-    document.getElementById('closeTime').value = settings.close_time||'';
-    document.getElementById('taxRate').value = settings.tax_rate||'';
+    const assignValue = (id, value) => {
+      const el = document.getElementById(id);
+      if (el) el.value = value ?? '';
+    };
+    assignValue('cafeName', settings.name || '');
+    assignValue('cafePhone', settings.phone || '');
+    assignValue('cafeEmail', settings.email || '');
+    assignValue('cafeAddress', settings.address || '');
+    assignValue('openTime', settings.open_time || '');
+    assignValue('closeTime', settings.close_time || '');
+    assignValue('taxRate', settings.tax_rate || '');
     currentLogo = settings.logo_b64||'';
-    document.getElementById('cafeLogo').value = currentLogo;
-    if (currentLogo) document.getElementById('logoPreview').innerHTML = `<img src="${currentLogo}" alt="Logo" class="w-full h-full object-cover">`;
+    const logoInput = document.getElementById('cafeLogo');
+    if (logoInput) logoInput.value = currentLogo;
+    const logoPreview = document.getElementById('logoPreview');
+    if (currentLogo && logoPreview) {
+      logoPreview.innerHTML = `<img src="${currentLogo}" alt="Logo" class="w-full h-full object-cover">`;
+    }
   }
 
   /* ── Reservations ── */
@@ -1180,7 +1191,7 @@
                 ${isUpcoming?'':`<span style="font-size:10px;color:#666;margin-left:8px;">(past)</span>`}
               </div>
               <div style="font-size:12px;color:#888;margin-top:4px;">
-                👤 ${escHtml(r.customer_name||'Guest')}
+                👤 ${escHtml(r.customer_name||'Guest')} · 📞 ${escHtml(r.customer_phone||'No phone')}
                 ${r.table?` · 🪑 Table ${r.table}`:' · <span style="color:#f97316;">No table assigned</span>'}
                 · 👥 ${r.party_size} people
                 ${r.notes?` · <em style="color:#999;">${escHtml(r.notes)}</em>`:''}

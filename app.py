@@ -207,6 +207,16 @@ class CafeSettings(db.Model):
     gst_no = db.Column(db.String(50), default='')
     fssai_no = db.Column(db.String(50), default='')
     footer_note = db.Column(db.Text, default='')
+    # Bill Customization
+    invoice_title = db.Column(db.String(100), default='RETAIL INVOICE')
+    show_cashier = db.Column(db.Boolean, default=True)
+    show_customer_phone = db.Column(db.Boolean, default=True)
+    show_token_number = db.Column(db.Boolean, default=True)
+    show_tax_rows = db.Column(db.Boolean, default=True)
+    show_round_off = db.Column(db.Boolean, default=True)
+    show_footer = db.Column(db.Boolean, default=True)
+    receipt_layout = db.Column(db.String(20), default='standard')
+    receipt_alignment = db.Column(db.String(20), default='center')
     loyalty_points_per_100 = db.Column(db.Float, default=10.0)  # Owner decides ratio
     points_redemption_value = db.Column(db.Float, default=0.5)  # 1 point = ₹0.50
     tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
@@ -305,7 +315,9 @@ class Review(db.Model):
 
 class Reservation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    customer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    customer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    customer_name = db.Column(db.String(100), nullable=True)
+    customer_phone = db.Column(db.String(20), nullable=True)
     table_id = db.Column(db.Integer, db.ForeignKey('table.id'), nullable=True)
     tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
     reserved_at = db.Column(db.DateTime, nullable=False)  # date+time of booking
@@ -412,7 +424,7 @@ def role_home(role):
     if role == 'restaurant':
         return url_for('dashboard')
     if role == 'customer':
-        return url_for('customer')
+        return url_for('restaurant_chooser')
     return url_for('pos')
 
 def page_login_required(allowed_roles=None, redirect_to=None):
@@ -473,6 +485,10 @@ def make_slug(name):
 
 def get_current_tenant_id():
     """Get the current tenant_id from session."""
+    tid = request.args.get('tenant_id')
+    if tid:
+        try: return int(tid)
+        except: pass
     return session.get('tenant_id')
 
 def get_current_tenant():
@@ -878,6 +894,51 @@ def login():
 def logout():
     session.clear()
     return jsonify({'ok': True})
+
+@app.route('/restaurants')
+@page_login_required(allowed_roles=('customer', 'restaurant', 'cashier', 'manager'))
+def restaurant_chooser():
+    return render_template('restaurants.html')
+
+@app.route('/api/restaurants')
+def get_restaurants():
+    tenants = Tenant.query.filter_by(is_active=True).all()
+    results = []
+    for t in tenants:
+        results.append({
+            'id': t.id,
+            'name': t.name,
+            'slug': t.slug,
+            'logo_b64': t.logo_b64,
+        })
+    return jsonify(results)
+
+@app.route('/r/<slug>/reservations')
+def tenant_reservation_page(slug):
+    tenant = Tenant.query.filter_by(slug=slug).first_or_404()
+    return render_template('customer.html', 
+        tenant_id=tenant.id,
+        tenant_name=tenant.name, 
+        tenant_slug=tenant.slug,
+        is_public=True,
+        user_name=session.get('user_name'),
+        user_role=session.get('user_role'),
+        is_logged_in='user_id' in session
+    )
+
+@app.route('/api/qr/reservation/<int:tenant_id>')
+def reservation_qr_code(tenant_id):
+    """Generate a QR code for the restaurant's reservation URL."""
+    tenant = Tenant.query.get_or_404(tenant_id)
+    url = request.host_url.rstrip('/') + f'/r/{tenant.slug}/reservations'
+    qr = qrcode.QRCode(box_size=8, border=2)
+    qr.add_data(url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color='black', back_color='white')
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    b64 = base64.b64encode(buf.getvalue()).decode()
+    return jsonify({'qr': f'data:image/png;base64,{b64}', 'url': url})
 
 @app.route('/api/quick-login', methods=['POST'])
 def quick_login():
@@ -1297,6 +1358,59 @@ def update_table_status(tid):
     t.status = status
     db.session.commit()
     return jsonify({'ok': True, 'status': t.status})
+
+@app.route('/api/tables/<int:source_tid>/transfer', methods=['POST'])
+@staff_required
+def transfer_table(source_tid):
+    tid = get_current_tenant_id()
+    source = Table.query.filter_by(id=source_tid, tenant_id=tid, active=True).first_or_404()
+    d = request.json or {}
+    try:
+        target_tid = int(d.get('target_table_id'))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Valid target table is required'}), 400
+
+    if target_tid == source_tid:
+        return jsonify({'error': 'Source and target table must be different'}), 400
+
+    target = Table.query.filter_by(id=target_tid, tenant_id=tid, active=True).first()
+    if not target:
+        return jsonify({'error': 'Target table not found'}), 404
+    if target.status != 'free':
+        return jsonify({'error': 'Target table must be free'}), 400
+
+    active_orders = (
+        Order.query
+        .filter(
+            Order.table_id == source.id,
+            Order.status.in_(['draft', 'sent']),
+            Order.tenant_id == tid,
+            Order.branch_id == get_active_branch_id(),
+        )
+        .all()
+    )
+    if not active_orders:
+        return jsonify({'error': 'No active order found on source table'}), 400
+
+    for order in active_orders:
+        order.table_id = target.id
+    source.status = 'free'
+    target.status = 'occupied'
+    db.session.commit()
+
+    socketio.emit('table_transfer', {
+        'source_table_id': source.id,
+        'source_table_number': source.number,
+        'target_table_id': target.id,
+        'target_table_number': target.number,
+        'order_ids': [o.id for o in active_orders],
+    })
+    return jsonify({
+        'ok': True,
+        'source_table_id': source.id,
+        'target_table_id': target.id,
+        'target_table_number': target.number,
+    })
 
 # ─── API: Payment Methods ──────────────────────────────────
 @app.route('/api/payment-methods', methods=['GET'])
@@ -2125,26 +2239,41 @@ def mark_item_complete(item_id):
 
 # ─── API: Reservations ────────────────────────────────────
 @app.route('/api/reservations', methods=['GET'])
-@login_required
 def get_my_reservations():
-    uid = session['user_id']
-    role = normalize_role(session.get('user_role'))
+    uid = session.get('user_id')
+    role = normalize_role(session.get('user_role')) if uid else 'customer'
     tid = get_current_tenant_id()
-    if role == 'customer':
-        reservations = Reservation.query.filter_by(customer_id=uid, tenant_id=tid).order_by(Reservation.reserved_at.asc()).all()
-    else:
-        # Staff/admin see all upcoming reservations
+    
+    if uid and role != 'customer':
+        # Staff/admin see all upcoming reservations for this tenant
         reservations = Reservation.query.filter(
             Reservation.reserved_at >= datetime.utcnow() - timedelta(hours=2),
             Reservation.tenant_id == tid
         ).order_by(Reservation.reserved_at.asc()).all()
+    else:
+        # Customer or Guest
+        if uid:
+            reservations = Reservation.query.filter_by(customer_id=uid, tenant_id=tid).order_by(Reservation.reserved_at.asc()).all()
+        else:
+            g_ids = session.get('guest_res_ids', [])
+            if not g_ids:
+                return jsonify([])
+            reservations = Reservation.query.filter(Reservation.id.in_(g_ids), Reservation.tenant_id == tid).all()
     return jsonify([_serialize_reservation(r) for r in reservations])
 
 def _serialize_reservation(r):
+    # Use direct ID checks to avoid lazy-loading issues with null keys
+    c_name = 'Guest'
+    if r.customer_id:
+        if r.customer:
+            c_name = r.customer.name
+    elif r.customer_name:
+        c_name = r.customer_name
+
     return {
         'id': r.id,
         'customer_id': r.customer_id,
-        'customer_name': r.customer.name if r.customer else 'Guest',
+        'customer_name': c_name,
         'table_id': r.table_id,
         'table': r.table.number if r.table else None,
         'reserved_at': r.reserved_at.isoformat(),
@@ -2162,59 +2291,116 @@ def _serialize_reservation(r):
     }
 
 @app.route('/api/reservations', methods=['POST'])
-@login_required
 def create_reservation():
-    d = request.json or {}
-    tid = get_current_tenant_id()
     try:
+        d = request.json or {}
+        print(f"[DEBUG] POST /api/reservations data: {d}")  # LOG INPUT
+        tid = get_current_tenant_id()
+        print(f"[DEBUG] tenant_id: {tid}")  # LOG TENANT
+        uid = session.get('user_id')
+        print(f"[DEBUG] user_id: {uid}")  # LOG USER
+        c_name = d.get('customer_name')
+        c_phone = d.get('customer_phone')
+        if not uid and not (c_name and c_phone):
+            return jsonify({'error': 'Guest reservations require name and phone number'}), 401
+        
+        # Validate & parse datetime
         dt_str = (d.get('reserved_at') or '').replace('Z', '+00:00')
-        reserved_at = datetime.fromisoformat(dt_str)
-        # Strip timezone info so we compare as naive UTC
-        if reserved_at.tzinfo is not None:
-            # Convert to UTC, then make naive
-            import datetime as dt_mod
-            reserved_at = reserved_at.utctimetuple()
-            reserved_at = datetime(*reserved_at[:6])
-    except (ValueError, TypeError, AttributeError):
-        return jsonify({'error': 'Invalid date/time format'}), 400
-    if reserved_at < datetime.utcnow():
-        return jsonify({'error': 'Cannot reserve in the past'}), 400
-    table_id = d.get('table_id')
-    if table_id:
-        # Check for conflicting reservation (±90 min window)
-        window_start = reserved_at - timedelta(minutes=90)
-        window_end = reserved_at + timedelta(minutes=90)
-        conflict = Reservation.query.filter(
-            Reservation.table_id == table_id,
-            Reservation.status.in_(['pending', 'confirmed']),
-            Reservation.reserved_at >= window_start,
-            Reservation.reserved_at <= window_end,
-            Reservation.tenant_id == tid,
-        ).first()
-        if conflict:
-            return jsonify({'error': 'Table already reserved in this time window'}), 409
-    r = Reservation(
-        customer_id=session['user_id'],
-        table_id=table_id,
-        reserved_at=reserved_at,
-        party_size=int(d.get('party_size', 2)),
-        notes=d.get('notes', ''),
-        tenant_id=tid,
-    )
-    db.session.add(r)
-    db.session.flush()
-    for item in d.get('items', []):
-        ri = ReservationItem(
-            reservation_id=r.id,
-            product_id=item.get('product_id'),
-            product_name=item.get('name', ''),
-            qty=int(item.get('qty', 1)),
-            price=float(item.get('price', 0)),
-            notes=item.get('notes', ''),
+        print(f"[DEBUG] datetime string: '{dt_str}'")  # LOG DT
+        reserved_at = None
+        try:
+            reserved_at = datetime.fromisoformat(dt_str)
+            if reserved_at.tzinfo:
+                reserved_at = reserved_at.replace(tzinfo=None)  # Make naive UTC
+            print(f"[DEBUG] parsed datetime: {reserved_at}")
+        except Exception as dt_err:
+            print(f"[ERROR] datetime parse error: {dt_err}")
+            return jsonify({'error': f'Invalid date/time format: {str(dt_err)}'}), 400
+        
+        if reserved_at < datetime.utcnow():
+            return jsonify({'error': 'Cannot reserve in the past'}), 400
+        
+        table_id_raw = d.get('table_id')
+        print(f"[DEBUG] table_id: {table_id_raw}")  # LOG TABLE
+        table_id = None
+        if table_id_raw:
+            try:
+                table_id = int(table_id_raw)
+                # Check conflict
+                window_start = reserved_at - timedelta(minutes=90)
+                window_end = reserved_at + timedelta(minutes=90)
+                conflict = Reservation.query.filter(
+                    Reservation.table_id == table_id,
+                    Reservation.status.in_(['pending', 'confirmed']),
+                    Reservation.reserved_at >= window_start,
+                    Reservation.reserved_at <= window_end,
+                    Reservation.tenant_id == tid,
+                ).first()
+                if conflict:
+                    print(f"[DEBUG] conflict found: {conflict.id}")
+                    return jsonify({'error': 'Table already reserved in this time window'}), 409
+            except ValueError:
+                return jsonify({'error': 'Invalid table ID'}), 400
+        
+        # Verify tenant exists
+        if tid and not Tenant.query.get(tid):
+            print(f"[ERROR] tenant_id {tid} not found")
+            return jsonify({'error': f'Tenant {tid} not found'}), 404
+        
+        try:
+            party_size = int(d.get('party_size') or 2)
+        except ValueError:
+            party_size = 2
+
+        r = Reservation(
+            customer_id=uid if uid else None,
+            customer_name=c_name,
+            customer_phone=c_phone,
+            table_id=table_id,
+            reserved_at=reserved_at,
+            party_size=party_size,
+            status='pending',
+            notes=d.get('notes', ''),
+            tenant_id=tid,
         )
-        db.session.add(ri)
-    db.session.commit()
-    return jsonify({'ok': True, 'id': r.id, 'reservation': _serialize_reservation(r)})
+        db.session.add(r)
+        db.session.flush()  # Get ID early
+        print(f"[DEBUG] created reservation id: {r.id}")
+        
+        if not uid:
+            if 'guest_res_ids' not in session: session['guest_res_ids'] = []
+            session['guest_res_ids'].append(r.id)
+            session.modified = True
+        
+        for item in d.get('items', []):
+            try:
+                qty = int(item.get('qty') or 1)
+            except ValueError:
+                qty = 1
+            try:
+                price = float(item.get('price') or 0)
+            except ValueError:
+                price = 0.0
+            ri = ReservationItem(
+                reservation_id=r.id,
+                product_id=item.get('product_id'),
+                product_name=item.get('name', ''),
+                qty=qty,
+                price=price,
+                notes=item.get('notes', ''),
+            )
+            db.session.add(ri)
+        
+        db.session.commit()
+        print(f"[SUCCESS] reservation {r.id} committed")
+        return jsonify({'ok': True, 'id': r.id, 'reservation': _serialize_reservation(r)})
+    
+    except Exception as e:
+        import traceback
+        print(f"[ERROR create_reservation] {type(e).__name__}: {str(e)}")
+        print(f"[ERROR] full traceback: {traceback.format_exc()}")
+        db.session.rollback()
+        return jsonify({'error': f'Server error: {str(e)}', 'debug': type(e).__name__}), 500
 
 @app.route('/api/reservations/<int:rid>', methods=['PUT'])
 @login_required
@@ -2233,20 +2419,35 @@ def update_reservation(rid):
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid date/time'}), 400
     if 'table_id' in d:
-        r.table_id = d['table_id']
+        t_id_raw = d['table_id']
+        try:
+            r.table_id = int(t_id_raw) if t_id_raw else None
+        except ValueError:
+            return jsonify({'error': 'Invalid table ID'}), 400
     if 'party_size' in d:
-        r.party_size = int(d['party_size'])
+        try:
+            r.party_size = int(d['party_size'] or 2)
+        except ValueError:
+            pass
     if 'notes' in d:
         r.notes = d['notes']
     if 'items' in d:
         ReservationItem.query.filter_by(reservation_id=r.id).delete()
         for item in d['items']:
+            try:
+                qty = int(item.get('qty') or 1)
+            except ValueError:
+                qty = 1
+            try:
+                price = float(item.get('price') or 0)
+            except ValueError:
+                price = 0.0
             ri = ReservationItem(
                 reservation_id=r.id,
                 product_id=item.get('product_id'),
                 product_name=item.get('name', ''),
-                qty=int(item.get('qty', 1)),
-                price=float(item.get('price', 0)),
+                qty=qty,
+                price=price,
                 notes=item.get('notes', ''),
             )
             db.session.add(ri)
@@ -3147,6 +3348,7 @@ def get_cafe_settings():
             db.session.commit()
         
         return jsonify({
+            'tenant_id': settings.tenant_id,
             'name': settings.name,
             'phone': settings.phone,
             'email': settings.email,
@@ -3158,6 +3360,15 @@ def get_cafe_settings():
             'gst_no': getattr(settings, 'gst_no', ''),
             'fssai_no': getattr(settings, 'fssai_no', ''),
             'footer_note': getattr(settings, 'footer_note', ''),
+            'invoice_title': settings.invoice_title,
+            'show_cashier': settings.show_cashier,
+            'show_customer_phone': settings.show_customer_phone,
+            'show_token_number': settings.show_token_number,
+            'show_tax_rows': settings.show_tax_rows,
+            'show_round_off': settings.show_round_off,
+            'show_footer': settings.show_footer,
+            'receipt_layout': settings.receipt_layout,
+            'receipt_alignment': settings.receipt_alignment,
             'loyalty_points_per_100': getattr(settings, 'loyalty_points_per_100', 0),
             'points_redemption_value': getattr(settings, 'points_redemption_value', 0)
         })
@@ -3186,6 +3397,16 @@ def save_cafe_settings():
     settings.gst_no = (d.get('gst_no') or '').strip()
     settings.fssai_no = (d.get('fssai_no') or '').strip()
     settings.footer_note = (d.get('footer_note') or '').strip()
+    # Bill Customization
+    settings.invoice_title = (d.get('invoice_title') or 'RETAIL INVOICE').strip()
+    settings.show_cashier = d.get('show_cashier', True)
+    settings.show_customer_phone = d.get('show_customer_phone', True)
+    settings.show_token_number = d.get('show_token_number', True)
+    settings.show_tax_rows = d.get('show_tax_rows', True)
+    settings.show_round_off = d.get('show_round_off', True)
+    settings.show_footer = d.get('show_footer', True)
+    settings.receipt_layout = d.get('receipt_layout', 'standard')
+    settings.receipt_alignment = d.get('receipt_alignment', 'center')
     settings.loyalty_points_per_100 = float(d.get('loyalty_points_per_100', 10.0))
     settings.points_redemption_value = float(d.get('points_redemption_value', 0.5))
     
@@ -3388,39 +3609,90 @@ def ensure_order_table_schema():
         columns = {row[1] for row in rows}
         if 'tip' not in columns:
             conn.exec_driver_sql('ALTER TABLE "order" ADD COLUMN tip FLOAT DEFAULT 0')
-            conn.commit()
         if 'customer_name' not in columns:
             conn.exec_driver_sql('ALTER TABLE "order" ADD COLUMN customer_name VARCHAR(100) DEFAULT NULL')
-            conn.commit()
+        if 'customer_phone' not in columns:
+            conn.exec_driver_sql('ALTER TABLE "order" ADD COLUMN customer_phone VARCHAR(20) DEFAULT NULL')
         if 'branch_id' not in columns:
             conn.exec_driver_sql('ALTER TABLE "order" ADD COLUMN branch_id INTEGER')
-            conn.commit()
-        # OrderItem notes
+        if 'tenant_id' not in columns:
+            conn.exec_driver_sql('ALTER TABLE "order" ADD COLUMN tenant_id INTEGER')
+        if 'subtotal' not in columns:
+            conn.exec_driver_sql('ALTER TABLE "order" ADD COLUMN subtotal FLOAT DEFAULT 0')
+        if 'tax_amount' not in columns:
+            conn.exec_driver_sql('ALTER TABLE "order" ADD COLUMN tax_amount FLOAT DEFAULT 0')
+        if 'tax_breakdown_json' not in columns:
+            conn.exec_driver_sql('ALTER TABLE "order" ADD COLUMN tax_breakdown_json TEXT DEFAULT "{}"')
+        if 'round_off' not in columns:
+            conn.exec_driver_sql('ALTER TABLE "order" ADD COLUMN round_off FLOAT DEFAULT 0')
+        if 'razorpay_order_id' not in columns:
+            conn.exec_driver_sql('ALTER TABLE "order" ADD COLUMN razorpay_order_id VARCHAR(100) DEFAULT NULL')
+        
+        # OrderItem table
         rows2 = conn.exec_driver_sql('PRAGMA table_info("order_item")').fetchall()
         cols2 = {row[1] for row in rows2}
         if 'notes' not in cols2:
             conn.exec_driver_sql('ALTER TABLE "order_item" ADD COLUMN notes TEXT DEFAULT ""')
-            conn.commit()
-        # Product image_b64
+        if 'tax_rate' not in cols2:
+            conn.exec_driver_sql('ALTER TABLE "order_item" ADD COLUMN tax_rate FLOAT DEFAULT 0')
+        if 'tax_amount' not in cols2:
+            conn.exec_driver_sql('ALTER TABLE "order_item" ADD COLUMN tax_amount FLOAT DEFAULT 0')
+        if 'tax_info_json' not in cols2:
+            conn.exec_driver_sql('ALTER TABLE "order_item" ADD COLUMN tax_info_json TEXT DEFAULT "{}"')
+            
+        # Product table
         rows3 = conn.exec_driver_sql('PRAGMA table_info("product")').fetchall()
         cols3 = {row[1] for row in rows3}
         if 'image_b64' not in cols3:
             conn.exec_driver_sql('ALTER TABLE "product" ADD COLUMN image_b64 TEXT DEFAULT ""')
-            conn.commit()
         if 'branch_id' not in cols3:
             conn.exec_driver_sql('ALTER TABLE "product" ADD COLUMN branch_id INTEGER')
-            conn.commit()
+        if 'tenant_id' not in cols3:
+            conn.exec_driver_sql('ALTER TABLE "product" ADD COLUMN tenant_id INTEGER')
+            
+        # User table
         rows4 = conn.exec_driver_sql('PRAGMA table_info("user")').fetchall()
         cols4 = {row[1] for row in rows4}
         if 'hourly_rate' not in cols4:
             conn.exec_driver_sql('ALTER TABLE "user" ADD COLUMN hourly_rate FLOAT DEFAULT 0')
-            conn.commit()
         if 'is_superadmin' not in cols4:
             conn.exec_driver_sql('ALTER TABLE "user" ADD COLUMN is_superadmin BOOLEAN DEFAULT 0')
-            conn.commit()
+        if 'is_platform_admin' not in cols4:
+            conn.exec_driver_sql('ALTER TABLE "user" ADD COLUMN is_platform_admin BOOLEAN DEFAULT 0')
         if 'branch_id' not in cols4:
             conn.exec_driver_sql('ALTER TABLE "user" ADD COLUMN branch_id INTEGER')
-            conn.commit()
+        if 'tenant_id' not in cols4:
+            conn.exec_driver_sql('ALTER TABLE "user" ADD COLUMN tenant_id INTEGER')
+        if 'monthly_target' not in cols4:
+            conn.exec_driver_sql('ALTER TABLE "user" ADD COLUMN monthly_target FLOAT DEFAULT 0')
+
+        # Branch table
+        rowsB = conn.exec_driver_sql('PRAGMA table_info("branch")').fetchall()
+        colsB = {row[1] for row in rowsB}
+        if 'monthly_target' not in colsB:
+            conn.exec_driver_sql('ALTER TABLE "branch" ADD COLUMN monthly_target FLOAT DEFAULT 0')
+        if 'tenant_id' not in colsB:
+            conn.exec_driver_sql('ALTER TABLE "branch" ADD COLUMN tenant_id INTEGER')
+
+        # Customer table
+        rows5 = conn.exec_driver_sql('PRAGMA table_info("customer")').fetchall()
+        cols5 = {row[1] for row in rows5}
+        if 'loyalty_points' not in cols5:
+            conn.exec_driver_sql('ALTER TABLE "customer" ADD COLUMN loyalty_points FLOAT DEFAULT 0')
+        if 'tenant_id' not in cols5:
+            conn.exec_driver_sql('ALTER TABLE "customer" ADD COLUMN tenant_id INTEGER')
+
+        # Reservation table
+        rowsR = conn.exec_driver_sql('PRAGMA table_info("reservation")').fetchall()
+        colsR = {row[1] for row in rowsR}
+        if 'tenant_id' not in colsR:
+            conn.exec_driver_sql('ALTER TABLE "reservation" ADD COLUMN tenant_id INTEGER')
+        if 'customer_name' not in colsR:
+            conn.exec_driver_sql('ALTER TABLE "reservation" ADD COLUMN customer_name VARCHAR(100) DEFAULT NULL')
+        if 'customer_phone' not in colsR:
+            conn.exec_driver_sql('ALTER TABLE "reservation" ADD COLUMN customer_phone VARCHAR(20) DEFAULT NULL')
+
+        conn.commit()
 
 def ensure_branch_schema():
     default_branch = Branch.query.order_by(Branch.id.asc()).first()
@@ -4028,7 +4300,6 @@ with app.app_context():
     ensure_order_table_schema()
     ensure_branch_schema()
     ensure_default_accounts()
-    ensure_branch_schema()
     ensure_demo_catalog()
     ensure_demo_floors_and_tables()
     ensure_sample_data()
