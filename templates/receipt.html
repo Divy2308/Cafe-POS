@@ -4,58 +4,105 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Receipt #{{ order.order_number }}</title>
-<style>
-  @page { margin: 0; size: 58mm auto; }
-  body {
-    background: #f4f4f4;
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 10px;
-    line-height: 1.1;
+  @page {
     margin: 0;
-    padding: 10px 0;
-    display: flex;
-    justify-content: center;
+    size: 58mm 200mm; /* Large height to prevent pagination issues on some drivers */
   }
-  .receipt {
+
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 58mm !important;
     background: #fff;
-    width: 58mm;
-    padding: 5px 8px;
-    box-sizing: border-box;
-    color: #000;
+    -webkit-print-color-adjust: exact;
+    image-rendering: px-pixelated;
   }
+  
+  body {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 11px; /* Slightly larger for thermal printer legibility */
+    line-height: 1.2;
+    color: #000;
+    overflow: hidden;
+  }
+
+  .receipt {
+    width: 58mm;
+    padding: 2mm 3mm;
+    box-sizing: border-box;
+    background: #fff;
+  }
+
+  /* Preview mode (non-print) */
+  @media screen {
+    html, body { 
+      width: 100% !important; 
+      height: 100%;
+      overflow: auto;
+      background: #f0f0f0 !important;
+    }
+    body {
+      display: flex;
+      justify-content: center;
+      padding: 20px 0;
+    }
+    .receipt {
+      box-shadow: 0 0 15px rgba(0,0,0,0.1);
+      border-radius: 4px;
+      margin-top: 10px;
+      min-height: 100px;
+    }
+  }
+
   .r-center { text-align: center; }
   .r-bold { font-weight: bold; }
-  .r-shop-title { font-size: 14px; margin-bottom: 2px; text-transform: uppercase; }
+  .r-shop-title { font-size: 15px; margin-bottom: 2px; text-transform: uppercase; }
   .r-shop-address { font-size: 10px; margin-bottom: 2px; }
   .r-shop-contact { font-size: 10px; margin-bottom: 4px; }
-  .r-invoice-header { font-size: 12px; margin: 10px 0 5px; text-transform: uppercase; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 3px 0; }
+  .r-invoice-header { font-size: 13px; margin: 10px 0 5px; text-transform: uppercase; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 4px 0; }
   
-  .r-meta-row { display: flex; justify-content: space-between; margin-bottom: 2px; position: relative; }
-  .r-border-top { border-top: 1px solid #000; margin-top: 5px; padding-top: 5px; }
-  .r-border-bottom { border-bottom: 1px solid #000; margin-bottom: 5px; padding-bottom: 5px; }
+  .r-meta-row { display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 10px; }
+  .r-border-top { border-top: 1px dashed #333; margin-top: 6px; padding-top: 6px; }
+  .r-border-bottom { border-bottom: 1px dashed #333; margin-bottom: 6px; padding-bottom: 6px; }
   
   table { width: 100%; border-collapse: collapse; margin: 8px 0; }
-  th { text-align: left; border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 4px 0; font-size: 10px; text-transform: uppercase; }
-  td { padding: 4px 0; vertical-align: top; }
+  th { text-align: left; border-top: 1px dashed #333; border-bottom: 1px dashed #333; padding: 5px 0; font-size: 10px; text-transform: uppercase; }
+  td { padding: 5px 0; vertical-align: top; font-size: 11px; }
   
-  .col-item { width: 45%; }
-  .col-qty { width: 15%; text-align: center; }
+  .col-item { width: 50%; }
+  .col-qty { width: 10%; text-align: center; }
   .col-rate { width: 20%; text-align: right; }
   .col-amt { width: 20%; text-align: right; }
 
-  .r-totals { margin-top: 5px; font-size: 11px; }
+  .r-totals { margin-top: 5px; font-size: 10px; }
   .r-totals-row { display: flex; justify-content: flex-end; margin-bottom: 2px; }
-  .r-totals-label { flex: 1; text-align: right; padding-right: 15px; color: #333; }
-  .r-totals-val { width: 80px; text-align: right; }
-  .r-grand { font-size: 13px; font-weight: bold; border-top: 1.5px solid #000; border-bottom: 1.5px solid #000; padding: 4px 0; margin-top: 4px; }
+  .r-totals-label { flex: 1; text-align: right; padding-right: 15px; }
+  .r-totals-val { width: 60px; text-align: right; }
+  .r-grand { font-size: 14px; font-weight: bold; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 5px 0; margin-top: 4px; }
   
-  .r-footer { margin-top: 15px; font-size: 10px; text-transform: lowercase; }
-  .no-print { position: fixed; top: 10px; right: 10px; background: #007bff; color: #fff; border: none; padding: 8px 15px; cursor: pointer; border-radius: 4px; }
+  .r-footer { margin-top: 15px; font-size: 9px; }
+  .no-print { position: fixed; top: 10px; right: 10px; background: #f97316; color: #fff; border: none; padding: 10px 20px; cursor: pointer; border-radius: 8px; font-weight: bold; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); z-index: 100; }
+  .no-print:hover { background: #ea580c; }
   
   @media print {
-    body { background: #fff; padding: 0; }
-    .no-print { display: none; }
-    .receipt { width: 100%; box-shadow: none; padding: 0; }
+    @page {
+      margin: 0;
+      size: auto;
+    }
+    html, body {
+      width: 58mm;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: hidden;
+    }
+    .receipt {
+      width: 58mm;
+      margin: 0;
+      padding: 0;
+    }
+    .no-print {
+      display: none !important;
+    }
   }
 </style>
 </head>

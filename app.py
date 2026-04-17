@@ -1,5 +1,14 @@
 import gevent.monkey
-gevent.monkey.patch_all()
+import sys
+
+# On Windows, gevent.monkey.patch_all() can hang during startup, 
+# especially when the Flask reloader is active.
+# Disabling signal and selectors patching improves stability on Windows.
+if sys.platform == "win32":
+    gevent.monkey.patch_all(signal=False, selectors=False)
+else:
+    gevent.monkey.patch_all()
+
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO, emit, join_room
