@@ -6,3 +6,10 @@ instance/
 .env
 node_modules/
 package-lock.json
+.venv/
+*.html
+!templates/**/*.html
+!pos-cafe-landing.html
+pos-cafe-landing.html
+pos_runtime.db
+instance/pos.db
