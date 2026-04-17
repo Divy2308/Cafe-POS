@@ -9,3 +9,7 @@ resend
 gevent
 gevent-websocket
 gunicorn
+requests>=2.32,<3
+urllib3>=2,<3
+charset-normalizer>=3,<4
+chardet>=5,<6

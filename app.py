@@ -1,6 +1,8 @@
+import gevent.monkey
+gevent.monkey.patch_all()
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO, emit, join_room
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 import qrcode, io, base64, json
@@ -101,6 +103,24 @@ except ImportError:
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode=_async_mode)
 CORS(app)
 
+
+def _tenant_room(tenant_id):
+    return f'tenant:{tenant_id}' if tenant_id else None
+
+
+def _branch_room(tenant_id, branch_id):
+    if tenant_id and branch_id:
+        return f'tenant:{tenant_id}:branch:{branch_id}'
+    return _tenant_room(tenant_id)
+
+
+def emit_scoped(event, payload, tenant_id=None, branch_id=None):
+    room = _branch_room(tenant_id, branch_id)
+    if room:
+        socketio.emit(event, payload, to=room)
+    else:
+        socketio.emit(event, payload)
+
 @app.template_filter('from_json')
 def from_json_filter(s):
     try:
@@ -183,6 +203,7 @@ class Table(db.Model):
     tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
     active = db.Column(db.Boolean, default=True)
     status = db.Column(db.String(20), default='free')  # free, occupied
+    merged_to_id = db.Column(db.Integer, db.ForeignKey('table.id'), nullable=True)
     tenant = db.relationship('Tenant', backref='tables')
 
 class PaymentMethod(db.Model):
@@ -191,6 +212,7 @@ class PaymentMethod(db.Model):
     type = db.Column(db.String(20), nullable=False)  # cash, digital, upi
     enabled = db.Column(db.Boolean, default=True)
     upi_id = db.Column(db.String(100), default='')
+    qr_b64 = db.Column(db.Text, default='')
     tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
     tenant = db.relationship('Tenant', backref='payment_methods')
 
@@ -279,6 +301,14 @@ class Order(db.Model):
     branch = db.relationship('Branch', backref='orders')
     tenant = db.relationship('Tenant', backref='orders')
 
+class Addon(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'))
+    name = db.Column(db.String(100), nullable=False)
+    price = db.Column(db.Float, default=0.0)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
+    product = db.relationship('Product', backref=db.backref('addons', cascade="all, delete-orphan"))
+
 class OrderItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.Integer, db.ForeignKey('order.id'))
@@ -287,6 +317,7 @@ class OrderItem(db.Model):
     qty = db.Column(db.Integer, default=1)
     price = db.Column(db.Float, default=0)
     notes = db.Column(db.Text, default='')  # Item modifier notes (e.g. 'no onion')
+    addons_json = db.Column(db.Text, default='[]') # JSON list of selected addons
     tax_rate = db.Column(db.Float, default=0)
     tax_amount = db.Column(db.Float, default=0)
     tax_info_json = db.Column(db.Text, default='{}')
@@ -1236,6 +1267,7 @@ def get_products():
             'unit': p.unit,
             'image_b64': p.image_b64 or '',
             'branch_id': p.branch_id or branch_id,
+            'addons': [{'id': a.id, 'name': a.name, 'price': a.price} for a in p.addons]
         } for p in products_by_category.get(c.id, [])]
         if prods:
             result.append({'id':c.id,'name':c.name,'products':prods})
@@ -1247,7 +1279,7 @@ def get_all_products():
     products = apply_tenant_scope(apply_branch_scope(Product.query, Product.branch_id), Product).all()
     cats = apply_tenant_scope(Category.query, Category).all()
     return jsonify({
-        'products': [{'id':p.id,'name':p.name,'price':p.price,'category_id':p.category_id,'description':p.description,'tax':p.tax,'unit':p.unit,'active':p.active,'image_b64':p.image_b64 or '', 'branch_id': p.branch_id} for p in products],
+        'products': [{'id':p.id,'name':p.name,'price':p.price,'category_id':p.category_id,'description':p.description,'tax':p.tax,'unit':p.unit,'active':p.active,'image_b64':p.image_b64 or '', 'branch_id': p.branch_id, 'addons': [{'id': a.id, 'name': a.name, 'price': a.price} for a in p.addons]} for p in products],
         'categories': [{'id':c.id,'name':c.name} for c in cats]
     })
 
@@ -1255,9 +1287,10 @@ def get_all_products():
 @staff_required
 def add_product():
     d = request.json
+    tid = get_current_tenant_id()
     cat = apply_tenant_scope(Category.query.filter_by(name=d.get('category','')), Category).first()
     if not cat:
-        cat = Category(name=d.get('category','General'), tenant_id=get_current_tenant_id())
+        cat = Category(name=d.get('category','General'), tenant_id=tid)
         db.session.add(cat)
         db.session.flush()
     p = Product(name=d['name'], price=float(d['price']), category_id=cat.id,
@@ -1265,8 +1298,14 @@ def add_product():
                 tax=float(d.get('tax',0)), 
                 tax_config_json=json.dumps(d.get('tax_config', {})),
                 unit=d.get('unit','pcs'),
-                branch_id=get_active_branch_id(), tenant_id=get_current_tenant_id())
+                branch_id=get_active_branch_id(), tenant_id=tid)
     db.session.add(p)
+    db.session.flush()
+
+    if 'addons' in d:
+        for a_data in d['addons']:
+            db.session.add(Addon(product_id=p.id, name=a_data['name'], price=float(a_data['price']), tenant_id=tid))
+
     db.session.commit()
     return jsonify({'ok':True,'id':p.id})
 
@@ -1292,10 +1331,17 @@ def update_product(pid):
     if 'category' in d and d['category']:
         cat = apply_tenant_scope(Category.query.filter_by(name=d['category']), Category).first()
         if not cat:
-            cat = Category(name=d['category'], tenant_id=get_current_tenant_id())
+            cat = Category(name=d['category'], tenant_id=tid)
             db.session.add(cat)
             db.session.flush()
         p.category_id = cat.id
+    
+    if 'addons' in d:
+        # Clear existing and add new
+        Addon.query.filter_by(product_id=p.id).delete()
+        for a_data in d['addons']:
+            db.session.add(Addon(product_id=p.id, name=a_data['name'], price=float(a_data['price']), tenant_id=tid))
+
     db.session.commit()
     return jsonify({'ok':True})
 
@@ -1317,7 +1363,7 @@ def get_floors():
     floors = apply_tenant_scope(Floor.query, Floor).all()
     result = []
     for f in floors:
-        tables = [{'id':t.id,'number':t.number,'seats':t.seats,'status':t.status,'active':t.active} for t in f.tables if t.active]
+        tables = [{'id':t.id,'number':t.number,'seats':t.seats,'status':t.status,'active':t.active, 'merged_to_id': t.merged_to_id} for t in f.tables if t.active]
         result.append({'id':f.id,'name':f.name,'tables':tables})
     return jsonify(result)
 
@@ -1412,11 +1458,74 @@ def transfer_table(source_tid):
         'target_table_number': target.number,
     })
 
+@app.route('/api/tables/merge', methods=['POST'])
+@staff_required
+def merge_tables():
+    tid = get_current_tenant_id()
+    bid = get_active_branch_id()
+    d = request.json or {}
+    source_id = d.get('source_table_id')
+    target_id = d.get('target_table_id')
+
+    if not source_id or not target_id:
+        return jsonify({'error': 'Source and target table IDs are required'}), 400
+    if source_id == target_id:
+        return jsonify({'error': 'Source and target must be different'}), 400
+
+    source = Table.query.filter_by(id=source_id, tenant_id=tid, active=True).first_or_404()
+    target = Table.query.filter_by(id=target_id, tenant_id=tid, active=True).first_or_404()
+
+    # Move all active orders from source to target
+    active_orders = Order.query.filter(
+        Order.table_id == source.id,
+        Order.status.in_(['draft', 'sent']),
+        Order.tenant_id == tid,
+        Order.branch_id == bid
+    ).all()
+
+    for order in active_orders:
+        order.table_id = target.id
+
+    source.merged_to_id = target.id
+    source.status = 'occupied'
+    target.status = 'occupied'
+
+    db.session.commit()
+
+    emit_scoped('table_merged', {
+        'source_table_id': source.id,
+        'target_table_id': target.id
+    }, tenant_id=tid, branch_id=bid)
+
+    return jsonify({'ok': True})
+
+@app.route('/api/tables/<int:table_id>/unmerge', methods=['POST'])
+@staff_required
+def unmerge_table(table_id):
+    tid = get_current_tenant_id()
+    t = Table.query.filter_by(id=table_id, tenant_id=tid, active=True).first_or_404()
+    
+    if not t.merged_to_id:
+        return jsonify({'error': 'Table is not merged'}), 400
+
+    old_target_id = t.merged_to_id
+    t.merged_to_id = None
+    t.status = 'free'
+    
+    db.session.commit()
+    
+    emit_scoped('table_unmerged', {
+        'table_id': t.id,
+        'target_table_id': old_target_id
+    }, tenant_id=tid, branch_id=get_active_branch_id())
+    
+    return jsonify({'ok': True})
+
 # ─── API: Payment Methods ──────────────────────────────────
 @app.route('/api/payment-methods', methods=['GET'])
 def get_payment_methods():
     methods = apply_tenant_scope(PaymentMethod.query, PaymentMethod).all()
-    return jsonify([{'id':m.id,'name':m.name,'type':m.type,'enabled':m.enabled,'upi_id':m.upi_id} for m in methods])
+    return jsonify([{'id':m.id,'name':m.name,'type':m.type,'enabled':m.enabled,'upi_id':m.upi_id,'qr_b64':m.qr_b64} for m in methods])
 
 @app.route('/api/payment-methods/<int:mid>', methods=['PUT'])
 @staff_required
@@ -1425,6 +1534,7 @@ def update_payment_method(mid):
     d = request.json
     m.enabled = d.get('enabled', m.enabled)
     m.upi_id = d.get('upi_id', m.upi_id)
+    m.qr_b64 = d.get('qr_b64', m.qr_b64)
     db.session.commit()
     return jsonify({'ok':True})
 
@@ -1510,6 +1620,20 @@ def generate_qr(upi_id, amount):
     img.save(buf, format='PNG')
     b64 = base64.b64encode(buf.getvalue()).decode()
     return jsonify({'qr': f'data:image/png;base64,{b64}', 'upi_string': upi_string})
+
+@app.route('/api/qr-img/<string:upi_id>/<float:amount>')
+def get_qr_image(upi_id, amount):
+    upi_string = f"upi://pay?pa={upi_id}&am={amount:.2f}&cu=INR"
+    qr = qrcode.QRCode(box_size=8, border=2)
+    qr.add_data(upi_string)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+    from flask import send_file
+    return send_file(buf, mimetype='image/png')
+
 
 @app.route('/qr.jpeg')
 def qr_image():
@@ -3543,12 +3667,20 @@ def export_orders_csv():
 # ─── SocketIO ──────────────────────────────────────────────
 @socketio.on('connect')
 def on_connect():
+    tenant_id = get_current_tenant_id()
+    branch_id = get_active_branch_id()
+    tenant_room = _tenant_room(tenant_id)
+    branch_room = _branch_room(tenant_id, branch_id)
+    if tenant_room:
+        join_room(tenant_room)
+    if branch_room and branch_room != tenant_room:
+        join_room(branch_room)
     emit('connected', {'status':'ok'})
 
 @socketio.on('call_waiter')
 def on_call_waiter(data):
     """Relay call-waiter event to all connected staff."""
-    emit('call_waiter', data, broadcast=True)
+    emit_scoped('call_waiter', data, tenant_id=get_current_tenant_id(), branch_id=get_active_branch_id())
 
 # ─── Seed Data ─────────────────────────────────────────────
 def seed_data():
@@ -3599,6 +3731,19 @@ def ensure_payment_methods():
             changed = True
     if changed:
         db.session.commit()
+
+def ensure_payment_method_schema():
+    # Older SQLite databases may not have newer payment method columns.
+    with db.engine.connect() as conn:
+        rows = conn.exec_driver_sql('PRAGMA table_info("payment_method")').fetchall()
+        columns = {row[1] for row in rows}
+        if 'upi_id' not in columns:
+            conn.exec_driver_sql('ALTER TABLE "payment_method" ADD COLUMN upi_id VARCHAR(100) DEFAULT ""')
+        if 'qr_b64' not in columns:
+            conn.exec_driver_sql('ALTER TABLE "payment_method" ADD COLUMN qr_b64 TEXT DEFAULT ""')
+        if 'tenant_id' not in columns:
+            conn.exec_driver_sql('ALTER TABLE "payment_method" ADD COLUMN tenant_id INTEGER')
+        conn.commit()
 
 def ensure_order_table_schema():
     # Older SQLite databases may not have the newer order columns added in code.
@@ -4296,6 +4441,7 @@ def ensure_sample_data():
 with app.app_context():
     db.create_all()
     seed_data()
+    ensure_payment_method_schema()
     ensure_payment_methods()
     ensure_order_table_schema()
     ensure_branch_schema()

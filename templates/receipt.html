@@ -84,7 +84,7 @@
   <div class="r-border-top r-border-bottom">
     <div class="r-meta-row">
        <span>Name: {{ order.customer_name or 'Walk-in' }}</span>
-       {% if cafe_settings.show_customer_phone !== false %}
+       {% if cafe_settings.show_customer_phone is not sameas false %}
        <span>{{ '(M: ' ~ order.customer_phone ~ ')' if order.customer_phone else '' }}</span>
        {% endif %}
     </div>
@@ -99,14 +99,14 @@
     <span></span>
   </div>
   <div class="r-meta-row">
-    {% if cafe_settings.show_cashier !== false %}
+    {% if cafe_settings.show_cashier is not sameas false %}
     <span>Cashier: {{ order.user.name if order.user else 'biller' }}</span>
     {% else %}
     <span></span>
     {% endif %}
     <span>Bill No.: {{ order.order_number[-4:] }}</span>
   </div>
-  {% if cafe_settings.show_token_number !== false %}
+  {% if cafe_settings.show_token_number is not sameas false %}
   <div class="r-bold" style="font-size: 13px; margin-top: 3px;">
     Token No.: {{ order.order_number[-2:] }}
   </div>
@@ -127,6 +127,12 @@
         <td class="col-item">
             {{ item.product_name }}
             {% if item.notes %}<br><small style="font-style:italic">({{ item.notes }})</small>{% endif %}
+            {% if item.addons_json %}
+              {% set addons = item.addons_json|from_json %}
+              {% if addons %}
+                <br><small style="color:#555">Addons: {{ addons|map(attribute='name')|join(', ') }}</small>
+              {% endif %}
+            {% endif %}
         </td>
         <td class="col-qty">{{ item.qty }}</td>
         <td class="col-rate">{{ "%.2f"|format(item.price) }}</td>
@@ -143,7 +149,7 @@
       <div class="r-totals-val">{{ "%.2f"|format(order.subtotal) }}</div>
     </div>
     
-    {% if cafe_settings.show_tax_rows !== false and order.tax_breakdown_json %}
+    {% if cafe_settings.show_tax_rows is not sameas false and order.tax_breakdown_json %}
       {% set data = order.tax_breakdown_json|from_json %}
       {% for label, amt in data.items() %}
       <div class="r-totals-row">
@@ -153,7 +159,7 @@
       {% endfor %}
     {% endif %}
 
-    {% if cafe_settings.show_round_off !== false %}
+    {% if cafe_settings.show_round_off is not sameas false %}
     <div class="r-totals-row">
       <div class="r-totals-label">Round off</div>
       <div class="r-totals-val">{{ "%.2f"|format(order.round_off) }}</div>
@@ -166,7 +172,7 @@
     </div>
   </div>
 
-  {% if cafe_settings.show_footer !== false %}
+  {% if cafe_settings.show_footer is not sameas false %}
   <div class="{{ 'r-center' if cafe_settings.receipt_alignment != 'left' else '' }} r-footer">
     <div class="r-bold" style="margin-bottom: 10px;">{{ cafe_settings.footer_note or 'Thanks. Visit Again!!!' }}</div>
     <div class="r-bold">Order Once Placed can not Be cancelled.</div>

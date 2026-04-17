@@ -374,10 +374,6 @@ tr:hover td{background:rgba(255,255,255,.015)}
       <div class="table-header"><div class="table-title">Recent Requests</div><button class="act-btn view" onclick="openTab('requests')">View all</button></div>
       <div id="overview-requests"></div>
     </div>
-    <div class="table-card">
-      <div class="table-header"><div class="table-title">Live Activity</div></div>
-      <div id="live-activity"></div>
-    </div>
   </div>
 </div>
 
@@ -613,14 +609,7 @@ let restaurants = [
   {id:5,name:'The Pizza Factory',owner:'Karan Desai',email:'karan@pizza.com',city:'Ahmedabad',phone:'9554433221',plan:'starter',tables:6,ordersDay:34,status:'active',applied:'2025-04-02',type:'QSR',gst:''},
   {id:6,name:'Royal Thali',owner:'Meera Sharma',email:'meera@royalthali.com',city:'Gandhinagar',phone:'9443322110',plan:'pro',tables:15,ordersDay:95,status:'active',applied:'2025-03-28',type:'Dine-in',gst:'24AABCU9603R1ZW'},
 ];
-let requests = [
-  {id:101,name:'Chai Pe Charcha',owner:'Vikas Nair',email:'vikas@chai.com',city:'Ahmedabad',phone:'9332211009',plan:'starter',applied:'2025-04-10',status:'pending',note:'Small chai stall, 4 tables',type:'Cafe'},
-  {id:102,name:'Dosa Delight',owner:'Anand Kumar',email:'anand@dosa.com',city:'Surat',phone:'9221100998',plan:'pro',applied:'2025-04-09',status:'pending',note:'South Indian chain, 3 branches',type:'Dine-in'},
-  {id:103,name:'Night Owl Bar',owner:'Ravi Kapoor',email:'ravi@nightowl.com',city:'Vadodara',phone:'9110099887',plan:'enterprise',applied:'2025-04-08',status:'pending',note:'Bar + restaurant combo',type:'Bar'},
-  {id:104,name:'Momo Corner',owner:'Tenzin Dorje',email:'tenzin@momo.com',city:'Rajkot',phone:'9009988776',plan:'starter',applied:'2025-04-05',status:'pending',note:'Tibetan food stall',type:'QSR'},
-  {id:105,name:'Punjabi Tadka',owner:'Gurpreet Singh',email:'gurpreet@punjabi.com',city:'Ahmedabad',phone:'8998877665',plan:'pro',applied:'2025-03-30',status:'approved',note:'North Indian restaurant',type:'Dine-in'},
-  {id:106,name:'Green Bowl',owner:'Ayesha Khan',email:'ayesha@green.com',city:'Surat',phone:'8887766554',plan:'starter',applied:'2025-03-28',status:'rejected',note:'Health food, rejected due to docs',type:'Cafe'},
-];
+let requests = [];
 let logs = [];
 let bcHistory = [];
 let reqFilter = 'all';
@@ -656,16 +645,31 @@ function initApp(){
   startClock();
   renderMiniCharts();
   renderOverviewRequests();
-  renderLiveActivity();
   renderRequests();
   renderRestaurants();
   renderBilling();
   renderActivityLog();
   renderBcHistory();
-  setInterval(tickLiveActivity,4000);
   setInterval(()=>{
     document.getElementById('active-sessions').textContent=Math.floor(10+Math.random()*6);
   },5000);
+  loadRealRequests();
+}
+
+async function loadRealRequests(){
+  try {
+    const res = await fetch('/api/shrey/requests');
+    const data = await res.json();
+    if (res.ok && Array.isArray(data.requests)) {
+      requests = data.requests;
+      updateStats();
+      renderOverviewRequests();
+      renderRequests();
+      renderRestaurants();
+    }
+  } catch (e) {
+    console.error('Failed to load real requests', e);
+  }
 }
 
 function startClock(){
@@ -681,32 +685,6 @@ function renderMiniCharts(){
     const max=Math.max(...vals);
     el.innerHTML=vals.map((v,i)=>`<div class="bar ${i===vals.length-1?'active':''}" style="height:${(v/max*100).toFixed(0)}%"></div>`).join('');
   });
-}
-
-const EVENTS=['opened a new session','processed payment','sent order to kitchen','added new product','closed session','completed 50 orders','updated menu','generated report'];
-const COLORS=['cyan','green','amber','green','muted','green','cyan','amber'];
-function renderLiveActivity(){
-  const el=document.getElementById('live-activity');
-  const items=restaurants.slice(0,5).map((r,i)=>`
-    <div class="log-item">
-      <div class="log-type" style="background:var(--${COLORS[i]})"></div>
-      <div class="log-msg"><strong>${r.name}</strong> ${EVENTS[i]}</div>
-      <div class="log-time">${Math.floor(Math.random()*59)+1}m ago</div>
-    </div>`).join('');
-  el.innerHTML=items;
-}
-function tickLiveActivity(){
-  const r=restaurants[Math.floor(Math.random()*restaurants.length)];
-  const e=EVENTS[Math.floor(Math.random()*EVENTS.length)];
-  const c=COLORS[Math.floor(Math.random()*COLORS.length)];
-  const el=document.getElementById('live-activity');
-  const div=document.createElement('div');
-  div.className='log-item';
-  div.style.animation='fadeIn .3s ease';
-  div.innerHTML=`<div class="log-type" style="background:var(--${c})"></div><div class="log-msg"><strong>${r.name}</strong> ${e}</div><div class="log-time">just now</div>`;
-  el.insertBefore(div,el.firstChild);
-  if(el.children.length>6) el.removeChild(el.lastChild);
-  addLog(r.name,e,'cyan');
 }
 
 function renderOverviewRequests(){
@@ -758,18 +736,26 @@ function filterReqs(f){
 }
 function searchReqs(v){ reqSearch=v.toLowerCase(); renderRequests(); }
 
-function quickApprove(id){
+async function quickApprove(id){
   const r=requests.find(x=>x.id===id)||restaurants.find(x=>x.id===id);
   if(!r) return;
+  if (requests.includes(r)) {
+    const res = await fetch('/api/shrey/requests/'+id+'/approve', { method:'POST', headers:{'Content-Type':'application/json'} });
+    const data = await res.json().catch(()=>({}));
+    if (!res.ok) { showToast(data.error||'Approval failed','red'); return; }
+  }
   if(r.status!==undefined) r.status='approved';
   addLog(r.name,'was approved','green');
   updateStats();
   renderRequests(); renderOverviewRequests(); renderRestaurants();
   showToast(r.name+' approved!','green');
 }
-function quickReject(id){
+async function quickReject(id){
   const r=requests.find(x=>x.id===id);
   if(!r) return;
+  const res = await fetch('/api/shrey/requests/'+id+'/reject', { method:'POST', headers:{'Content-Type':'application/json'} });
+  const data = await res.json().catch(()=>({}));
+  if (!res.ok) { showToast(data.error||'Rejection failed','red'); return; }
   r.status='rejected';
   addLog(r.name,'was rejected','red');
   updateStats();

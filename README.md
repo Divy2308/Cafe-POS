@@ -16,13 +16,17 @@ A full-featured Restaurant POS system built with Flask + HTML/CSS/JS + Tailwind 
 ## Setup
 
 ```bash
-# 1. Install dependencies
+# 1. Create and activate a virtual environment
+python -m venv .venv
+.venv\Scripts\activate
+
+# 2. Install dependencies
 pip install -r requirements.txt
 
-# 2. Run the app
+# 3. Run the app
 python app.py
 
-# 3. Open in browser
+# 4. Open in browser
 http://localhost:5000
 ```
 

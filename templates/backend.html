@@ -486,6 +486,16 @@
         <input id="p-tax-config" placeholder="CGST:2.5, SGST:2.5" class="text-sm">
         <p class="text-[10px] text-gray-500 mt-1">Format: Name:Rate, Name:Rate</p>
       </div>
+
+      <!-- Addons Section -->
+      <div class="border-t border-border pt-4">
+        <label class="text-xs text-brand-500 uppercase tracking-wider mb-2 font-bold block">Addons / Customizations</label>
+        <div id="p-addons-container" class="space-y-2 overflow-y-auto pr-1" style="max-height: 200px;"></div>
+        <button type="button" onclick="addAddonRow()" class="mt-2 text-xs text-brand-500 font-bold hover:underline flex items-center gap-1">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4"/></svg>
+          Add Option (e.g. Extra Cheese)
+        </button>
+      </div>
     </div>
     <div class="flex gap-3 mt-6">
       <button onclick="closeProductModal()" class="btn-ghost flex-1 py-2.5 rounded-xl text-sm">Cancel</button>
@@ -709,9 +719,22 @@ function updateCatSuggestions() {
 
 let currentImageB64='';
 
+function addAddonRow(name='', price='') {
+  const container = document.getElementById('p-addons-container');
+  const div = document.createElement('div');
+  div.className = 'flex gap-2 items-center addon-row';
+  div.innerHTML = `
+    <input type="text" class="flex-1 text-xs" placeholder="Option Name" value="${escHtml(name)}">
+    <input type="number" class="w-20 text-xs" placeholder="Price" value="${price}">
+    <button type="button" onclick="this.parentElement.remove()" class="text-red-500 p-2 hover:bg-red-500/10 rounded-lg transition">✕</button>
+  `;
+  container.appendChild(div);
+}
+
 function openProductModal() {
   document.getElementById('p-edit-id').value='';
   ['p-name','p-price','p-tax','p-category','p-unit','p-desc','p-tax-config'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('p-addons-container').innerHTML = '';
   document.getElementById('p-active').checked=true;
   clearProductImage();
   document.getElementById('product-modal-title').textContent='Add Product';
@@ -740,6 +763,8 @@ function clearProductImage() {
   document.getElementById('p-image-preview-img').src='';
 }
 
+function closeProductModal() { document.getElementById('product-modal').classList.add('hidden'); }
+
 function editProduct(id) {
   const p=allProducts.find(x=>x.id===id);
   if (!p) return;
@@ -751,6 +776,10 @@ function editProduct(id) {
   document.getElementById('p-unit').value=p.unit||'pcs';
   document.getElementById('p-desc').value=p.description||'';
   document.getElementById('p-active').checked=p.active;
+  document.getElementById('p-addons-container').innerHTML = '';
+  if (p.addons && p.addons.length) {
+    p.addons.forEach(a => addAddonRow(a.name, a.price));
+  }
   let taxStr='';
   try { const config=JSON.parse(p.tax_config_json||'{}'); taxStr=Object.entries(config).map(([k,v])=>`${k}:${v}`).join(', '); } catch(e){}
   document.getElementById('p-tax-config').value=taxStr;
@@ -763,8 +792,6 @@ function editProduct(id) {
   setTimeout(()=>document.getElementById('p-name').focus(),100);
 }
 
-function closeProductModal() { document.getElementById('product-modal').classList.add('hidden'); }
-
 async function saveProduct() {
   const editId=document.getElementById('p-edit-id').value;
   const d={
@@ -776,8 +803,18 @@ async function saveProduct() {
     description:document.getElementById('p-desc').value.trim(),
     active:document.getElementById('p-active').checked,
     image_b64:currentImageB64||'',
-    tax_config:{}
+    tax_config:{},
+    addons: []
   };
+
+  // Collect addons
+  document.querySelectorAll('.addon-row').forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    const name = inputs[0].value.trim();
+    const price = inputs[1].value.trim();
+    if (name) d.addons.push({ name, price: price || 0 });
+  });
+
   const taxStr=document.getElementById('p-tax-config').value.trim();
   if (taxStr) taxStr.split(',').forEach(part=>{const [k,v]=part.split(':').map(s=>s.trim()); if(k&&v) d.tax_config[k]=parseFloat(v);});
   if (!d.name||!d.price) return toast('Name and price are required','error');
@@ -854,11 +891,39 @@ function renderPayments() {
         </div>
         <label class="toggle"><input type="checkbox" ${m.enabled?'checked':''} onchange="togglePayment(${m.id},this.checked)"><span class="toggle-slider"></span></label>
       </div>
-      ${m.type==='upi'?`<div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">UPI ID</label><div class="flex gap-2"><input id="upi-id-${m.id}" value="${m.upi_id}" placeholder="yourname@ybl" class="text-sm"><button onclick="saveUPI(${m.id})" class="btn-ghost px-3 py-2 rounded-lg text-xs whitespace-nowrap">Save</button></div></div>`:''}
+      ${m.type==='upi'?`
+        <div class="mt-3 p-3 bg-gray-900/40 border border-white/5 rounded-xl">
+          <label class="text-[10px] text-gray-400 uppercase tracking-wider mb-2 block font-semibold">Custom UPI QR Code</label>
+          <div class="flex items-center gap-4 mb-3">
+            <div class="w-16 h-16 bg-gray-950 rounded-lg flex items-center justify-center overflow-hidden border border-white/10 shadow-inner">
+              ${m.qr_b64 ? `<img src="${m.qr_b64}" class="w-full h-full object-contain">` : `<span class="text-xl opacity-30">📷</span>`}
+            </div>
+            <div class="flex-1">
+              <input type="file" onchange="uploadPaymentQR(${m.id}, this)" accept="image/*" class="text-[10px] text-gray-500 w-full mb-1">
+              <p class="text-[9px] text-gray-500 leading-tight">Upload your custom QR if you don't want to use the auto-generated one.</p>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <input id="upi-id-${m.id}" type="text" value="${m.upi_id || ''}" placeholder="your-upi-id@bank" class="text-sm bg-gray-950 border-white/5 rounded-lg focus:ring-1 focus:ring-purple-500 h-9 flex-1 px-3">
+            <button onclick="saveUPI(${m.id})" class="bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 border border-purple-500/30 px-4 py-2 rounded-lg text-xs font-semibold transition-all">Save</button>
+          </div>
+        </div>`:''}
     </div>`).join('');
 }
 async function togglePayment(id,enabled) { await api('/api/payment-methods/'+id,'PUT',{enabled}); toast(enabled?'Payment method enabled':'Disabled'); }
 async function saveUPI(id) { const upi_id=document.getElementById('upi-id-'+id).value; await api('/api/payment-methods/'+id,'PUT',{upi_id}); toast('UPI ID saved!'); }
+
+async function uploadPaymentQR(id, input) {
+  if (!input.files || !input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const qr_b64 = e.target.result;
+    await api('/api/payment-methods/'+id, 'PUT', {qr_b64});
+    toast('Custom QR uploaded!');
+    renderPayments();
+  };
+  reader.readAsDataURL(input.files[0]);
+}
 
 function renderReviews() {
   const summary=document.getElementById('reviews-summary');

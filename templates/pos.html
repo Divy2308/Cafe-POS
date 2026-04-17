@@ -110,6 +110,23 @@
     white-space: nowrap;
   }
 
+  .table-card.merge-selectable {
+    border-style: dashed;
+    border-width: 2px;
+    background: rgba(249, 115, 22, 0.05);
+  }
+
+  .table-card.merge-selected {
+    border-color: #f97316;
+    border-width: 3px;
+    background: rgba(249, 115, 22, 0.15);
+  }
+
+  .table-card.merged-child {
+    opacity: 0.65;
+    background:Repeating-linear-gradient(45deg, rgba(249,115,22,0.05), rgba(249,115,22,0.05) 10px, rgba(249,115,22,0.1) 10px, rgba(249,115,22,0.1) 20px);
+  }
+
   #mobile-floor-select {
     background: var(--input-bg);
     border-color: var(--input-border);
@@ -1063,10 +1080,7 @@
       <div class="flex items-center gap-3">
         <div class="w-9 h-9 brand-gradient rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden"
           id="pos-logo">
-          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-          </svg>
+          <img src="/static/img/logo_icon.svg" alt="POS Cafè Icon" class="w-6 h-6 object-contain">
         </div>
         <div>
           <div class="font-display font-700 text-sm text-white" id="pos-cafe-name">POS Cafe</div>
@@ -1169,6 +1183,11 @@
       <div class="flex flex-col gap-4 mb-6">
         <div class="flex items-center justify-between">
           <h2 class="font-display text-xl font-700">Floor Plan</h2>
+          <div class="flex gap-2">
+            <button id="merge-mode-btn" onclick="toggleMergeMode()" class="btn-ghost px-3 py-1.5 rounded-lg text-xs border border-border flex items-center gap-2">
+               🔗 Merge Tables
+            </button>
+          </div>
         </div>
         <!-- Mobile Floor Selector -->
         <div id="mobile-floor-select-wrap">
@@ -1380,12 +1399,7 @@
     <!-- ═══ PAYMENT VIEW ═══ -->
     <div id="view-payment" class="hidden flex-1 flex items-center justify-center p-4 sm:p-8">
       <div class="w-full max-w-sm sm:max-w-md">
-        <button onclick="showView('order')"
-          class="btn-ghost px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 mb-6">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg> Back to Order
-        </button>
+        
         <div class="card p-5 sm:p-6" style="border-radius:20px; max-height:calc(100vh - 7rem); overflow-y:auto;">
           <h2 class="font-display text-xl sm:text-2xl font-700 mb-2">Payment</h2>
           <div class="text-xs text-gray-500 uppercase tracking-wider mb-4">Bill <span id="pay-order-num"
@@ -1475,6 +1489,33 @@
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- Addon Selection Modal -->
+<div id="addon-modal" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-[60]" onclick="if(event.target===this)closeAddonModal()">
+  <div class="card p-6 w-full max-w-sm m-4 overflow-hidden flex flex-col" style="border-radius:24px; max-height: 85vh;">
+    <div class="flex justify-between items-start mb-4">
+      <div>
+        <h3 id="addon-product-name" class="font-display text-xl font-700">Customize Item</h3>
+        <p id="addon-product-price" class="text-sm text-brand-500 font-bold"></p>
+      </div>
+      <button onclick="closeAddonModal()" class="text-gray-500 p-1">✕</button>
+    </div>
+    
+    <div id="addon-list" class="flex-1 overflow-y-auto space-y-3 py-2 pr-1">
+      <!-- Addons will be injected here -->
+    </div>
+
+    <div class="mt-6 pt-4 border-t border-border">
+      <div class="flex justify-between items-center mb-4">
+        <span class="text-sm text-gray-400">Total Price</span>
+        <span id="addon-total-display" class="text-xl font-800 text-white">₹0</span>
+      </div>
+      <button id="addon-confirm-btn" class="btn-primary w-full py-3.5 rounded-xl font-bold transition-all active:scale-95 shadow-lg shadow-brand-500/20">
+        Add to Ticket
+      </button>
+    </div>
   </div>
 </div>
 
@@ -1634,8 +1675,81 @@
     if (floors.length) renderTables(activeFloorId || floors[0].id);
   }
 
+  let mergeState = { active: false, source: null };
+
+  function toggleMergeMode() {
+    mergeState.active = !mergeState.active;
+    mergeState.source = null;
+    const btn = document.getElementById('merge-mode-btn');
+    if (mergeState.active) {
+      btn.textContent = '❌ Cancel Merge';
+      btn.classList.add('bg-red-500/10', 'text-red-500', 'border-red-500/20');
+      toast('Select first table to merge', 'info');
+    } else {
+      btn.textContent = '🔗 Merge Tables';
+      btn.classList.remove('bg-red-500/10', 'text-red-500', 'border-red-500/20');
+    }
+    renderTables(activeFloorId);
+  }
+
+  function handleTableSelection(id, number, status) {
+    if (mergeState.active) {
+      if (!mergeState.source) {
+        mergeState.source = { id, number };
+        toast('Select second table to merge into', 'info');
+        renderTables(activeFloorId);
+      } else {
+        if (mergeState.source.id === id) {
+          mergeState.source = null;
+          renderTables(activeFloorId);
+          return;
+        }
+        confirmTableMerge(mergeState.source.id, id, mergeState.source.number, number);
+      }
+    } else {
+      selectTable(id, number, status);
+    }
+  }
+
+  async function confirmTableMerge(sourceId, targetId, sourceNum, targetNum) {
+    if (!confirm(`Merge Table ${sourceNum} into Table ${targetNum}? Orders will be combined.`)) {
+      mergeState.source = null;
+      renderTables(activeFloorId);
+      return;
+    }
+    const r = await api('/api/tables/merge', 'POST', { source_table_id: sourceId, target_table_id: targetId });
+    if (r.ok) {
+      toast('Tables merged successfully', 'success');
+      toggleMergeMode();
+      await reloadData();
+    } else {
+      toast(r.error || 'Merge failed', 'error');
+    }
+  }
+
+  async function unmergeTable(id) {
+    if (!confirm('Unmerge this table?')) return;
+    const r = await api(`/api/tables/${id}/unmerge`, 'POST');
+    if (r.ok) {
+      toast('Table unmerged', 'success');
+      await reloadData();
+    } else {
+      toast(r.error || 'Unmerge failed', 'error');
+    }
+  }
+
+  function getTableName(id) {
+    if (!floors) return 'Table';
+    for (const f of floors) {
+      const t = f.tables.find(t => t.id === id);
+      if (t) return t.number;
+    }
+    return 'Table';
+  }
+
   function renderTables(floorId) {
     floorId = Number(floorId);
+    if (!floors) return;
     const floor = floors.find(f => f.id === floorId);
     if (!floor) return;
     activeFloorId = floorId;
@@ -1649,20 +1763,39 @@
     if (select) select.value = floorId;
 
     const grid = document.getElementById('tables-grid');
-    grid.innerHTML = floor.tables.map(t => `
-    <div class="table-card ${t.status === 'occupied' ? 'occupied' : 'free'}" onclick="selectTable(${t.id},'${t.number}','${t.status}')" oncontextmenu="toggleTableStatus(event,${t.id},'${t.status}')">
-      <div class="table-header">
-        <div class="table-number">${t.number}</div>
-        <div class="table-seats">${t.seats} seats</div>
-      </div>
-      <div class="table-footer">
-        <div class="table-status">
-          <span class="tag ${t.status === 'occupied' ? 'occupied' : 'free'}">${t.status === 'occupied' ? 'Occupied' : 'Free'}</span>
-          ${t.status === 'occupied' ? `<button class="table-free-btn" onclick="event.stopPropagation(); freeTable(${t.id}, '${String(t.number).replace(/'/g, "\\'")}')">Free</button>` : ''}
+    grid.innerHTML = floor.tables.map(t => {
+      let extraClass = '';
+      if (mergeState.active) {
+        if (mergeState.source && mergeState.source.id === t.id) extraClass = 'merge-selected';
+        else extraClass = 'merge-selectable';
+      } else if (t.merged_to_id) {
+        extraClass = 'merged-child';
+      }
+
+      const mergedText = t.merged_to_id ? `<div class="text-[10px] text-brand-500 font-bold mt-1">Merged to ${getTableName(t.merged_to_id)}</div>` : '';
+
+      return `
+      <div class="table-card ${t.status === 'occupied' ? 'occupied' : 'free'} ${extraClass}" 
+           onclick="handleTableSelection(${t.id},'${t.number}','${t.status}')" 
+           oncontextmenu="toggleTableStatus(event,${t.id},'${t.status}')">
+        <div class="table-header">
+          <div class="table-number">${t.number}</div>
+          <div class="table-seats">${t.seats} seats</div>
+          ${mergedText}
         </div>
-        <div class="table-hint">right-click to toggle</div>
-      </div>
-    </div>`).join('');
+        <div class="table-footer">
+          <div class="table-status">
+            <span class="tag ${t.status === 'occupied' ? 'occupied' : 'free'}">${t.status === 'occupied' ? 'Occupied' : 'Free'}</span>
+            ${t.status === 'occupied' ? 
+              `<button class="table-free-btn" style="display:block;" onclick="event.stopPropagation(); freeTable(${t.id}, '${String(t.number).replace(/'/g, "\\'")}')">Free</button>` : 
+              `<button class="table-free-btn" style="background:rgba(34,197,150,0.1);color:#22c59e;border-color:rgba(34,197,150,0.2);display:block;" onclick="event.stopPropagation(); toggleTableStatus(event, ${t.id}, 'free')">Occupy</button>`
+            }
+          </div>
+          <div class="table-hint">Right-click for options</div>
+          ${t.merged_to_id ? `<button onclick="event.stopPropagation(); unmergeTable(${t.id})" class="text-[10px] mt-2 text-red-500 font-bold underline">Unmerge Table</button>` : ''}
+        </div>
+      </div>`;
+    }).join('');
   }
 
   async function freeTable(tableId, number) {
@@ -1806,10 +1939,87 @@
   }
 
   // ─── Cart ─────────────────────────────────────────────────
-  function addToCart(id, name, price) {
-    const ex = cart.find(i => i.product_id === id);
-    if (ex) { ex.qty++; } else { cart.push({ product_id: id, name, price, qty: 1, notes: '' }); }
+  function addToCart(id, name, price, selectedAddons = []) {
+    // If not coming from modal, check if product has addons
+    if (selectedAddons.length === 0) {
+      const p = findProductById(id);
+      if (p && p.addons && p.addons.length > 0) {
+        return showAddonModal(p);
+      }
+    }
+
+    const itemPrice = price + selectedAddons.reduce((s, a) => s + a.price, 0);
+    const itemKey = id + '_' + JSON.stringify(selectedAddons.map(a => a.id).sort());
+    
+    // Check for existing item with same addons
+    const ex = cart.find(i => i.itemKey === itemKey);
+    if (ex) { 
+      ex.qty++; 
+    } else { 
+      cart.push({ 
+        itemKey,
+        product_id: id, 
+        name, 
+        basePrice: price,
+        price: itemPrice, 
+        qty: 1, 
+        notes: '',
+        addons: selectedAddons
+      }); 
+    }
     renderCart();
+  }
+
+  function findProductById(id) {
+    for (const c of products) {
+      const p = c.products.find(x => x.id === id);
+      if (p) return p;
+    }
+    return null;
+  }
+
+  function showAddonModal(p) {
+    document.getElementById('addon-product-name').textContent = p.name;
+    document.getElementById('addon-product-price').textContent = 'Base Price: ₹' + p.price;
+    const list = document.getElementById('addon-list');
+    list.innerHTML = p.addons.map(a => `
+      <label class="flex items-center justify-between p-3 rounded-xl border border-border bg-black/10 cursor-pointer hover:bg-brand-500/5 transition">
+        <div class="flex items-center gap-3">
+          <input type="checkbox" class="addon-checkbox w-5 h-5 rounded-lg border-border text-brand-500 focus:ring-brand-500" 
+                 data-id="${a.id}" data-name="${a.name}" data-price="${a.price}" onchange="updateAddonTotal(${p.price})">
+          <span class="text-sm font-medium text-white">${a.name}</span>
+        </div>
+        <span class="text-xs font-bold text-brand-500">+₹${a.price}</span>
+      </label>
+    `).join('');
+    
+    document.getElementById('addon-confirm-btn').onclick = () => {
+      const selected = [];
+      document.querySelectorAll('.addon-checkbox:checked').forEach(cb => {
+        selected.push({
+          id: parseInt(cb.dataset.id),
+          name: cb.dataset.name,
+          price: parseFloat(cb.dataset.price)
+        });
+      });
+      addToCart(p.id, p.name, p.price, selected);
+      closeAddonModal();
+    };
+    
+    updateAddonTotal(p.price);
+    document.getElementById('addon-modal').classList.remove('hidden');
+  }
+
+  function updateAddonTotal(basePrice) {
+    let extra = 0;
+    document.querySelectorAll('.addon-checkbox:checked').forEach(cb => {
+      extra += parseFloat(cb.dataset.price);
+    });
+    document.getElementById('addon-total-display').textContent = '₹' + (basePrice + extra);
+  }
+
+  function closeAddonModal() {
+    document.getElementById('addon-modal').classList.add('hidden');
   }
 
   function updateQty(idx, delta) {
@@ -1832,6 +2042,7 @@
           <div>
             <div class="cart-item-name">${i.name}</div>
             <div class="cart-item-meta">₹${i.price} × ${i.qty}</div>
+            ${i.addons && i.addons.length ? `<div class="text-[10px] text-brand-500 mt-1">${i.addons.map(a => '+' + a.name).join(', ')}</div>` : ''}
           </div>
           <div class="cart-item-price">₹${(i.price * i.qty).toFixed(0)}</div>
         </div>
@@ -1969,7 +2180,14 @@
     if (!cart.length) { toast('Add items first', 'error'); return null; }
     const customerName = (document.getElementById('customer-name')?.value || '').trim();
     const customerPhone = (document.getElementById('customer-phone')?.value || '').trim();
-    const items = cart.map(i => ({ product_id: i.product_id, name: i.name, price: i.price, qty: i.qty, notes: i.notes || '' }));
+    const items = cart.map(i => ({ 
+      product_id: i.product_id, 
+      name: i.name, 
+      price: i.price, 
+      qty: i.qty, 
+      notes: i.notes || '',
+      addons_json: JSON.stringify(i.addons || [])
+    }));
     if (currentOrder && currentOrder.status === 'draft') {
       currentOrder.items = items.map(i => ({ ...i }));
       return currentOrder;
@@ -2192,7 +2410,7 @@
     const methods = await api('/api/payment-methods');
     const el = document.getElementById('pay-methods');
     el.innerHTML = methods.filter(m => m.enabled).map(m => `
-    <div class="pay-method card p-3 rounded-xl flex items-center gap-2 sm:gap-3 min-h-[56px]" onclick="selectMethod('${m.type}','${m.upi_id}','${m.name.replace(/'/g, "\\'")}',${bill.subtotal})" id="pm-${m.type}">
+    <div class="pay-method card p-3 rounded-xl flex items-center gap-2 sm:gap-3 min-h-[56px]" onclick="selectMethod('${m.type}','${m.upi_id}','${m.name.replace(/'/g, "\\'")}',${bill.subtotal}, '${m.qr_b64 || ''}')" id="pm-${m.type}">
       <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:rgba(249,115,22,0.1)">
         ${m.type === 'cash' ? '💵' : m.type === 'upi' ? '📱' : m.type === 'razorpay' ? '⚡' : '💳'}
       </div>
@@ -2221,16 +2439,20 @@
     refreshPaymentTotals();
   }
 
-  function selectMethod(type, upiId, name, amount) {
+  function selectMethod(type, upiId, name, amount, qr_b64) {
     const totalWithTip = getPaymentTotal();
-    selectedMethod = { type, upiId, name, amount: totalWithTip };
+    selectedMethod = { type, upiId, name, amount: totalWithTip, qr_b64: qr_b64 || '' };
     document.querySelectorAll('.pay-method').forEach(el => el.classList.remove('selected'));
     document.getElementById('pm-' + type)?.classList.add('selected');
     updateCashPaymentUI();
     if (type === 'upi' || type === 'qrorupi' || (name || '').toLowerCase().includes('qr')) {
       document.getElementById('qr-amount').textContent = formatCurrency(totalWithTip);
       document.getElementById('qr-upi-id').textContent = upiId || 'Scan this QR code with any UPI app';
-      document.getElementById('qr-img').src = "{{ url_for('qr_image') }}";
+      if (qr_b64 && qr_b64.length > 50) {
+        document.getElementById('qr-img').src = qr_b64;
+      } else {
+        document.getElementById('qr-img').src = "/api/qr-img/" + (upiId || 'cafe@ybl') + "/" + totalWithTip;
+      }
       showView('qr');
     }
   }
@@ -2319,7 +2541,11 @@
     if (selectedMethod.type === 'upi' || selectedMethod.type === 'qrorupi' || (selectedMethod.name || '').toLowerCase().includes('qr')) {
       document.getElementById('qr-amount').textContent = '₹' + selectedMethod.amount.toFixed(0);
       document.getElementById('qr-upi-id').textContent = selectedMethod.upiId || 'Scan this QR code with any UPI app';
-      document.getElementById('qr-img').src = "{{ url_for('qr_image') }}";
+      if (selectedMethod.qr_b64 && selectedMethod.qr_b64.length > 50) {
+        document.getElementById('qr-img').src = selectedMethod.qr_b64;
+      } else {
+        document.getElementById('qr-img').src = "/api/qr-img/" + (selectedMethod.upiId || 'cafe@ybl') + "/" + selectedMethod.amount;
+      }
       showView('qr');
       return;
     }

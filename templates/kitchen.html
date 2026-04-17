@@ -191,7 +191,7 @@ let knownActiveTicketIds = new Set();
 let bright = false;
 let completedClearTimers = {};
 let dragSrcId = null;
-let toastTimer = null;
+let kitchenToastTimer = null;
 
 // ── Audio ──────────────────────────────────────────────────────────────
 function getAudioCtx() {
@@ -226,10 +226,11 @@ function playKitchenChime() {
 document.addEventListener('click', () => unlockAudio().catch(() => {}), { once: true, capture: true });
 
 // ── Toast ──────────────────────────────────────────────────────────────
-function toast(msg) {
+function showKitchenToast(msg) {
   const el = document.getElementById('toast');
   el.textContent = msg; el.classList.add('show');
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+  clearTimeout(kitchenToastTimer);
+  kitchenToastTimer = setTimeout(() => el.classList.remove('show'), 3000);
 }
 
 // ── Bright mode ────────────────────────────────────────────────────────
@@ -303,6 +304,7 @@ function renderTicket(t) {
         </div>
       </div>
       ${i.notes ? `<div class="item-notes">📝 ${i.notes}</div>` : ''}
+      <div class="addon-text" style="font-size:10px;color:#f97316;font-weight:700" data-json='${i.addons_json||"[]"}'></div>
     </div>`).join('');
 
   const cls = [
@@ -355,6 +357,14 @@ function render() {
     itemEl.textContent = pendingItems > 0 ? pendingItems + ' items' : '';
     document.getElementById('col-' + stage).innerHTML = stg.map(t => renderTicket(t)).join('');
   });
+  
+  // Fill addon texts
+  document.querySelectorAll('.addon-text').forEach(el => {
+    try {
+      const addons = JSON.parse(el.dataset.json || '[]');
+      if (addons.length) el.textContent = '➕ ' + addons.map(a => a.name).join(', ');
+    } catch(e) {}
+  });
 }
 
 // ── Advance ticket ─────────────────────────────────────────────────────
@@ -405,7 +415,7 @@ function onDrop(e, targetId) {
     src.status = newStatus;
     if (newStatus === 'preparing' && !src.started_at) src.started_at = new Date().toISOString();
     if (newStatus === 'completed') scheduleAutoClear(src.id);
-    toast(`↕️ Moved ${src.order_number} → ${newStatus.replace('_', ' ')}`);
+    showKitchenToast(`↕️ Moved ${src.order_number} → ${newStatus.replace('_', ' ')}`);
     // Optionally POST: await api('/api/kitchen/tickets/' + src.id + '/set-status', 'POST', { status: newStatus });
   } else {
     const si = tickets.indexOf(src), ti = tickets.indexOf(tgt);
@@ -434,7 +444,7 @@ socket.on('new_ticket', t => {
   knownActiveTicketIds = new Set([...knownActiveTicketIds, t.id]);
   if (!tickets.some(ticket => ticket.id === t.id)) tickets.push(t);
   render();
-  if (hasHydratedTickets && !alreadyKnown) { toast('🍳 New order: ' + t.order_number); playKitchenChime(); }
+  if (hasHydratedTickets && !alreadyKnown) { showKitchenToast('🍳 New order: ' + t.order_number); playKitchenChime(); }
 });
 
 socket.on('ticket_update', d => {
@@ -466,7 +476,7 @@ async function loadTickets() {
   tickets.filter(t => t.status === 'completed').forEach(t => scheduleAutoClear(t.id));
   if (hasHydratedTickets && newIds.length > 0) {
     const newest = tickets.find(t => newIds.includes(t.id));
-    toast(newest ? '🍳 New order: ' + newest.order_number : '🍳 New order received');
+    showKitchenToast(newest ? '🍳 New order: ' + newest.order_number : '🍳 New order received');
     playKitchenChime();
   }
   hasHydratedTickets = true;

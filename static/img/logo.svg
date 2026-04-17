@@ -1,0 +1,31 @@
+<svg width="400" height="300" viewBox="160 70 360 270" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="cupGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#ea580c"/>
+    </linearGradient>
+    <linearGradient id="plateGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fb923c"/>
+      <stop offset="100%" stop-color="#c2410c"/>
+    </linearGradient>
+    <clipPath id="cupClip">
+      <path d="M254 170 L266 310 Q270 322 285 322 L395 322 Q410 322 414 310 L426 170 Z"/>
+    </clipPath>
+  </defs>
+
+  <!-- Cup Icon -->
+  <g transform="translate(340, 200)">
+    <ellipse cx="0" cy="118" rx="82" ry="10" fill="#ea580c" opacity="0.25"/>
+    <rect x="-88" y="110" width="176" height="16" rx="8" fill="url(#plateGrad)"/>
+    <path d="M-74 110 L-62 -42 Q-58 -52 -46 -52 L46 -52 Q58 -52 62 -42 L74 110 Z" fill="url(#cupGrad)"/>
+    <path d="M74 10 Q98 10 98 28 Q98 46 74 46" fill="none" stroke="#f97316" stroke-width="9" stroke-linecap="round"/>
+    <!-- Steam -->
+    <path d="M-40 -65 Q-30 -85 -40 -105" fill="none" stroke="#f97316" stroke-width="5" stroke-linecap="round" opacity="0.6"/>
+    <path d="M0 -65 Q10 -85 0 -105" fill="none" stroke="#f97316" stroke-width="5" stroke-linecap="round" opacity="0.6"/>
+    <path d="M40 -65 Q50 -85 40 -105" fill="none" stroke="#f97316" stroke-width="5" stroke-linecap="round" opacity="0.6"/>
+  </g>
+
+  <!-- Product Name -->
+  <text x="168" y="220" font-size="64" font-family="system-ui, sans-serif" font-weight="900" fill="currentColor">POS</text>
+  <text x="168" y="275" font-size="58" font-family="system-ui, sans-serif" font-weight="900" fill="#f97316">Cafe</text>
+</svg>
