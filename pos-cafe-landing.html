@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>POS Cafè — The 3D Point of Sale for Modern Cafés</title>
+<meta name="description" content="POS Cafè is a beautiful, lightning-fast point of sale built for cafés. Manage orders, payments, and insights — all in one purple-powered dashboard." />
+
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+        colors: {
+          background: 'oklch(99% 0.005 300)',
+          foreground: 'oklch(20% 0.02 290)',
+          card: 'oklch(100% 0 0)',
+          muted: 'oklch(96% 0.01 290)',
+          'muted-foreground': 'oklch(50% 0.02 290)',
+          accent: 'oklch(95% 0.04 295)',
+          'accent-foreground': 'oklch(35% 0.18 290)',
+          border: 'oklch(92% 0.01 290)',
+          primary: {
+            DEFAULT: 'oklch(55% 0.22 295)',
+            foreground: 'oklch(99% 0.005 300)',
+            glow: 'oklch(70% 0.18 295)',
+            deep: 'oklch(40% 0.20 295)',
+          },
+        },
+        boxShadow: {
+          soft: '0 4px 20px -4px oklch(55% 0.22 295 / 0.15)',
+          glow: '0 10px 40px -10px oklch(55% 0.22 295 / 0.5)',
+          '3d': '0 30px 60px -15px oklch(40% 0.20 295 / 0.35), 0 10px 20px -5px oklch(40% 0.20 295 / 0.2)',
+        },
+        keyframes: {
+          float: { '0%,100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-12px)' } },
+          'float-slow': { '0%,100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-20px)' } },
+          'pulse-glow': { '0%,100%': { opacity: '0.3' }, '50%': { opacity: '0.6' } },
+        },
+        animation: {
+          float: 'float 4s ease-in-out infinite',
+          'float-slow': 'float-slow 6s ease-in-out infinite',
+          'pulse-glow': 'pulse-glow 4s ease-in-out infinite',
+        },
+      },
+    },
+  };
+</script>
+
+<style>
+  html { scroll-behavior: smooth; }
+  body { font-family: 'Inter', sans-serif; background: oklch(99% 0.005 300); color: oklch(20% 0.02 290); }
+  .glass { background: oklch(100% 0 0 / 0.6); backdrop-filter: blur(20px); border: 1px solid oklch(100% 0 0 / 0.6); }
+  .gradient-primary { background: linear-gradient(135deg, oklch(55% 0.22 295), oklch(70% 0.18 295)); }
+  .gradient-text {
+    background: linear-gradient(135deg, oklch(55% 0.22 295), oklch(70% 0.18 295));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .bg-grid {
+    background-image:
+      linear-gradient(oklch(55% 0.22 295 / 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, oklch(55% 0.22 295 / 0.06) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+  .perspective-1000 { perspective: 1000px; }
+  .preserve-3d { transform-style: preserve-3d; }
+
+  /* scroll-driven 3D */
+  .feature-card { transition: transform .4s cubic-bezier(.2,.8,.2,1), box-shadow .4s; transform-style: preserve-3d; }
+  .feature-card:hover { transform: translateY(-8px) rotateX(4deg) rotateY(-4deg); }
+
+  .reveal { opacity: 0; transform: translateY(40px); transition: opacity .8s ease, transform .8s cubic-bezier(.2,.8,.2,1); }
+  .reveal.in { opacity: 1; transform: none; }
+
+  .bar { height: 0%; transition: height .8s cubic-bezier(.2,.8,.2,1); }
+</style>
+</head>
+<body class="overflow-x-hidden">
+
+<!-- ============ NAV ============ -->
+<header class="fixed top-0 inset-x-0 z-50 px-6 py-4">
+  <div class="max-w-6xl mx-auto glass rounded-2xl px-6 py-3 flex items-center justify-between shadow-soft">
+    <div class="flex items-center gap-2">
+      <div class="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center shadow-glow">
+        <!-- coffee icon -->
+        <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 8h1a4 4 0 0 1 0 8h-1M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>
+      </div>
+      <span class="font-bold text-lg">POS Cafè</span>
+    </div>
+    <nav class="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
+      <a href="#features" class="hover:text-foreground transition">Features</a>
+      <a href="#showcase" class="hover:text-foreground transition">Product</a>
+      <a href="#capabilities" class="hover:text-foreground transition">Capabilities</a>
+    </nav>
+    <div class="flex items-center gap-3">
+      <button class="hidden sm:inline-flex h-9 px-4 rounded-md text-sm font-medium hover:bg-accent">Sign in</button>
+      <button class="h-9 px-4 rounded-md text-sm font-medium gradient-primary text-white shadow-glow hover:opacity-90">Get Started</button>
+    </div>
+  </div>
+</header>
+
+<!-- ============ HERO ============ -->
+<section id="hero" class="relative pt-40 pb-32 px-6 bg-grid">
+  <div class="absolute inset-0 pointer-events-none overflow-hidden">
+    <div class="absolute -top-20 -left-20 w-96 h-96 rounded-full gradient-primary opacity-30 blur-3xl animate-pulse-glow"></div>
+    <div class="absolute top-40 -right-20 w-[500px] h-[500px] rounded-full bg-primary-glow opacity-20 blur-3xl animate-pulse-glow" style="animation-delay:2s"></div>
+  </div>
+
+  <div class="relative max-w-6xl mx-auto text-center" id="hero-inner">
+    <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass text-sm text-primary mb-8 shadow-soft">
+      ⚡ New: AI-powered menu insights
+    </div>
+
+    <h1 class="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight leading-[1.05]">
+      The point of sale <br/>
+      your <span class="gradient-text">café deserves</span>.
+    </h1>
+
+    <p class="mt-8 text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
+      POS Cafè blends speed, beauty and intelligence into one delightful system —
+      so you can serve faster and grow smarter.
+    </p>
+
+    <div class="mt-10 flex flex-wrap items-center justify-center gap-4">
+      <button class="h-12 px-7 rounded-md font-medium gradient-primary text-white shadow-glow hover:opacity-90">
+        Start free trial →
+      </button>
+      <button class="h-12 px-7 rounded-md font-medium glass border border-border">Watch demo</button>
+    </div>
+
+    <!-- 3D dashboard mockup (scroll-tilts) -->
+    <div class="mt-20 perspective-1000">
+      <div id="dashboard-3d" class="preserve-3d max-w-5xl mx-auto" style="transform: rotateX(15deg) scale(.9);">
+        <div class="relative rounded-3xl glass shadow-3d p-6 md:p-8">
+          <div class="flex items-center gap-2 mb-6">
+            <div class="w-3 h-3 rounded-full bg-red-400/70"></div>
+            <div class="w-3 h-3 rounded-full bg-yellow-400/70"></div>
+            <div class="w-3 h-3 rounded-full bg-green-400/70"></div>
+            <div class="ml-4 text-xs text-muted-foreground">app.poscafe.com/dashboard</div>
+          </div>
+          <div class="grid md:grid-cols-3 gap-4">
+            <div class="md:col-span-2 rounded-2xl gradient-primary text-white p-6 shadow-glow">
+              <div class="flex items-center justify-between mb-6">
+                <div>
+                  <div class="text-sm opacity-80">Today's Revenue</div>
+                  <div class="text-4xl font-bold mt-1">$2,847.20</div>
+                </div>
+                <svg class="w-8 h-8 opacity-80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+              </div>
+              <div class="flex items-end gap-2 h-24" id="bars">
+                <!-- bars injected by JS -->
+              </div>
+            </div>
+
+            <div class="rounded-2xl bg-card p-5 shadow-soft border border-border">
+              <div class="flex items-center justify-between mb-4">
+                <div class="text-sm font-semibold">Live Orders</div>
+                <span class="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">12</span>
+              </div>
+              <div class="space-y-3">
+                <div class="flex items-center justify-between text-sm p-2 rounded-lg bg-muted">
+                  <div><div class="font-medium">Cappuccino x2</div><div class="text-xs text-muted-foreground">2m ago</div></div>
+                  <div class="font-semibold text-primary">$8.50</div>
+                </div>
+                <div class="flex items-center justify-between text-sm p-2 rounded-lg bg-muted">
+                  <div><div class="font-medium">Latte + Croissant</div><div class="text-xs text-muted-foreground">4m ago</div></div>
+                  <div class="font-semibold text-primary">$11.20</div>
+                </div>
+                <div class="flex items-center justify-between text-sm p-2 rounded-lg bg-muted">
+                  <div><div class="font-medium">Espresso</div><div class="text-xs text-muted-foreground">5m ago</div></div>
+                  <div class="font-semibold text-primary">$3.50</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- floating cards -->
+        <div class="hidden md:flex absolute -left-10 top-32 glass rounded-2xl p-4 shadow-3d animate-float items-center gap-3">
+          <div class="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center text-white">💳</div>
+          <div class="text-left">
+            <div class="text-xs text-muted-foreground">Payment</div>
+            <div class="text-sm font-semibold">Tap to pay ✓</div>
+          </div>
+        </div>
+        <div class="hidden md:flex absolute -right-8 bottom-20 glass rounded-2xl p-4 shadow-3d animate-float-slow items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-accent flex items-center justify-center">⭐</div>
+          <div class="text-left">
+            <div class="text-xs text-muted-foreground">Rating</div>
+            <div class="text-sm font-semibold">4.9 / 5.0</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ LOGOS ============ -->
+<section class="py-16 px-6 border-y border-border/60">
+  <div class="max-w-6xl mx-auto">
+    <p class="text-center text-sm text-muted-foreground mb-8">Trusted by 2,000+ cafés worldwide</p>
+    <div class="flex flex-wrap items-center justify-center gap-x-12 gap-y-6 opacity-60 font-bold tracking-widest text-sm">
+      <span>BREW &amp; CO</span><span>MORNING ROAST</span><span>ESPRESSO LAB</span>
+      <span>CAFÉ NORD</span><span>BEAN HOUSE</span><span>ARTISAN</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FEATURES ============ -->
+<section id="features" class="py-32 px-6 relative">
+  <div class="absolute inset-0 bg-grid opacity-40 pointer-events-none"></div>
+  <div class="max-w-6xl mx-auto relative">
+    <div class="text-center max-w-2xl mx-auto mb-20 reveal">
+      <h2 class="text-4xl md:text-6xl font-bold tracking-tight">
+        Everything your café needs.
+        <span class="gradient-text"> Nothing it doesn't.</span>
+      </h2>
+      <p class="mt-6 text-lg text-muted-foreground">Designed with baristas. Built for owners. Loved by customers.</p>
+    </div>
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6" id="features-grid"></div>
+  </div>
+</section>
+
+<!-- ============ SHOWCASE (sticky 3D rotate) ============ -->
+<section id="showcase" class="py-32 px-6 relative">
+  <div class="max-w-6xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
+    <div class="reveal">
+      <div class="inline-block px-3 py-1 rounded-full bg-accent text-accent-foreground text-xs font-semibold mb-5">PRODUCT</div>
+      <h2 class="text-4xl md:text-5xl font-bold tracking-tight leading-tight">
+        A POS that feels like
+        <span class="gradient-text"> magic in your hands.</span>
+      </h2>
+      <p class="mt-6 text-lg text-muted-foreground">
+        Every interaction is crafted — from the soft haptics of placing an order
+        to the satisfying chime of a completed payment.
+      </p>
+      <ul class="mt-8 space-y-4">
+        <li class="flex items-center gap-3"><span class="w-6 h-6 rounded-full gradient-primary text-white flex items-center justify-center text-xs">✓</span> Drag-and-drop menu builder</li>
+        <li class="flex items-center gap-3"><span class="w-6 h-6 rounded-full gradient-primary text-white flex items-center justify-center text-xs">✓</span> Offline mode that just works</li>
+        <li class="flex items-center gap-3"><span class="w-6 h-6 rounded-full gradient-primary text-white flex items-center justify-center text-xs">✓</span> One-tap split bills &amp; tipping</li>
+        <li class="flex items-center gap-3"><span class="w-6 h-6 rounded-full gradient-primary text-white flex items-center justify-center text-xs">✓</span> Beautiful printed &amp; digital receipts</li>
+      </ul>
+    </div>
+
+    <div class="perspective-1000 preserve-3d">
+      <div id="showcase-3d" class="relative rounded-[2.5rem] gradient-primary p-3 shadow-3d" style="transform: rotateY(-25deg) scale(.85);">
+        <div class="rounded-[2rem] bg-card p-6 min-h-[420px]">
+          <div class="flex items-center justify-between mb-5">
+            <div class="flex items-center gap-2"><span class="text-primary">🛍️</span><span class="font-semibold">New Order</span></div>
+            <span class="text-xs text-muted-foreground">#1024</span>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="rounded-2xl p-4 text-white shadow-soft" style="background:linear-gradient(135deg,oklch(55% 0.22 295 / .8),oklch(70% 0.18 295))"><div class="text-sm opacity-90">Latte</div><div class="text-xl font-bold mt-1">$4.50</div></div>
+            <div class="rounded-2xl p-4 text-white shadow-soft" style="background:linear-gradient(135deg,oklch(40% 0.20 295),oklch(55% 0.22 295))"><div class="text-sm opacity-90">Mocha</div><div class="text-xl font-bold mt-1">$5.20</div></div>
+            <div class="rounded-2xl p-4 text-white shadow-soft" style="background:linear-gradient(135deg,oklch(70% 0.18 295),oklch(55% 0.22 295))"><div class="text-sm opacity-90">Americano</div><div class="text-xl font-bold mt-1">$3.50</div></div>
+            <div class="rounded-2xl p-4 text-white shadow-soft" style="background:linear-gradient(135deg,oklch(55% 0.22 295),oklch(40% 0.20 295))"><div class="text-sm opacity-90">Croissant</div><div class="text-xl font-bold mt-1">$3.80</div></div>
+          </div>
+          <div class="mt-6 p-4 rounded-2xl bg-muted flex items-center justify-between">
+            <div><div class="text-xs text-muted-foreground">Total</div><div class="text-2xl font-bold">$17.00</div></div>
+            <button class="h-9 px-4 rounded-md font-medium gradient-primary text-white shadow-glow">Charge →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CAPABILITIES ============ -->
+<section id="capabilities" class="py-32 px-6 relative">
+  <div class="absolute inset-0 bg-grid opacity-30 pointer-events-none"></div>
+  <div class="max-w-6xl mx-auto relative">
+    <div class="text-center max-w-2xl mx-auto mb-16 reveal">
+      <div class="inline-block px-3 py-1 rounded-full bg-accent text-accent-foreground text-xs font-semibold mb-5">EVERY CAPABILITY</div>
+      <h2 class="text-4xl md:text-6xl font-bold tracking-tight">
+        One platform.<span class="gradient-text"> Every workflow.</span>
+      </h2>
+      <p class="mt-6 text-lg text-muted-foreground">From the first signup to the last receipt — POS Cafè handles it all.</p>
+    </div>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4" id="cap-grid"></div>
+  </div>
+</section>
+
+<!-- ============ CTA ============ -->
+<section class="py-32 px-6">
+  <div class="max-w-4xl mx-auto text-center relative reveal">
+    <div class="absolute inset-0 -z-10"><div class="absolute inset-0 gradient-primary opacity-20 blur-3xl rounded-full"></div></div>
+    <h2 class="text-5xl md:text-7xl font-bold tracking-tight">
+      Brew better business <br/><span class="gradient-text">with POS Cafè</span>.
+    </h2>
+    <p class="mt-6 text-lg text-muted-foreground">Join thousands of cafés already serving smarter.</p>
+    <div class="mt-10 flex flex-wrap justify-center gap-4">
+      <button class="h-12 px-8 rounded-md font-medium gradient-primary text-white shadow-glow">Start your free trial →</button>
+      <button class="h-12 px-8 rounded-md font-medium glass border border-border">Talk to sales</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="border-t border-border/60 py-12 px-6">
+  <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+    <div class="flex items-center gap-2">
+      <div class="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center text-white">☕</div>
+      <span class="font-bold">POS Cafè</span>
+    </div>
+    <div class="flex gap-6 text-sm text-muted-foreground">
+      <a href="#" class="hover:text-foreground">Privacy</a>
+      <a href="#" class="hover:text-foreground">Terms</a>
+      <a href="#" class="hover:text-foreground">Contact</a>
+    </div>
+    <div class="text-sm text-muted-foreground">© 2026 POS Cafè</div>
+  </div>
+</footer>
+
+<!-- ============ SCRIPTS ============ -->
+<script>
+  /* Feature cards */
+  const features = [
+    ['⚡','Lightning-fast checkout','Process orders in under 3 seconds with our optimized payment flow.'],
+    ['📊','Real-time insights','Track sales, top items and busy hours from a beautiful dashboard.'],
+    ['📱','Works on any device','iPad, Android tablet, or your phone — POS Cafè runs everywhere.'],
+    ['👥','Built-in CRM','Recognize regulars, reward loyalty and grow your community.'],
+    ['🧾','Smart receipts','Digital, printed, or both — your customers choose how to receive them.'],
+    ['⏰','Shift management','Track barista hours, tips and performance effortlessly.'],
+  ];
+  document.getElementById('features-grid').innerHTML = features.map(([i,t,d]) => `
+    <div class="feature-card reveal p-8 rounded-3xl glass shadow-soft hover:shadow-3d">
+      <div class="w-14 h-14 rounded-2xl gradient-primary shadow-glow flex items-center justify-center mb-6 text-2xl text-white">${i}</div>
+      <h3 class="text-xl font-semibold mb-2">${t}</h3>
+      <p class="text-muted-foreground">${d}</p>
+    </div>`).join('');
+
+  /* Capabilities */
+  const caps = [
+    ['🛡️','Auth & roles','Signup, login, password reset with role-based dashboards.'],
+    ['🏢','Multi-tenant','Self-registration with auto tenant, branch, owner and unique slugs.'],
+    ['🗂️','Floor & tables','Add, edit, merge, transfer and track table status live.'],
+    ['☕','Product CRUD','Manage menu items with images, addons and recipes.'],
+    ['🛍️','Order sessions','Draft → sent → paid flow with customer details.'],
+    ['👨‍🍳','Kitchen workflow','Live tickets, advance and complete items.'],
+    ['💳','Payments','Cash, UPI QR and Razorpay with secure webhook verification.'],
+    ['📱','Self-ordering','Customers scan a table QR to browse, order and pay.'],
+    ['📅','Reservations','Create, confirm, seat and cancel bookings with availability.'],
+    ['🧾','Custom receipts','Branding, layout and bill tweaks per café.'],
+    ['📦','Inventory & stock','Track stock and log adjustments tied to every sale.'],
+    ['🧑‍💼','Attendance','Staff clock-in/out, shifts and reports.'],
+    ['📈','Analytics','Sales, product reports and branch comparisons.'],
+    ['⭐','Customer reviews','Collect post-payment ratings from every guest.'],
+    ['🔔','Web push','Notify staff and customers instantly across devices.'],
+    ['📲','Mobile-ready','Fully responsive UI for phones, tablets and counters.'],
+  ];
+  document.getElementById('cap-grid').innerHTML = caps.map(([i,t,d]) => `
+    <div class="feature-card reveal p-6 rounded-2xl glass shadow-soft hover:shadow-3d">
+      <div class="w-11 h-11 rounded-xl gradient-primary shadow-glow flex items-center justify-center mb-4 text-xl text-white">${i}</div>
+      <h3 class="text-base font-semibold mb-1.5">${t}</h3>
+      <p class="text-sm text-muted-foreground leading-relaxed">${d}</p>
+    </div>`).join('');
+
+  /* Bars in dashboard */
+  const heights = [40,65,50,80,60,90,75,95,70,85,60,100];
+  document.getElementById('bars').innerHTML = heights.map(h => `<div class="bar flex-1 bg-white/40 rounded-t-md" data-h="${h}"></div>`).join('');
+
+  /* Reveal on scroll */
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('in');
+        if (e.target.id === 'hero-inner' || e.target.closest('#hero')) {
+          document.querySelectorAll('#bars .bar').forEach(b => b.style.height = b.dataset.h + '%');
+        }
+      }
+    });
+  }, { threshold: 0.15 });
+  document.querySelectorAll('.reveal, #hero').forEach(el => io.observe(el));
+  // Trigger bars
+  setTimeout(() => document.querySelectorAll('#bars .bar').forEach(b => b.style.height = b.dataset.h + '%'), 400);
+
+  /* 3D scroll-driven transforms */
+  const dashboard = document.getElementById('dashboard-3d');
+  const showcase = document.getElementById('showcase-3d');
+  const showcaseSection = document.getElementById('showcase');
+
+  function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+  function lerp(a,b,t){return a+(b-a)*t;}
+
+  function onScroll() {
+    const vh = window.innerHeight;
+
+    // Hero dashboard: as you scroll down, untilt and scale up, then fade
+    const heroRect = document.getElementById('hero').getBoundingClientRect();
+    const p1 = clamp(1 - (heroRect.bottom / (heroRect.height + vh)), 0, 1);
+    const rotX = lerp(15, 0, clamp(p1 * 2, 0, 1));
+    const sc   = lerp(0.9, 1, clamp(p1 * 2, 0, 1));
+    dashboard.style.transform = `rotateX(${rotX}deg) scale(${sc})`;
+
+    // Showcase: rotate Y from -25 → +25 as section passes through viewport
+    const sRect = showcaseSection.getBoundingClientRect();
+    const total = sRect.height + vh;
+    const passed = clamp(vh - sRect.top, 0, total);
+    const p2 = passed / total; // 0 → 1
+    const rotY = lerp(-25, 25, p2);
+    const sc2  = lerp(0.85, 1, 1 - Math.abs(p2 - 0.5) * 2);
+    showcase.style.transform = `rotateY(${rotY}deg) scale(${sc2})`;
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+</script>
+</body>
+</html>
