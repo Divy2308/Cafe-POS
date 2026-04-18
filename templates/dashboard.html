@@ -1486,7 +1486,7 @@
     else toast(r.error || 'Error', 'error');
   }
 
-  async function logout() { await fetch('/api/logout', { method: 'POST' }); window.location.href = '/'; }
+
 
   document.addEventListener('DOMContentLoaded', async () => {
     await loadBranches();

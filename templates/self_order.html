@@ -337,7 +337,8 @@ function callWaiter() {
 }
 
 async function logout() {
-  await fetch('/api/logout', { method: 'POST' });
+  const r = await api('/api/logout', 'POST');
+  if (!r || r.error) return;
   window.location.href = '/auth';
 }
 </script>

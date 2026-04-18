@@ -129,6 +129,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
 .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:600;font-family:'JetBrains Mono',monospace;letter-spacing:.04em}
 .badge-pending{background:var(--amber-bg);color:var(--amber);border:1px solid rgba(255,179,0,.2)}
 .badge-active{background:var(--green-bg);color:var(--green);border:1px solid rgba(0,230,118,.2)}
+.badge-approved{background:var(--green-bg);color:var(--green);border:1px solid rgba(0,230,118,.2)}
 .badge-rejected{background:var(--red-bg);color:var(--red);border:1px solid rgba(255,71,87,.2)}
 .badge-suspended{background:var(--purple-bg);color:var(--purple);border:1px solid rgba(167,139,250,.2)}
 .badge-trial{background:var(--cyan-bg);color:var(--cyan);border:1px solid rgba(0,212,255,.2)}
@@ -616,6 +617,7 @@ let reqFilter = 'all';
 let reqSearch = '';
 let restSearch = '';
 let currentAction = null;
+let appInitialized = false;
 
 function tryUnlock(){
   const v=document.getElementById('lock-pass').value;
@@ -634,14 +636,17 @@ function togglePass(){
   const i=document.getElementById('lock-pass');
   i.type=i.type==='password'?'text':'password';
 }
-function lockSystem(){
-  document.getElementById('app').style.display='none';
-  document.getElementById('lock').classList.remove('hidden');
-  document.getElementById('lock-pass').value='';
-  document.getElementById('lock-err').textContent='';
+async function lockSystem(){
+  try {
+    await fetch('/shreyapi/logout', { method:'POST' });
+  } finally {
+    window.location.href='/shrey';
+  }
 }
 
 function initApp(){
+  if(appInitialized) return;
+  appInitialized = true;
   startClock();
   renderMiniCharts();
   renderOverviewRequests();
@@ -1034,7 +1039,12 @@ function showToast(msg,color){
   toastTimer=setTimeout(()=>{t.style.transform='translateY(20px)';t.style.opacity='0';},3000);
 }
 
-document.getElementById('lock-pass').addEventListener('keydown',e=>{if(e.key==='Enter')tryUnlock();});
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('lock').classList.add('hidden');
+  document.getElementById('app').style.display='flex';
+  initApp();
+  document.getElementById('lock-pass').addEventListener('keydown',e=>{if(e.key==='Enter')tryUnlock();});
+});
 </script>
 </body>
 </html>

@@ -1,18 +1,18 @@
-import gevent.monkey
 import sys
 
-# On Windows, gevent.monkey.patch_all() can hang during startup, 
-# especially when the Flask reloader is active.
-# Disabling signal and selectors patching improves stability on Windows.
-if sys.platform == "win32":
-    gevent.monkey.patch_all(signal=False, selectors=False)
-else:
+IS_WINDOWS = sys.platform == "win32"
+
+# gevent + Flask's debug reloader is unreliable on Windows and can double-bind
+# the development port. Keep Windows on the simpler threaded path for local dev.
+if not IS_WINDOWS:
+    import gevent.monkey
     gevent.monkey.patch_all()
 
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO, emit, join_room
 from flask_cors import CORS
+from flask_wtf.csrf import CSRFProtect, generate_csrf
 from werkzeug.security import generate_password_hash, check_password_hash
 import qrcode, io, base64, json
 import sqlite3
@@ -73,10 +73,19 @@ if os.path.exists(DB_PATH):
             pass
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'pos-cafe-hackathon-2024'
+_secret_key = os.getenv('SECRET_KEY', 'pos-cafe-default-insecure-key')
+app.config['SECRET_KEY'] = _secret_key
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + DB_PATH.replace('\\', '/')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'connect_args': {'timeout': 30}}
+# Security: protect session cookies from JS access and downgrade attacks
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+# Only set Secure flag in production (HTTPS). Set HTTPS_ONLY=1 in your env.
+if os.getenv('HTTPS_ONLY', '0') == '1':
+    app.config['SESSION_COOKIE_SECURE'] = True
+# CSRF config
+app.config['WTF_CSRF_TIME_LIMIT'] = 3600  # 1 hour token lifetime
 
 SMTP_HOST = os.getenv('SMTP_HOST', '').strip()
 SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
@@ -96,20 +105,36 @@ RAZORPAY_KEY_ID = os.getenv('RAZORPAY_KEY_ID', '').strip()
 RAZORPAY_KEY_SECRET = os.getenv('RAZORPAY_KEY_SECRET', '').strip()
 RAZORPAY_CURRENCY = os.getenv('RAZORPAY_CURRENCY', 'INR').strip().upper() or 'INR'
 RAZORPAY_MERCHANT_NAME = os.getenv('RAZORPAY_MERCHANT_NAME', 'POS Cafe').strip() or 'POS Cafe'
-
 PASSWORD_RESET_CODES = {}
 
 db = SQLAlchemy(app)
-try:
-    import gevent  # noqa: F401
-    _async_mode = 'gevent'
-except ImportError:
+csrf = CSRFProtect(app)
+if IS_WINDOWS:
+    _async_mode = 'threading'
+else:
     try:
-        import eventlet  # noqa: F401
-        _async_mode = 'eventlet'
+        import gevent  # noqa: F401
+        _async_mode = 'gevent'
     except ImportError:
-        _async_mode = None
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode=_async_mode)
+        try:
+            import eventlet  # noqa: F401
+            _async_mode = 'eventlet'
+        except ImportError:
+            _async_mode = None
+
+_allowed_origins = os.getenv('ALLOWED_ORIGINS', '*')
+if _allowed_origins != '*':
+    _allowed_origins = [o.strip() for o in _allowed_origins.split(',')]
+else:
+    import logging
+    logging.warning('[SECURITY] SocketIO cors_allowed_origins is "*". Set ALLOWED_ORIGINS in .env for production.')
+
+# Warn if running with the default insecure key
+if _secret_key == 'pos-cafe-default-insecure-key':
+    import logging
+    logging.warning('[SECURITY] Using default SECRET_KEY. Set a strong SECRET_KEY in .env before deploying to production.')
+
+socketio = SocketIO(app, cors_allowed_origins=_allowed_origins, async_mode=_async_mode)
 CORS(app)
 
 
@@ -137,6 +162,17 @@ def from_json_filter(s):
     except:
         return {}
 
+@app.context_processor
+def inject_csrf_token():
+    """Make csrf_token() available in all Jinja2 templates."""
+    return {'csrf_token': generate_csrf}
+
+@app.route('/api/csrf-token', methods=['GET'])
+def get_csrf_token():
+    """Return a CSRF token for use by JS SPAs that can't use Jinja2."""
+    return jsonify({'csrf_token': generate_csrf()})
+
+
 # ─── Models ───────────────────────────────────────────────
 class Tenant(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -145,6 +181,7 @@ class Tenant(db.Model):
     logo_b64 = db.Column(db.Text, default='')
     plan = db.Column(db.String(20), default='free')
     is_active = db.Column(db.Boolean, default=True)
+    approval_status = db.Column(db.String(20), default='approved')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     owner_id = db.Column(db.Integer, nullable=True)
 
@@ -518,17 +555,40 @@ def find_user_by_email(email):
         return None
     return User.query.filter(db.func.lower(User.email) == email.lower()).first()
 
+def get_tenant_access_block_message(user):
+    if not user or not user.tenant_id or getattr(user, 'is_platform_admin', False):
+        return None
+    tenant = Tenant.query.get(user.tenant_id)
+    if not tenant:
+        return None
+
+    status = (tenant.approval_status or ('approved' if tenant.is_active else 'pending')).strip().lower()
+    if status == 'pending':
+        return 'Your restaurant request is pending admin approval.'
+    if status == 'rejected':
+        return 'Your restaurant request was rejected. Contact admin for review.'
+    if status == 'suspended':
+        return 'This restaurant account is suspended.'
+    if not tenant.is_active:
+        return 'This restaurant account is not active.'
+    return None
+
 def make_slug(name):
     """Convert a name like 'Chai Point Cafe' to 'chai-point-cafe'."""
     slug = re.sub(r'[^a-z0-9]+', '-', (name or '').strip().lower()).strip('-')
     return slug or 'my-cafe'
 
 def get_current_tenant_id():
-    """Get the current tenant_id from session."""
-    tid = request.args.get('tenant_id')
-    if tid:
-        try: return int(tid)
-        except: pass
+    """Get the current tenant_id from session. Only allow URL override for platform admins."""
+    user = get_current_user()
+    # If the user is a platform admin, they can see any tenant via ?tenant_id=
+    if user and getattr(user, 'is_platform_admin', False):
+        tid = request.args.get('tenant_id')
+        if tid:
+            try: return int(tid)
+            except: pass
+    
+    # Otherwise, strictly use the session's tenant_id (assigned at login)
     return session.get('tenant_id')
 
 def get_current_tenant():
@@ -844,64 +904,7 @@ def auth():
         return redirect(role_home(session.get('user_role')))
     return render_template('auth.html')
 
-@app.route('/api/signup', methods=['POST'])
-def signup():
-    d = request.json or {}
-    if User.query.filter_by(email=d['email']).first():
-        return jsonify({'error': 'Email already exists'}), 400
-    password_error = strong_password_error(d.get('password', ''), d.get('email', ''))
-    if password_error:
-        return jsonify({'error': password_error}), 400
-    role = normalize_role(d.get('role', 'cashier'))
-    # Map unsupported roles to the closest valid role.
-    if role not in ('cashier', 'restaurant', 'kitchen', 'manager', 'customer'):
-        role = 'cashier'
-    creator = get_current_user()
-    branch_id = d.get('branch_id')
-    if branch_id:
-        try:
-            branch_id = int(branch_id)
-        except (TypeError, ValueError):
-            branch_id = None
-    elif creator:
-        branch_id = get_active_branch_id(creator)
-    else:
-        default_branch = get_default_branch()
-        branch_id = default_branch.id if default_branch else None
 
-    if creator and not is_superadmin(creator):
-        branch_id = creator.branch_id
-
-    tenant_id = None
-    if creator:
-        tenant_id = creator.tenant_id
-    elif d.get('tenant_id'):
-        tenant_id = int(d['tenant_id'])
-    else:
-        # Assign to default tenant
-        t = Tenant.query.order_by(Tenant.id.asc()).first()
-        tenant_id = t.id if t else None
-
-    u = User(
-        name=d['name'],
-        email=d['email'],
-        password=generate_password_hash(d['password'], method='scrypt'),
-        role=role,
-        branch_id=branch_id,
-        tenant_id=tenant_id,
-        hourly_rate=float(d.get('hourly_rate', 0) or 0),
-        is_superadmin=bool(d.get('is_superadmin', False)) and bool(creator and is_superadmin(creator)),
-    )
-    db.session.add(u)
-    db.session.commit()
-    if not creator:
-        session['user_id'] = u.id
-        session['user_name'] = u.name
-        session['user_role'] = role
-        session['tenant_id'] = u.tenant_id
-        if u.branch_id:
-            session['active_branch_id'] = u.branch_id
-    return jsonify({'ok': True, 'name': u.name, 'role': u.role})
 
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -909,6 +912,9 @@ def login():
     u = User.query.filter_by(email=d['email']).first()
     if not u or not check_password_hash(u.password, d['password']):
         return jsonify({'error': 'Invalid credentials'}), 401
+    blocked_message = get_tenant_access_block_message(u)
+    if blocked_message:
+        return jsonify({'error': blocked_message}), 403
     session['user_id'] = u.id
     session['user_name'] = u.name
     session['user_role'] = normalize_role(u.role)
@@ -980,83 +986,17 @@ def reservation_qr_code(tenant_id):
     b64 = base64.b64encode(buf.getvalue()).decode()
     return jsonify({'qr': f'data:image/png;base64,{b64}', 'url': url})
 
-@app.route('/api/quick-login', methods=['POST'])
-def quick_login():
-    """Dev endpoint: quickly login as a test user by role (customer/staff/owner)."""
-    d = request.json or {}
-    role_param = (d.get('role') or '').strip().lower()
-    
-    role_map = {
-        'customer': 'customer',
-        'user': 'customer',
-        'staff': 'cashier',
-        'pos': 'cashier',
-        'owner': 'restaurant',
-        'admin': 'restaurant'
-    }
-    
-    role = role_map.get(role_param, 'customer')
-    test_email = f'{role_param}@test.cafe'
-    test_password = 'Test@1234567'
-    
-    # Try to find existing test user
-    user = User.query.filter_by(email=test_email).first()
-    
-    # Create test user if doesn't exist
-    if not user:
-        from werkzeug.security import generate_password_hash
-        # Get or create Default Tenant for test users
-        default_tenant = Tenant.query.filter_by(slug='default').first()
-        if not default_tenant:
-            default_tenant = Tenant(name='Default Tenant', slug='default', plan='free', is_active=True)
-            db.session.add(default_tenant)
-            db.session.flush()
-        
-        default_branch = Branch.query.filter_by(tenant_id=default_tenant.id).order_by(Branch.id.asc()).first()
-        branch_id = default_branch.id if default_branch else None
-        
-        user = User(
-            name=f'Test {role_param.title()}',
-            email=test_email,
-            password=generate_password_hash(test_password, method='scrypt'),
-            role=role,
-            tenant_id=default_tenant.id,
-            branch_id=branch_id,
-            is_superadmin=(role == 'restaurant')
-        )
-        db.session.add(user)
-        db.session.commit()
-    
-    # Log them in
-    session['user_id'] = user.id
-    session['user_name'] = user.name
-    session['user_role'] = normalize_role(user.role)
-    session['tenant_id'] = user.tenant_id or Tenant.query.filter_by(slug='default').first().id
-    if user.branch_id:
-        session['active_branch_id'] = user.branch_id
-    elif is_superadmin(user):
-        default_branch = get_default_branch()
-        if default_branch:
-            session['active_branch_id'] = default_branch.id
-    
-    session.modified = True  # Force Flask to save session
-    home_url = role_home(session['user_role'])
-    
-    return jsonify({
-        'ok': True,
-        'name': user.name,
-        'role': session['user_role'],
-        'home': home_url
-    })
+
 
 @app.route('/api/register-restaurant', methods=['POST'])
 def register_restaurant():
-    """Onboard a new restaurant: creates Tenant + Branch + Owner user."""
+    """Create a restaurant onboarding request pending admin approval."""
     d = request.json or {}
     restaurant_name = (d.get('restaurant_name') or '').strip()
     name = (d.get('name') or '').strip()
     email = (d.get('email') or '').strip()
     password = d.get('password') or ''
+    phone = (d.get('phone') or '').strip()
 
     if not restaurant_name or not name or not email or not password:
         return jsonify({'error': 'Restaurant name, your name, email, and password are required'}), 400
@@ -1075,12 +1015,21 @@ def register_restaurant():
         counter += 1
 
     # Create tenant
-    tenant = Tenant(name=restaurant_name, slug=slug)
+    tenant = Tenant(
+        name=restaurant_name,
+        slug=slug,
+        is_active=False,
+        approval_status='pending',
+    )
     db.session.add(tenant)
     db.session.flush()
 
     # Create default branch
-    branch = Branch(name=f'{restaurant_name} — Main', tenant_id=tenant.id)
+    branch = Branch(
+        name=f'{restaurant_name} — Main',
+        tenant_id=tenant.id,
+        phone=phone,
+    )
     db.session.add(branch)
     db.session.flush()
 
@@ -1108,18 +1057,12 @@ def register_restaurant():
 
     db.session.commit()
 
-    # Log them in
-    session['user_id'] = owner.id
-    session['user_name'] = owner.name
-    session['user_role'] = 'restaurant'
-    session['tenant_id'] = tenant.id
-    session['active_branch_id'] = branch.id
-
     return jsonify({
         'ok': True,
         'name': owner.name,
-        'role': 'restaurant',
+        'status': 'pending',
         'tenant_slug': tenant.slug,
+        'message': 'Request submitted. Login will be enabled after admin approval.',
     })
 
 @app.route('/api/password-reset/request', methods=['POST'])
@@ -1238,10 +1181,33 @@ def dashboard():
         is_superadmin=is_superadmin(),
     )
 
+def _serialize_shrey_request(tenant):
+    owner = User.query.get(tenant.owner_id) if tenant.owner_id else User.query.filter_by(
+        tenant_id=tenant.id, role='restaurant'
+    ).order_by(User.id.asc()).first()
+    branch = Branch.query.filter_by(tenant_id=tenant.id).order_by(Branch.id.asc()).first()
+    status = (tenant.approval_status or ('approved' if tenant.is_active else 'pending')).strip().lower()
+    return {
+        'id': tenant.id,
+        'name': tenant.name,
+        'owner': owner.name if owner else '—',
+        'email': owner.email if owner else '',
+        'city': (branch.address or '').strip() or '—',
+        'phone': (branch.phone or '').strip() or '—',
+        'plan': tenant.plan or 'free',
+        'applied': tenant.created_at.strftime('%Y-%m-%d') if tenant.created_at else '',
+        'status': status,
+        'type': 'Restaurant',
+        'note': '',
+    }
+
 @app.route('/shrey')
 def shrey_login_page():
+    if session.get('shrey_admin'):
+        return render_template('shrey.html')
     return render_template('shrey_login.html')
 
+@csrf.exempt
 @app.route('/shreyapi/login', methods=['POST'])
 def shrey_login_api():
     d = request.json or {}
@@ -1250,11 +1216,52 @@ def shrey_login_api():
         return jsonify({'ok': True})
     return jsonify({'error': 'Invalid credentials'}), 401
 
+@csrf.exempt
+@app.route('/shreyapi/logout', methods=['POST'])
+def shrey_logout_api():
+    session.pop('shrey_admin', None)
+    return jsonify({'ok': True})
+
 @app.route('/shreyadmin')
 def shreyadmin_page():
+    return redirect(url_for('shrey_login_page'))
+
+@app.route('/api/shrey/requests')
+def shrey_requests_api():
     if not session.get('shrey_admin'):
-        return redirect(url_for('shrey_login_page'))
-    return render_template('shrey.html')
+        return jsonify({'error': 'unauthorized'}), 401
+
+    tenants = Tenant.query.order_by(Tenant.created_at.desc(), Tenant.id.desc()).all()
+    requests = []
+    for tenant in tenants:
+        if tenant.slug == 'default' or not tenant.owner_id:
+            continue
+        requests.append(_serialize_shrey_request(tenant))
+    return jsonify({'requests': requests})
+
+@csrf.exempt
+@app.route('/api/shrey/requests/<int:tenant_id>/approve', methods=['POST'])
+def approve_shrey_request(tenant_id):
+    if not session.get('shrey_admin'):
+        return jsonify({'error': 'unauthorized'}), 401
+
+    tenant = Tenant.query.get_or_404(tenant_id)
+    tenant.is_active = True
+    tenant.approval_status = 'approved'
+    db.session.commit()
+    return jsonify({'ok': True, 'request': _serialize_shrey_request(tenant)})
+
+@csrf.exempt
+@app.route('/api/shrey/requests/<int:tenant_id>/reject', methods=['POST'])
+def reject_shrey_request(tenant_id):
+    if not session.get('shrey_admin'):
+        return jsonify({'error': 'unauthorized'}), 401
+
+    tenant = Tenant.query.get_or_404(tenant_id)
+    tenant.is_active = False
+    tenant.approval_status = 'rejected'
+    db.session.commit()
+    return jsonify({'ok': True, 'request': _serialize_shrey_request(tenant)})
 
 # ─── API: Products ─────────────────────────────────────────
 @app.route('/api/products', methods=['GET'])
@@ -3754,6 +3761,19 @@ def ensure_payment_method_schema():
             conn.exec_driver_sql('ALTER TABLE "payment_method" ADD COLUMN tenant_id INTEGER')
         conn.commit()
 
+def ensure_tenant_schema():
+    # Older SQLite databases may not have the tenant approval_status column yet.
+    with db.engine.connect() as conn:
+        rows = conn.exec_driver_sql('PRAGMA table_info("tenant")').fetchall()
+        columns = {row[1] for row in rows}
+        if 'approval_status' not in columns:
+            conn.exec_driver_sql('ALTER TABLE "tenant" ADD COLUMN approval_status VARCHAR(20) DEFAULT "approved"')
+        conn.exec_driver_sql(
+            "UPDATE tenant SET approval_status = 'approved' "
+            "WHERE approval_status IS NULL OR TRIM(approval_status) = ''"
+        )
+        conn.commit()
+
 def ensure_order_table_schema():
     # Older SQLite databases may not have the newer order columns added in code.
     # Add them in-place so existing data stays intact.
@@ -4449,6 +4469,7 @@ def ensure_sample_data():
 
 with app.app_context():
     db.create_all()
+    ensure_tenant_schema()
     seed_data()
     ensure_payment_method_schema()
     ensure_payment_methods()
@@ -4464,4 +4485,12 @@ if __name__ == '__main__':
     import os
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_ENV') != 'production'
-    socketio.run(app, host='0.0.0.0', port=port, debug=debug, allow_unsafe_werkzeug=True)
+    use_reloader = debug and not IS_WINDOWS
+    socketio.run(
+        app,
+        host='0.0.0.0',
+        port=port,
+        debug=debug,
+        use_reloader=use_reloader,
+        allow_unsafe_werkzeug=True,
+    )

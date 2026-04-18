@@ -16,6 +16,18 @@
   .toggle input:checked + .toggle-slider { background:#f97316; }
   .toggle input:checked + .toggle-slider:before { transform:translateX(20px); background:white; }
   .modal-bg { background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); }
+  
+  /* Modal Scrollability */
+  #product-modal .card,
+  #delete-modal .card,
+  #floor-modal .card,
+  #table-modal .card,
+  #inventory-modal .card,
+  #stock-adjust-modal .card {
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
 
   /* Touch-friendly inputs */
   input[type="text"],
@@ -1069,7 +1081,7 @@ async function loadReviews() {
   allReviews=rv; renderReviews();
 }
 
-async function logout() { await fetch('/api/logout',{method:'POST'}); window.location.href='/'; }
+
 
 init();
 </script>

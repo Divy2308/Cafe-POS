@@ -1112,6 +1112,603 @@
     }
   }
 
+  /* ─── PAYMENT MODAL ─── */
+  .pay-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .65);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 9000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .pay-overlay.open {
+    display: flex;
+    animation: overlayIn .25s ease both;
+  }
+
+  @keyframes overlayIn {
+    from { opacity: 0 }
+    to { opacity: 1 }
+  }
+
+  .pay-modal {
+    background: #fff;
+    border-radius: 24px;
+    padding: 0;
+    max-width: 420px;
+    width: 100%;
+    overflow: hidden;
+    box-shadow: 0 40px 100px rgba(0,0,0,.4), 0 0 0 1px rgba(113,75,103,.1);
+    animation: modalUp .35s cubic-bezier(.16,1,.3,1) both;
+  }
+
+  @keyframes modalUp {
+    from { opacity: 0; transform: translateY(24px) scale(.97) }
+    to   { opacity: 1; transform: none }
+  }
+
+  .pay-modal-head {
+    background: linear-gradient(135deg, var(--ember), var(--ember3));
+    padding: 28px 28px 24px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .pay-modal-head::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='0.07'/%3E%3C/svg%3E");
+    pointer-events: none;
+  }
+
+  .pay-modal-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,.15);
+    border: 1px solid rgba(255,255,255,.25);
+    border-radius: 100px;
+    padding: 4px 12px;
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: .1em;
+    color: rgba(255,255,255,.9);
+    margin-bottom: 16px;
+  }
+
+  .pay-modal-badge-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #fff;
+    animation: blink 1.8s ease-in-out infinite;
+  }
+
+  .pay-modal-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 34px;
+    color: #fff;
+    letter-spacing: .02em;
+    line-height: 1;
+    margin-bottom: 6px;
+    position: relative;
+  }
+
+  .pay-modal-sub {
+    font-size: 13px;
+    color: rgba(255,255,255,.8);
+    line-height: 1.55;
+    position: relative;
+  }
+
+  .pay-modal-body {
+    padding: 24px 28px 28px;
+    background: #fff;
+  }
+
+  .pay-amount-card {
+    background: rgba(113,75,103,.05);
+    border: 1.5px solid rgba(113,75,103,.15);
+    border-radius: 16px;
+    padding: 18px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+  }
+
+  .pay-amount-label {
+    font-size: 12px;
+    color: #6b7280;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: .06em;
+    margin-bottom: 4px;
+  }
+
+  .pay-amount-value {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 36px;
+    color: var(--ember);
+    letter-spacing: .02em;
+    line-height: 1;
+  }
+
+  .pay-amount-note {
+    font-size: 11px;
+    color: #9ca3af;
+    margin-top: 3px;
+  }
+
+  .pay-badge-secure {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+
+  .pay-badge-rzp {
+    background: #072654;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .pay-badge-ssl {
+    font-size: 10px;
+    color: #22c55e;
+    font-family: 'DM Mono', monospace;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .pay-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .pay-step {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .pay-step-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--ember), var(--ember3));
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .pay-step-text {
+    font-size: 13px;
+    color: #374151;
+    line-height: 1.5;
+  }
+
+  .pay-step-text strong {
+    color: #111827;
+    font-weight: 700;
+  }
+
+  .btn-pay {
+    width: 100%;
+    min-height: 50px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #072654, #1a3a6e);
+    color: white;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    border: none;
+    cursor: pointer;
+    font-family: 'Cabinet Grotesk', sans-serif;
+    box-shadow: 0 8px 24px rgba(7,38,84,.35);
+    transition: all .25s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .btn-pay:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 36px rgba(7,38,84,.45);
+  }
+
+  .btn-pay:active {
+    transform: scale(.96);
+  }
+
+  .btn-confirm-pay {
+    width: 100%;
+    min-height: 50px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #16a34a, #15803d);
+    color: white;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    border: none;
+    cursor: pointer;
+    font-family: 'Cabinet Grotesk', sans-serif;
+    box-shadow: 0 8px 24px rgba(22,163,74,.3);
+    transition: all .25s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    display: none;
+  }
+
+  .btn-confirm-pay.visible {
+    display: flex;
+    animation: panelIn .35s cubic-bezier(.16,1,.3,1) both;
+  }
+
+  .btn-confirm-pay:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 36px rgba(22,163,74,.4);
+  }
+
+  .pay-cancel {
+    display: block;
+    text-align: center;
+    font-size: 12px;
+    color: #9ca3af;
+    font-family: 'DM Mono', monospace;
+    cursor: pointer;
+    transition: color .2s;
+    background: none;
+    border: none;
+    width: 100%;
+    padding: 6px;
+  }
+
+  .pay-cancel:hover {
+    color: #6b7280;
+  }
+
+  .pay-waiting {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 14px;
+    background: rgba(113,75,103,.05);
+    border: 1px dashed rgba(113,75,103,.2);
+    border-radius: 12px;
+    margin-bottom: 10px;
+    font-size: 13px;
+    color: #6b7280;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .pay-waiting.visible {
+    display: flex;
+    animation: panelIn .35s cubic-bezier(.16,1,.3,1) both;
+  }
+
+  .pay-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(113,75,103,.2);
+    border-top-color: var(--ember);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg) }
+  }
+
+  /* ─── PAYMENT METHOD TABS ─── */
+  .pay-method-tabs {
+    display: flex;
+    gap: 6px;
+    background: rgba(0,0,0,.04);
+    border: 1px solid rgba(0,0,0,.07);
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 16px;
+  }
+
+  .pay-method-tab {
+    flex: 1;
+    padding: 10px 8px;
+    border-radius: 9px;
+    font-size: 12px;
+    font-weight: 700;
+    font-family: 'Cabinet Grotesk', sans-serif;
+    letter-spacing: .02em;
+    border: none;
+    background: transparent;
+    color: #6b7280;
+    cursor: pointer;
+    transition: all .22s cubic-bezier(.16,1,.3,1);
+  }
+
+  .pay-method-tab.active {
+    background: linear-gradient(135deg, var(--ember), var(--ember3));
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(113,75,103,.35);
+  }
+
+  .pay-method-tab:hover:not(.active) {
+    background: rgba(0,0,0,.06);
+    color: #374151;
+  }
+
+  .pay-tab-panel {
+    display: none;
+  }
+
+  .pay-tab-panel.active {
+    display: block;
+    animation: panelIn .3s cubic-bezier(.16,1,.3,1) both;
+  }
+
+  /* ─── QR CODE ─── */
+  .qr-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 0 12px;
+  }
+
+  .qr-image {
+    width: 200px;
+    height: 200px;
+    object-fit: contain;
+    border-radius: 16px;
+    border: 3px solid rgba(113,75,103,.15);
+    box-shadow: 0 8px 28px rgba(0,0,0,.12);
+    background: #fff;
+    padding: 4px;
+    transition: transform .3s, box-shadow .3s;
+  }
+
+  .qr-image:hover {
+    transform: scale(1.03);
+    box-shadow: 0 14px 40px rgba(0,0,0,.18);
+  }
+
+  .qr-label {
+    margin-top: 12px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #374151;
+    letter-spacing: .02em;
+  }
+
+  .qr-apps {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 8px;
+  }
+
+  .qr-app-pill {
+    background: rgba(113,75,103,.07);
+    border: 1px solid rgba(113,75,103,.14);
+    border-radius: 100px;
+    padding: 3px 10px;
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    color: var(--ember);
+    letter-spacing: .04em;
+  }
+
+  /* ─── SUCCESS SCREEN ─── */
+  .success-screen {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: #f9fafb;
+    z-index: 99999;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+  }
+
+  .success-screen.show {
+    display: flex;
+    animation: overlayIn .3s ease both;
+  }
+
+  .success-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 40px 24px;
+    max-width: 400px;
+    animation: modalUp .5s cubic-bezier(.16,1,.3,1) both;
+  }
+
+  .success-check-wrap {
+    margin-bottom: 24px;
+  }
+
+  .success-check-svg {
+    width: 90px;
+    height: 90px;
+  }
+
+  .success-circle {
+    stroke-dasharray: 233;
+    stroke-dashoffset: 233;
+    animation: drawCircle .6s ease forwards;
+  }
+
+  .success-tick {
+    stroke-dasharray: 60;
+    stroke-dashoffset: 60;
+    animation: drawTick .4s ease .55s forwards;
+  }
+
+  @keyframes drawCircle { to { stroke-dashoffset: 0 } }
+  @keyframes drawTick   { to { stroke-dashoffset: 0 } }
+
+  .success-badge {
+    display: inline-flex;
+    align-items: center;
+    background: rgba(34,197,94,.1);
+    border: 1px solid rgba(34,197,94,.25);
+    border-radius: 100px;
+    padding: 4px 14px;
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: .14em;
+    color: #16a34a;
+    margin-bottom: 18px;
+  }
+
+  .success-heading {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(32px, 6vw, 52px);
+    line-height: .95;
+    color: #111827;
+    letter-spacing: .02em;
+    margin-bottom: 10px;
+  }
+
+  .success-heading span {
+    color: #16a34a;
+  }
+
+  .success-restaurant {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--ember);
+    letter-spacing: .06em;
+    margin-bottom: 10px;
+  }
+
+  .success-sub {
+    font-size: 14px;
+    color: #6b7280;
+    line-height: 1.65;
+    margin-bottom: 28px;
+  }
+
+  .success-countdown-wrap {
+    position: relative;
+    width: 56px;
+    height: 56px;
+    margin-bottom: 10px;
+  }
+
+  .success-ring {
+    width: 56px;
+    height: 56px;
+    position: absolute;
+    inset: 0;
+  }
+
+  .success-ring-fill {
+    transition: stroke-dashoffset .1s linear;
+  }
+
+  .success-countdown-num {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    color: #16a34a;
+    line-height: 1;
+  }
+
+  .success-redirect-note {
+    font-size: 11px;
+    color: #9ca3af;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: .06em;
+  }
+
+  /* ─── QR EXTRA ELEMENTS ─── */
+  .qr-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 0 12px;
+    gap: 4px;
+  }
+
+  .qr-upi-id {
+    margin-top: 6px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    letter-spacing: .05em;
+    color: #6b7280;
+    background: rgba(0,0,0,.05);
+    border-radius: 8px;
+    padding: 4px 12px;
+    word-break: break-all;
+  }
+
+  .qr-open-app-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 14px;
+    padding: 10px 20px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #16a34a, #15803d);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: 'Cabinet Grotesk', sans-serif;
+    text-decoration: none;
+    transition: transform .2s, box-shadow .2s;
+    box-shadow: 0 4px 14px rgba(22,163,74,.35);
+  }
+
+  .qr-open-app-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(22,163,74,.4);
+  }
+
+  .qr-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+    gap: 6px;
+    font-size: 13px;
+    color: #ef4444;
+    text-align: center;
+  }
+
   /* ─── FOOTER NOTE ─── */
   .form-footer-note {
     text-align: center;
@@ -1274,7 +1871,6 @@
       <!-- TAB BAR -->
       <div class="tab-bar">
         <button class="tab-btn active" id="tab-login" onclick="switchTab('login')">Login</button>
-        <button class="tab-btn" id="tab-signup" onclick="switchTab('signup')">Sign Up</button>
         <button class="tab-btn" id="tab-register" onclick="switchTab('register')">Start Business</button>
       </div>
 
@@ -1310,88 +1906,11 @@
               Open Session →
             </button>
 
-            <!-- QUICK DEV LOGIN BUTTONS -->
-            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
-              <div
-                style="font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px;">
-                Quick Access (Dev)</div>
-              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
-                <button class="btn-ghost" onclick="doQuickLogin('customer')" style="padding: 12px; font-size: 12px;">👤
-                  Customer</button>
-                <button class="btn-ghost" onclick="doQuickLogin('staff')" style="padding: 12px; font-size: 12px;">👨‍💼
-                  Staff</button>
-                <button class="btn-ghost" onclick="doQuickLogin('owner')" style="padding: 12px; font-size: 12px;">👑
-                  Owner</button>
-              </div>
-              <div style="margin-top: 12px; font-size: 10px; font-family: 'DM Mono', monospace; color: var(--muted);">
-                Sample menu IDs: 14, 15, 22, 23, 31, 32
-              </div>
-            </div>
-
             <div class="security-note">
               <span class="security-note-icon">🔒</span>
               <span class="security-note-text"><strong>Secure session:</strong> Passwords are bcrypt-hashed. Sessions
                 expire automatically after inactivity.</span>
             </div>
-          </div>
-        </div>
-
-        <!-- ── SIGN UP ── -->
-        <div class="form-panel" id="form-signup">
-          <div class="form-card-head">
-            <div class="form-eyebrow">Create Account</div>
-            <div class="form-title">Set up <em>access.</em></div>
-            <div class="form-sub">Choose a strong password. Weak passwords are rejected server-side too.</div>
-          </div>
-          <div class="form-card-body">
-            <div class="alert error" id="signup-alert">
-              <span>⚠</span><span id="signup-alert-msg">Please fill in all fields.</span>
-            </div>
-            <div class="field">
-              <label>Full name</label>
-              <input type="text" id="signup-name" placeholder="Your full name" autocomplete="name">
-            </div>
-            <div class="field">
-              <label>Work email</label>
-              <input type="email" id="signup-email" placeholder="you@cafe.com" autocomplete="email"
-                oninput="renderPasswordPolicy('signup')">
-            </div>
-            <div class="field">
-              <label>Password</label>
-              <div class="pw-wrap">
-                <input type="password" id="signup-password" placeholder="Create a strong password"
-                  autocomplete="new-password" oninput="renderPasswordPolicy('signup')">
-                <button type="button" class="pw-toggle" onclick="togglePassword('signup-password', this)">Show</button>
-              </div>
-              <!-- strength meter -->
-              <div class="strength-wrap">
-                <div class="strength-bars">
-                  <div class="strength-bar" id="su-b1"></div>
-                  <div class="strength-bar" id="su-b2"></div>
-                  <div class="strength-bar" id="su-b3"></div>
-                  <div class="strength-bar" id="su-b4"></div>
-                </div>
-                <div class="strength-meta">
-                  <span class="strength-label" id="su-strength-label">Enter a password</span>
-                  <span id="signup-meter-label"
-                    style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace"></span>
-                </div>
-              </div>
-              <div class="policy-grid" id="signup-rules"></div>
-            </div>
-            <div class="field">
-              <label>Account role</label>
-              <select id="signup-role">
-                <option value="cashier" selected>Staff / POS Operator</option>
-                <option value="customer">User / Customer</option>
-                <option value="restaurant">Restaurant Admin</option>
-              </select>
-              <small style="color: var(--muted); font-size: 11px; margin-top: 6px; display: block;">Select "Staff" for
-                POS terminal access or "User / Customer" for the customer view.</small>
-            </div>
-            <button class="btn-primary" id="signup-btn" onclick="doSignup()" style="margin-top:4px">
-              Create Account →
-            </button>
           </div>
         </div>
 
@@ -1452,15 +1971,10 @@
               <input type="tel" id="register-phone" placeholder="+91 12345 67890" autocomplete="tel">
             </div>
 
-            <button class="btn-primary" id="register-btn" onclick="doRegisterRestaurant()" style="margin-top:8px">
-              Create Restaurant →
+            <button class="btn-primary" id="register-btn" data-label="Create Restaurant Account →"
+              onclick="doRegisterRestaurant()" style="margin-top:8px">
+              Create Restaurant Account →
             </button>
-
-            <div class="security-note">
-              <span class="security-note-icon">🔒</span>
-              <span class="security-note-text"><strong>Secure setup:</strong> You'll be automatically logged in as
-                owner. Invite staff members in settings after.</span>
-            </div>
           </div>
         </div>
 
@@ -1563,7 +2077,34 @@
   </section>
 
 </div><!-- /auth-shell -->
-{% endblock %}
+
+<!-- ═══════════ SUCCESS SCREEN ═══════════ -->
+<div class="success-screen" id="success-screen">
+  <div class="success-content">
+    <div class="success-check-wrap">
+      <svg class="success-check-svg" viewBox="0 0 80 80" fill="none">
+        <circle class="success-circle" cx="40" cy="40" r="37" stroke="#22c55e" stroke-width="5" fill="none"/>
+        <polyline class="success-tick" points="22,42 35,55 58,28" stroke="#22c55e" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+    </div>
+    <div class="success-badge">REQUEST SUBMITTED</div>
+    <h2 class="success-heading">Welcome aboard,<br><span id="success-owner-name">Owner</span>!</h2>
+    <p class="success-restaurant" id="success-restaurant-name"></p>
+    <p class="success-sub">Your restaurant request is waiting for admin approval.<br>Taking you to login…</p>
+    <div class="success-countdown-wrap">
+      <svg class="success-ring" viewBox="0 0 44 44">
+        <circle cx="22" cy="22" r="19" fill="none" stroke="rgba(34,197,94,.15)" stroke-width="3"/>
+        <circle class="success-ring-fill" cx="22" cy="22" r="19" fill="none" stroke="#22c55e" stroke-width="3"
+          stroke-dasharray="119.4" stroke-dashoffset="119.4" stroke-linecap="round"
+          transform="rotate(-90 22 22)" id="countdown-ring"/>
+      </svg>
+      <span class="success-countdown-num" id="countdown-num">3</span>
+    </div>
+    <p class="success-redirect-note">Redirecting to Login</p>
+  </div>
+</div>
+
+{% endblock %}{# /body #}
 
 {% block scripts %}
 <script>
@@ -1583,12 +2124,13 @@
      TAB SWITCHER
   ══════════════════════════════════ */
   function switchTab(tab) {
-    ['login', 'signup', 'register', 'reset'].forEach(t => {
-      document.getElementById('form-' + t).classList.toggle('active', t === tab);
-      document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+    ['login', 'register', 'reset'].forEach(t => {
+      const panel = document.getElementById('form-' + t);
+      const btn = document.getElementById('tab-' + t);
+      if (panel) panel.classList.toggle('active', t === tab);
+      if (btn) btn.classList.toggle('active', t === tab);
     });
     clearAlerts();
-    if (tab === 'signup') renderPasswordPolicy('signup');
     if (tab === 'register') renderPasswordPolicy('register');
     if (tab === 'reset') { renderPasswordPolicy('reset'); resetStepDots(1); }
   }
@@ -1655,8 +2197,8 @@
     const pct = Math.round((passed / total) * 100);
 
     /* bars */
-    const barIds = prefix === 'signup'
-      ? ['su-b1', 'su-b2', 'su-b3', 'su-b4']
+    const barIds = prefix === 'register'
+      ? ['reg-b1', 'reg-b2', 'reg-b3', 'reg-b4']
       : ['rs-b1', 'rs-b2', 'rs-b3', 'rs-b4'];
     const cls = passed <= 2 ? 'weak' : passed <= 4 ? 'fair' : 'strong';
     barIds.forEach((id, i) => {
@@ -1666,7 +2208,7 @@
     });
 
     /* label */
-    const sLabel = document.getElementById((prefix === 'signup' ? 'su' : 'rs') + '-strength-label');
+    const sLabel = document.getElementById((prefix === 'register' ? 'reg' : 'rs') + '-strength-label');
     if (sLabel) {
       sLabel.textContent = !pw ? 'Enter a password' : passed <= 2 ? 'Weak' : passed <= 4 ? 'Fair' : 'Strong';
       sLabel.className = 'strength-label' + (pw ? ' ' + cls : '');
@@ -1757,7 +2299,11 @@
   ══════════════════════════════════ */
   async function api(url, method = 'GET', body = null) {
     try {
-      const opts = { method, headers: { 'Content-Type': 'application/json' } };
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+      const opts = {
+        method,
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }
+      };
       if (body) opts.body = JSON.stringify(body);
       const res = await fetch(url, opts);
       return await res.json();
@@ -1787,40 +2333,9 @@
   }
 
   /* ══════════════════════════════════
-     QUICK LOGIN (for dev/testing)
+     REGISTER RESTAURANT
   ══════════════════════════════════ */
-  async function doQuickLogin(role) {
-    clearAlerts();
-    const r = await api('/api/quick-login', 'POST', { role });
-    if (r.error) return showAlert('login-alert', r.error);
-    showAlert('login-alert', 'Welcome, ' + r.name + '!', 'success');
-    setTimeout(() => location.href = r.home || '/', 700);
-  }
-
-  /* ══════════════════════════════════
-     SIGNUP
-  ══════════════════════════════════ */
-  async function doSignup() {
-    clearAlerts();
-    const name = document.getElementById('signup-name').value.trim();
-    const email = document.getElementById('signup-email').value.trim();
-    const pw = document.getElementById('signup-password').value;
-    const role = document.getElementById('signup-role').value;
-    if (!name || !email || !pw) return showAlert('signup-alert', 'Please fill in all fields.');
-    const checks = getPasswordChecks(pw, email);
-    if (checks.some(c => !c.ok)) return showAlert('signup-alert', 'Strengthen your password — all checks must pass.');
-    setLoading('signup-btn', true);
-    const r = await api('/api/signup', 'POST', { name, email, password: pw, role });
-    setLoading('signup-btn', false);
-    if (r.error) return showAlert('signup-alert', r.error);
-    showAlert('signup-alert', 'Account created! Redirecting…', 'success');
-    setTimeout(() => location.href = homeForRole(r.role), 700);
-  }
-
-  /* ══════════════════════════════════
-     REGISTER RESTAURANT (NEW BUSINESS)
-  ══════════════════════════════════ */
-  async function doRegisterRestaurant() {
+  function doRegisterRestaurant() {
     clearAlerts();
     const restaurantName = document.getElementById('register-restaurant-name').value.trim();
     const ownerName = document.getElementById('register-owner-name').value.trim();
@@ -1828,29 +2343,61 @@
     const pw = document.getElementById('register-password').value;
     const phone = document.getElementById('register-phone').value.trim();
 
-    if (!restaurantName || !ownerName || !email || !pw) {
+    if (!restaurantName || !ownerName || !email || !pw)
       return showAlert('register-alert', 'Please fill in all required fields.');
-    }
 
     const checks = getPasswordChecks(pw, email);
-    if (checks.some(c => !c.ok)) {
+    if (checks.some(c => !c.ok))
       return showAlert('register-alert', 'Strengthen your password — all checks must pass.');
-    }
 
+    const payload = { restaurant_name: restaurantName, name: ownerName, email, password: pw, phone };
     setLoading('register-btn', true);
-    const r = await api('/api/register-restaurant', 'POST', {
-      restaurant_name: restaurantName,
-      name: ownerName,
-      email: email,
-      password: pw,
-      phone: phone
-    });
-    setLoading('register-btn', false);
+    api('/api/register-restaurant', 'POST', payload)
+      .then(r => {
+        setLoading('register-btn', false);
+        if (r.error) return showAlert('register-alert', r.error);
+        showSuccessAndRedirect(r.name || ownerName, restaurantName);
+      })
+      .catch(() => {
+        setLoading('register-btn', false);
+        showAlert('register-alert', 'Network error. Please try again.');
+      });
+  }
 
-    if (r.error) return showAlert('register-alert', r.error);
+  /* ══════════════════════════════════
+     SUCCESS SCREEN + AUTO REDIRECT
+  ══════════════════════════════════ */
+  function showSuccessAndRedirect(ownerName, restaurantName) {
+    /* Fill in personalised details */
+    document.getElementById('success-owner-name').textContent = ownerName || 'Owner';
+    document.getElementById('success-restaurant-name').textContent =
+      restaurantName ? '🏪 ' + restaurantName : '';
 
-    showAlert('register-alert', r.message || 'Registration submitted for approval.', 'success');
-    setTimeout(() => location.href = '/auth', 1800);
+    /* Show the full-screen overlay */
+    document.getElementById('success-screen').classList.add('show');
+    document.body.style.overflow = 'hidden';
+
+    /* Animated 3-second ring countdown then redirect */
+    const ring = document.getElementById('countdown-ring');
+    const numEl = document.getElementById('countdown-num');
+    const total = 3;          /* seconds */
+    const circumference = 119.4;
+    let elapsed = 0;
+    const fps = 30;
+    const interval = 1000 / fps;
+
+    const timer = setInterval(() => {
+      elapsed += interval / 1000;
+      const fraction = Math.min(elapsed / total, 1);
+      ring.style.strokeDashoffset = circumference * (1 - fraction);
+      const remaining = Math.max(0, Math.ceil(total - elapsed));
+      numEl.textContent = remaining;
+
+      if (fraction >= 1) {
+        clearInterval(timer);
+        window.location.replace('/auth?registered=1#login');
+      }
+    }, interval);
   }
 
   /* ══════════════════════════════════
@@ -1907,13 +2454,12 @@
   ══════════════════════════════════ */
   document.addEventListener('DOMContentLoaded', () => {
     switchTab('login');
-    renderPasswordPolicy('signup');
     renderPasswordPolicy('register');
     renderPasswordPolicy('reset');
 
     /* pre-fill tab from hash */
     const hash = location.hash.replace('#', '');
-    if (['login', 'signup', 'register', 'reset'].includes(hash)) switchTab(hash);
+    if (['login', 'register', 'reset'].includes(hash)) switchTab(hash);
   });
 </script>
 {% endblock %}

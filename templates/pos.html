@@ -1665,7 +1665,7 @@
     if (!activeFloorId && floors.length) activeFloorId = floors[0].id;
     
     // Desktop Tabs
-    tabs.innerHTML = floors.map(f => `<button onclick="renderTables(${f.id})" class="cat-pill px-4 py-1.5 rounded-full text-sm border border-border ${f.id === activeFloorId ? 'active' : ''}">${f.name}</button>`).join('');
+    tabs.innerHTML = floors.map(f => `<button onclick="renderTables(${f.id})" class="cat-pill px-4 py-1.5 rounded-full text-sm border border-border ${f.id === activeFloorId ? 'active' : ''}">${escapeHTML(f.name)}</button>`).join('');
     
     // Mobile Select
     if (select) {
@@ -1779,7 +1779,7 @@
            onclick="handleTableSelection(${t.id},'${t.number}','${t.status}')" 
            oncontextmenu="toggleTableStatus(event,${t.id},'${t.status}')">
         <div class="table-header">
-          <div class="table-number">${t.number}</div>
+          <div class="table-number">${escapeHTML(t.number)}</div>
           <div class="table-seats">${t.seats} seats</div>
           ${mergedText}
         </div>
@@ -1915,7 +1915,7 @@
           : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px;opacity:0.6;">${getCatEmoji(c.name)}</div>`;
         html += `<div class="product-btn" role="button" tabindex="0" onclick="addToCart(${p.id},'${p.name.replace(/'/g, "\\'")}',${p.price})" onkeydown="handleProductCardKeydown(event, ${p.id}, '${p.name.replace(/'/g, "\\'")}', ${p.price})">
         <div class="product-image">${imgHtml}</div>
-        <div class="product-name">${p.name}</div>
+        <div class="product-name">${escapeHTML(p.name)}</div>
         <div class="product-category">${c.name}</div>
         <div class="product-footer">
           <span class="product-price">₹${p.price}</span>
@@ -2040,9 +2040,9 @@
       <div class="cart-item">
         <div class="cart-item-header">
           <div>
-            <div class="cart-item-name">${i.name}</div>
+            <div class="cart-item-name">${escapeHTML(i.name)}</div>
             <div class="cart-item-meta">₹${i.price} × ${i.qty}</div>
-            ${i.addons && i.addons.length ? `<div class="text-[10px] text-brand-500 mt-1">${i.addons.map(a => '+' + a.name).join(', ')}</div>` : ''}
+            ${i.addons && i.addons.length ? `<div class="text-[10px] text-brand-500 mt-1">${i.addons.map(a => '+' + escapeHTML(a.name)).join(', ')}</div>` : ''}
           </div>
           <div class="cart-item-price">₹${(i.price * i.qty).toFixed(0)}</div>
         </div>
@@ -2147,6 +2147,12 @@
     if (!confirm('Log out from POS?')) return;
     const r = await api('/api/logout', 'POST');
     if (r.ok) window.location.href = '/auth';
+  }
+
+  function escapeHTML(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
   }
 
   function escapeAttr(str) {

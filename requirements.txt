@@ -2,6 +2,7 @@ flask
 flask-sqlalchemy
 flask-socketio
 flask-cors
+flask-wtf
 qrcode[pil]
 pillow
 werkzeug
@@ -13,3 +14,5 @@ requests>=2.32,<3
 urllib3>=2,<3
 charset-normalizer>=3,<4
 chardet>=5,<6
+razorpay>=1.4,<2
+qrcode[pil]>=7.4,<8
