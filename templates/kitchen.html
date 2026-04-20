@@ -206,6 +206,22 @@ async function unlockAudio() {
   audioUnlocked = ctx.state === 'running';
 }
 
+function playWaiterBell() {
+  const ctx = getAudioCtx(); if (!ctx) return;
+  if (ctx.state === 'suspended') { ctx.resume().catch(() => {}); if (ctx.state !== 'running') return; }
+  const now = ctx.currentTime;
+  const mg = ctx.createGain(); mg.gain.setValueAtTime(0.18, now); mg.connect(ctx.destination);
+  [0, 0.35, 0.7].forEach(off => {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'triangle'; o.frequency.setValueAtTime(1046, now + off);
+    g.gain.setValueAtTime(0.0001, now + off);
+    g.gain.linearRampToValueAtTime(0.45, now + off + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + off + 0.35);
+    o.connect(g); g.connect(mg);
+    o.start(now + off); o.stop(now + off + 0.4);
+  });
+}
+
 function playKitchenChime() {
   const ctx = getAudioCtx(); if (!ctx) return;
   if (ctx.state === 'suspended') { ctx.resume().catch(() => {}); if (ctx.state !== 'running') return; }
@@ -448,7 +464,11 @@ socket.on('new_ticket', t => {
 });
 
 socket.on('ticket_update', d => {
-  const t = tickets.find(t => t.id === d.id); if (!t) return;
+  let t = tickets.find(t => t.id === d.id);
+  if (!t) {
+    loadTickets();
+    return;
+  }
   t.status = d.status;
   if (d.started_at) t.started_at = d.started_at;
   if (Array.isArray(d.items)) {
@@ -459,6 +479,12 @@ socket.on('ticket_update', d => {
   }
   if (t.status === 'completed') scheduleAutoClear(t.id);
   render();
+});
+
+socket.on('call_waiter', d => {
+  const tbl = d.table_number != null ? d.table_number : d.table_id;
+  showKitchenToast('\uD83D\uDD14 Waiter · Table ' + tbl);
+  playWaiterBell();
 });
 
 // ── Load & poll ────────────────────────────────────────────────────────

@@ -1,345 +1,754 @@
 {% extends "base.html" %}
-{% block title %}Table {{ table_number }} — Order Now | POS Cafe{% endblock %}
+{% block title %}{{ cafe_name }} · Table {{ table_number }} · Order{% endblock %}
 {% block extra_head %}
 <style>
-  body { background:#050505; }
-  .menu-product { background:#111; border:2px solid #1a1a1a; border-radius:14px; padding:14px 12px; cursor:pointer; transition:all .2s; text-align:center; }
-  .menu-product:hover { border-color:#f97316; background:rgba(249,115,22,0.06); transform:translateY(-2px); }
-  .menu-product:active { transform:scale(.96); }
-  .cat-pill { cursor:pointer; transition:all .2s; }
-  .cat-pill.active { background:#f97316; color:white; border-color:#f97316; }
-  .cart-row { display:flex; align-items:center; gap:8px; padding:10px 0; border-bottom:1px solid #1a1a1a; }
-  .qty-btn { width:28px; height:28px; border-radius:8px; background:#222; border:none; color:#ccc; cursor:pointer; font-size:16px; flex-shrink:0; transition:background .15s; }
-  .qty-btn:hover { background:#333; }
-  .item-note-input { width:100%; margin-top:5px; padding:4px 8px; font-size:11px; background:#1a1a1a; border:1px solid #2a2a2a; border-radius:6px; color:#ccc; }
-  .item-note-input::placeholder { color:#555; }
-  .status-card { border-radius:16px; padding:24px; text-align:center; margin-top:20px; }
-  .status-to_cook { background:rgba(239,68,68,0.08); border:2px solid rgba(239,68,68,0.3); }
-  .status-preparing { background:rgba(249,115,22,0.1); border:2px solid rgba(249,115,22,0.4); animation:pulse-prep 2s infinite; }
-  .status-completed { background:rgba(34,197,94,0.1); border:2px solid rgba(34,197,94,0.4); }
-  @keyframes pulse-prep { 0%,100%{opacity:1} 50%{opacity:.85} }
-  .progress-bar { width:100%; height:10px; background:rgba(255,255,255,0.08); border-radius:5px; overflow:hidden; margin:16px 0; }
-  .progress-fill.to_cook  { width:25%; background:linear-gradient(90deg,#ef4444,#f97316); }
-  .progress-fill.preparing { width:65%; background:linear-gradient(90deg,#f97316,#facc15); animation:slide-prep 2s ease-in-out infinite; }
-  .progress-fill.completed { width:100%; background:linear-gradient(90deg,#22c55e,#86efac); }
-  @keyframes slide-prep { 0%,100%{opacity:1} 50%{opacity:.7} }
-  .progress-fill { height:100%; border-radius:5px; transition:width .5s; }
-  .sticky-cart { position:sticky; top:20px; }
-  .login-prompt { background:rgba(249,115,22,0.08); border:1px solid rgba(249,115,22,0.25); border-radius:14px; padding:20px; text-align:center; }
-  /* Call waiter */
-  .call-waiter-btn { position:fixed; bottom:24px; right:24px; z-index:999; background:#f97316; color:#fff; border:none; border-radius:50px; padding:14px 22px; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 8px 28px rgba(249,115,22,0.45); display:flex; align-items:center; gap:8px; transition:all .2s; }
-  .call-waiter-btn:hover { background:#ea580c; transform:translateY(-2px); box-shadow:0 12px 36px rgba(249,115,22,0.55); }
-  .call-waiter-btn:disabled { opacity:.5; cursor:not-allowed; transform:none; box-shadow:none; }
-  .call-waiter-btn.cooldown { background:#555; box-shadow:none; }
-  .menu-product img.prod-img { width:100%; height:80px; object-fit:cover; border-radius:8px; margin-bottom:8px; }
-  @media (max-width:640px) {
-    .split-layout { display:block !important; }
-    .sticky-cart { position:static; }
-    #order-status-section { margin-top:20px; }
-    .call-waiter-btn { bottom:16px; right:16px; padding:12px 18px; font-size:13px; }
+  body { background: radial-gradient(ellipse 120% 80% at 50% -20%, rgba(249,115,22,0.12), transparent 50%), #050508; min-height: 100vh; }
+  .so-wrap { max-width: 960px; margin: 0 auto; padding: 20px 16px 120px; }
+  .so-hero {
+    border-radius: 20px; padding: 22px 20px;
+    background: linear-gradient(135deg, rgba(249,115,22,0.15), rgba(15,15,18,0.9));
+    border: 1px solid rgba(249,115,22,0.22);
+    box-shadow: 0 24px 60px rgba(0,0,0,0.45);
+  }
+  .so-hero h1 { font-family: Syne, sans-serif; font-weight: 800; font-size: 1.5rem; letter-spacing: -0.02em; margin: 0 0 4px; }
+  .so-hero .sub { color: #9ca3af; font-size: 13px; }
+  .so-badge { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #fb923c; margin-bottom: 8px; }
+  .menu-product {
+    background: linear-gradient(180deg, #141416 0%, #0c0c0e 100%);
+    border: 1px solid #222; border-radius: 16px; padding: 12px 10px; cursor: pointer;
+    transition: transform .2s, border-color .2s, box-shadow .2s; text-align: center;
+  }
+  .menu-product:hover {
+    border-color: rgba(249,115,22,0.5); box-shadow: 0 12px 32px rgba(249,115,22,0.12); transform: translateY(-3px);
+  }
+  .menu-product:active { transform: scale(0.97); }
+  .menu-product img.prod-img { width: 100%; height: 96px; object-fit: cover; border-radius: 10px; margin-bottom: 8px; background: #1a1a1a; }
+  .cat-pill { cursor: pointer; transition: all .2s; }
+  .cat-pill.active { background: linear-gradient(135deg, #f97316, #ea580c) !important; color: #fff !important; border-color: transparent !important; }
+  .cart-panel {
+    background: #0e0e11; border: 1px solid #252528; border-radius: 18px; padding: 18px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+  .cart-row { display: flex; align-items: flex-start; gap: 10px; padding: 12px 0; border-bottom: 1px solid #1f1f22; }
+  .qty-btn { width: 32px; height: 32px; border-radius: 10px; background: #1c1c20; border: 1px solid #2a2a2e; color: #e5e5e5; cursor: pointer; font-size: 16px; flex-shrink: 0; }
+  .qty-btn:hover { background: #2a2a2f; }
+  .item-note-input { width: 100%; margin-top: 6px; padding: 8px 10px; font-size: 12px; background: #121214; border: 1px solid #2a2a2e; border-radius: 8px; color: #ccc; }
+  .bill-card {
+    border-radius: 16px; padding: 18px; margin-bottom: 12px;
+    background: #0c0c0f; border: 1px solid #222226;
+    transition: border-color .2s;
+  }
+  .bill-card:focus-within, .bill-card:hover { border-color: rgba(249,115,22,0.35); }
+  .status-pill { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 999px; text-transform: uppercase; letter-spacing: .04em; }
+  .st-to_cook { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.35); }
+  .st-preparing { background: rgba(249,115,22,0.15); color: #fdba74; border: 1px solid rgba(249,115,22,0.35); }
+  .st-completed { background: rgba(34,197,94,0.12); color: #86efac; border: 1px solid rgba(34,197,94,0.35); }
+  .st-sent, .st-other { background: rgba(148,163,184,0.12); color: #94a3b8; border: 1px solid rgba(148,163,184,0.25); }
+  .progress-wrap { height: 8px; border-radius: 999px; background: rgba(255,255,255,0.06); overflow: hidden; margin-top: 12px; }
+  .progress-fill { height: 100%; border-radius: 999px; transition: width .55s cubic-bezier(0.4, 0, 0.2, 1); }
+  .pf-to_cook { width: 28%; background: linear-gradient(90deg, #ef4444, #f97316); }
+  .pf-preparing { width: 62%; background: linear-gradient(90deg, #f97316, #fbbf24); animation: shimmer 2.2s ease-in-out infinite; }
+  .pf-completed { width: 100%; background: linear-gradient(90deg, #22c55e, #4ade80); }
+  @keyframes shimmer { 0%, 100% { opacity: 1; } 50% { opacity: 0.82; } }
+  .call-waiter-btn {
+    position: fixed; bottom: 22px; right: 22px; z-index: 999;
+    background: linear-gradient(135deg, #f97316, #ea580c); color: #fff; border: none; border-radius: 999px;
+    padding: 14px 22px; font-size: 14px; font-weight: 700; cursor: pointer;
+    box-shadow: 0 10px 36px rgba(249,115,22,0.45); display: flex; align-items: center; gap: 8px; transition: transform .2s, box-shadow .2s;
+  }
+  .call-waiter-btn:hover { transform: translateY(-2px); box-shadow: 0 14px 44px rgba(249,115,22,0.55); }
+  .call-waiter-btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+  .split-layout { display: grid; grid-template-columns: 1fr 320px; gap: 22px; align-items: start; }
+  @media (max-width: 900px) {
+    .split-layout { grid-template-columns: 1fr; }
+    .sticky-cart { position: static !important; }
+  }
+  .sticky-cart { position: sticky; top: 16px; }
+  .so-section-title { font-family: Syne, sans-serif; font-weight: 800; font-size: 1.15rem; margin: 0 0 14px; }
+  .addon-modal-bg { background: rgba(2, 6, 23, 0.82); backdrop-filter: blur(8px); }
+  .addon-check { accent-color: #f97316; }
+  .bill-action-btn {
+    font-size: 12px; font-weight: 700; border-radius: 8px; padding: 8px 12px; text-decoration: none;
+    border: 1px solid rgba(249,115,22,0.35); color: #fb923c; background: transparent; cursor: pointer;
+  }
+  .bill-action-btn.primary {
+    background: linear-gradient(135deg, #f97316, #ea580c); color: #fff; border-color: transparent;
   }
 </style>
 {% endblock %}
 {% block body %}
-<div style="max-width:900px; margin:0 auto; padding:20px;">
-  <!-- Header -->
-  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+<div class="so-wrap">
+  <div class="so-hero so-animate mb-6">
+    <div class="so-badge">{{ cafe_name }}</div>
+    <h1>Table {{ table_number }}</h1>
+    <p class="sub">Order from your seat — no account. Your session is private to this device.</p>
+  </div>
+
+  <div class="split-layout">
     <div>
-      <div style="font-size:13px; color:#f97316; font-weight:600; margin-bottom:4px;">🍽️ POS Cafe</div>
-      <h1 style="font-size:22px; font-weight:800; margin:0;">Table {{ table_number }}</h1>
-      <div style="font-size:13px; color:#666; margin-top:2px;">Order directly from your table</div>
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap;">
+        <input type="text" id="menu-search" placeholder="Search menu…" oninput="filterMenuSearch()"
+          style="flex:1; min-width:200px; max-width:320px; background:#111; border:1px solid #2a2a2e; border-radius:12px; color:#fff; padding:10px 14px; font-size:14px;" />
+      </div>
+      <div id="cat-pills" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;"></div>
+      <div id="menu-grid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px;"></div>
     </div>
-    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-      {% if is_logged_in %}
-      <span style="font-size:12px; color:#22c55e; background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.3); border-radius:8px; padding:6px 12px;">✓ {{ user_name }}</span>
-      <button onclick="logout()" style="background:transparent; border:1px solid #333; border-radius:8px; padding:6px 12px; color:#888; cursor:pointer; font-size:12px;">Logout</button>
-      {% else %}
-      <a href="/auth?next=/table/{{ table_id }}/order" style="background:#f97316; color:#fff; border:none; border-radius:8px; padding:8px 16px; font-size:13px; font-weight:600; text-decoration:none;">Login to Order</a>
-      {% endif %}
+
+    <div class="sticky-cart cart-panel">
+      <div style="font-family:Syne,sans-serif; font-weight:800; font-size:16px; margin-bottom:14px;">Your order</div>
+      <div id="cart-items-el">
+        <div style="color:#6b7280; font-size:13px; text-align:center; padding:28px 8px;">Tap dishes to add them here</div>
+      </div>
+      <div id="cart-footer" style="display:none; border-top:1px solid #252528; padding-top:14px; margin-top:12px;">
+        <div style="display:flex; justify-content:space-between; font-weight:800; font-size:16px; margin-bottom:8px;">
+          <span>Total</span>
+          <span style="color:#fb923c;" id="cart-total-el">₹0</span>
+        </div>
+        <p style="font-size:11px; color:#6b7280; margin:0 0 12px;">Optional — helps staff identify you</p>
+        <input type="text" id="cust-name" placeholder="Name (optional)" maxlength="100"
+          style="margin-bottom:8px; font-size:14px; border-radius:10px;" />
+        <input type="tel" id="cust-phone" placeholder="Phone (optional)" maxlength="20"
+          style="margin-bottom:14px; font-size:14px; border-radius:10px;" />
+        <button type="button" onclick="placeOrder()" id="place-order-btn" class="btn-orange" style="width:100%; padding:15px; font-size:15px; border-radius:12px;">
+          Send to kitchen
+        </button>
+      </div>
     </div>
   </div>
 
-  <!-- Placed Order Status (shown after order) -->
-  <div id="order-status-section" style="display:none;">
-    <div id="order-status-card" class="status-card status-to_cook">
-      <div id="order-status-icon" style="font-size:48px; margin-bottom:12px;">⏳</div>
-      <div id="order-status-num" style="font-size:28px; font-weight:800; color:#f97316; font-family:monospace;"></div>
-      <div id="order-status-label" style="font-size:15px; color:#ccc; margin-top:4px;"></div>
-      <div class="progress-bar"><div id="order-progress-fill" class="progress-fill to_cook"></div></div>
-      <div id="order-status-items" style="text-align:left; margin-top:12px; font-size:13px; color:#888;"></div>
-      <div id="order-status-total" style="margin-top:12px; font-size:18px; font-weight:700; color:#22c55e;"></div>
-      <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:16px;">
-        <button onclick="resetToMenu()" style="background:transparent; border:1px solid #333; border-radius:8px; padding:8px 20px; color:#888; cursor:pointer; font-size:12px;">Order More / Back to Menu</button>
-        <a id="view-receipt-btn" href="#" target="_blank" style="display:none; background:rgba(249,115,22,0.1); border:1px solid rgba(249,115,22,0.3); border-radius:8px; padding:8px 20px; color:#f97316; font-size:12px; font-weight:600; text-decoration:none;">🧾 View Receipt</a>
-      </div>
-    </div>
-  </div>
+  <section style="margin-top:40px;">
+    <h2 class="so-section-title">Recent bills</h2>
+    <p style="font-size:13px; color:#6b7280; margin:-8px 0 16px;">Orders tied to this phone browser — safe across refresh.</p>
+    <div id="recent-bills"></div>
+  </section>
+</div>
 
-  <!-- Menu + Cart -->
-  <div id="menu-section">
-    {% if not is_logged_in %}
-    <div class="login-prompt">
-      <div style="font-size:36px; margin-bottom:12px;">🔑</div>
-      <div style="font-size:16px; font-weight:700; margin-bottom:8px;">Login Required</div>
-      <div style="font-size:13px; color:#888; margin-bottom:16px;">Please log in to browse the menu and place your order at Table {{ table_number }}.</div>
-      <a href="/auth?next=/table/{{ table_id }}/order" style="display:inline-block; background:#f97316; color:#fff; border-radius:10px; padding:12px 28px; font-size:14px; font-weight:700; text-decoration:none;">Login / Sign Up</a>
+<div id="addon-modal" class="hidden fixed inset-0 addon-modal-bg items-center justify-center z-[80]" onclick="if(event.target===this)closeAddonModal()">
+  <div style="width:min(92vw, 420px); max-height:min(80vh, 620px); overflow:hidden; border-radius:20px; border:1px solid rgba(249,115,22,0.25); background:#0b0b0f; box-shadow:0 32px 90px rgba(0,0,0,0.55); display:flex; flex-direction:column;">
+    <div style="padding:20px 20px 12px; border-bottom:1px solid rgba(255,255,255,0.05);">
+      <div id="addon-product-name" style="font-family:Syne,sans-serif; font-size:22px; font-weight:800;"></div>
+      <div id="addon-product-price" style="color:#9ca3af; font-size:13px; margin-top:4px;"></div>
     </div>
-    {% else %}
-    <div class="split-layout" style="display:grid; grid-template-columns:1fr 300px; gap:20px;">
-      <!-- Menu panel -->
-      <div>
-        <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px; flex-wrap:wrap;">
-          <input type="text" id="menu-search" placeholder="Search dishes…" oninput="filterMenuSearch()" style="flex:1; max-width:280px; background:#111; border:1px solid #333; border-radius:8px; color:#fff; padding:8px 12px; font-size:13px;" />
-        </div>
-        <div id="cat-pills" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;"></div>
-        <div id="menu-grid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:10px; align-content:start;"></div>
+    <div id="addon-list" style="padding:16px 20px; overflow-y:auto; display:flex; flex-direction:column; gap:10px;"></div>
+    <div style="padding:16px 20px 20px; border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <span style="font-size:13px; color:#9ca3af;">Item total</span>
+        <span id="addon-total-display" style="font-size:22px; font-weight:800; color:#fff;">₹0</span>
       </div>
-
-      <!-- Cart panel -->
-      <div class="sticky-cart">
-        <div style="background:#111; border:1px solid #1a1a1a; border-radius:16px; padding:16px;">
-          <div style="font-size:15px; font-weight:700; margin-bottom:12px;">🛒 Your Order</div>
-          <div id="cart-items-el">
-            <div style="color:#555; font-size:13px; text-align:center; padding:20px 0;">Add items from the menu</div>
-          </div>
-          <div id="cart-footer" style="display:none; border-top:1px solid #1a1a1a; padding-top:12px; margin-top:10px;">
-            <div style="display:flex; justify-content:space-between; font-weight:700; font-size:15px; margin-bottom:14px;">
-              <span>Total</span>
-              <span style="color:#f97316;" id="cart-total-el">₹0</span>
-            </div>
-            <button onclick="placeOrder()" id="place-order-btn" class="btn-orange" style="width:100%; background:#f97316; color:#fff; border:none; border-radius:10px; padding:14px; font-size:14px; font-weight:700; cursor:pointer; transition:all .2s;">
-              🚀 Send to Kitchen
-            </button>
-          </div>
-        </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <button type="button" onclick="closeAddonModal()" class="bill-action-btn" style="width:100%;">Cancel</button>
+        <button type="button" id="addon-confirm-btn" class="bill-action-btn primary" style="width:100%;">Add to order</button>
       </div>
     </div>
-    {% endif %}
   </div>
 </div>
 
-{% if is_logged_in %}
-<!-- Call Waiter floating button -->
-<button id="call-waiter-btn" class="call-waiter-btn" onclick="callWaiter()">
-  🔔 Call Waiter
-</button>
-{% endif %}
-
+<button type="button" id="call-waiter-btn" class="call-waiter-btn" onclick="callWaiter()">🔔 Call waiter</button>
 {% endblock %}
 {% block scripts %}
 <script>
-const TABLE_ID = {{ table_id }};
-const TABLE_NUMBER = '{{ table_number }}';
-let menuData = [], cart = [];
-const socket = io();
-let activeOrderId = null;
-let activeOrderNumber = null;
-let activeOrderDbId = null;  // DB id for receipt link
-let waiterCooldown = false;
+(function () {
+  const TABLE_ID = {{ table_id }};
+  const TABLE_NUMBER = {{ table_number|tojson }};
+  const TENANT_ID = {{ tenant_id|tojson }};
+  const BRANCH_ID = {{ branch_id|tojson }};
+  const LS_TOKEN = 'pos_cafe_guest_token';
+  const LS_CART = 'pos_cafe_self_cart_' + TABLE_ID;
+  const LS_ORDERS = 'pos_cafe_guest_order_refs';
 
-{% if is_logged_in %}
-// ─── Menu ─────────────────────────────────────────────────
-async function loadMenu() {
-  const res = await fetch('/api/products');
-  menuData = await res.json();
-  renderCatPills(menuData);
-  renderMenuGrid(menuData);
-}
-
-const emojiMap = {Food:'🍽️',Beverages:'☕',Desserts:'🍰',Snacks:'🥨'};
-
-function renderCatPills(cats) {
-  const el = document.getElementById('cat-pills');
-  el.innerHTML = `<button onclick="showAllCats(this)" class="cat-pill px-3 py-1.5 rounded-full text-xs border border-border active">All</button>` +
-    cats.map(c => `<button onclick="filterCat(event,${c.id})" class="cat-pill px-3 py-1.5 rounded-full text-xs border border-border">${c.name}</button>`).join('');
-}
-
-function showAllCats(btn) {
-  document.querySelectorAll('.cat-pill').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  renderMenuGrid(menuData);
-}
-
-function filterCat(evt, catId) {
-  document.querySelectorAll('.cat-pill').forEach(b => b.classList.remove('active'));
-  evt.target.classList.add('active');
-  renderMenuGrid(menuData.filter(c => c.id === catId));
-}
-
-function filterMenuSearch() {
-  const q = document.getElementById('menu-search').value.toLowerCase();
-  const filtered = menuData.map(c => ({...c, products: c.products.filter(p => p.name.toLowerCase().includes(q))})).filter(c => c.products.length);
-  renderMenuGrid(filtered);
-}
-
-function renderMenuGrid(cats) {
-  const grid = document.getElementById('menu-grid');
-  grid.innerHTML = cats.flatMap(c => c.products.map(p => {
-    const imgHtml = p.image_b64
-      ? `<img src="${p.image_b64}" class="prod-img" alt="${p.name}" loading="lazy" />`
-      : `<div style="font-size:26px; margin-bottom:6px;">${emojiMap[c.name]||'🛒'}</div>`;
-    return `
-    <div class="menu-product" onclick="addToCart(${p.id},'${p.name.replace(/'/g,"\\'")}',${p.price})">
-      ${imgHtml}
-      <div style="font-size:12px; font-weight:600; line-height:1.3;">${p.name}</div>
-      <div style="color:#f97316; font-weight:700; margin-top:4px;">₹${p.price}</div>
-    </div>`;
-  })).join('');
-}
-
-function addToCart(id, name, price) {
-  const ex = cart.find(i => i.product_id === id);
-  if (ex) { ex.qty++; } else { cart.push({product_id:id, name, price, qty:1, notes:''}); }
-  renderCart();
-}
-
-function updateQty(idx, delta) {
-  cart[idx].qty += delta;
-  if (cart[idx].qty <= 0) cart.splice(idx, 1);
-  renderCart();
-}
-
-function updateNote(idx, val) { if (cart[idx]) cart[idx].notes = val; }
-
-function escapeAttr(s) { return (s||'').replace(/"/g,'&quot;'); }
-
-function renderCart() {
-  const el = document.getElementById('cart-items-el');
-  const footer = document.getElementById('cart-footer');
-  if (!cart.length) {
-    el.innerHTML = '<div style="color:#555; font-size:13px; text-align:center; padding:20px 0;">Add items from the menu</div>';
-    footer.style.display = 'none'; return;
+  function getGuestToken() {
+    let t = localStorage.getItem(LS_TOKEN);
+    if (!t) {
+      t = (crypto.randomUUID && crypto.randomUUID()) ||
+        'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+          const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+        });
+      localStorage.setItem(LS_TOKEN, t);
+    }
+    return t;
   }
-  el.innerHTML = cart.map((i, idx) => `
-    <div class="cart-row" style="flex-wrap:wrap;">
-      <div style="flex:1; min-width:0;">
-        <div style="font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${i.name}</div>
-        <div style="font-size:11px; color:#888;">₹${i.price} each</div>
-        <input type="text" class="item-note-input" placeholder="📝 Special request (e.g. no onion)" value="${escapeAttr(i.notes)}" oninput="updateNote(${idx}, this.value)" />
-      </div>
-      <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
-        <button class="qty-btn" onclick="updateQty(${idx},-1)">−</button>
-        <span style="font-size:13px; font-weight:700; min-width:16px; text-align:center;">${i.qty}</span>
-        <button class="qty-btn" onclick="updateQty(${idx},1)">+</button>
-        <span style="color:#f97316; font-weight:700; min-width:40px; text-align:right;">₹${(i.price*i.qty).toFixed(0)}</span>
-      </div>
-    </div>`).join('');
-  const total = cart.reduce((s,i) => s + i.price*i.qty, 0);
-  document.getElementById('cart-total-el').textContent = '₹'+total.toFixed(0);
-  footer.style.display = 'block';
-}
+  const guestToken = getGuestToken();
 
-async function placeOrder() {
-  if (!cart.length) { toast('Add items first!', 'error'); return; }
-  const btn = document.getElementById('place-order-btn');
-  btn.disabled = true; btn.textContent = '⏳ Sending to kitchen…';
-  const res = await fetch('/api/self-order', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({
-      table_id: TABLE_ID,
-      items: cart.map(i => ({product_id:i.product_id,name:i.name,price:i.price,qty:i.qty,notes:i.notes||''}))
-    })
-  });
-  const data = await res.json();
-  btn.disabled = false; btn.textContent = '🚀 Send to Kitchen';
-  if (data.ok) {
-    activeOrderId = data.order_id;
-    activeOrderNumber = data.order_number;
-    activeOrderDbId = data.order_id;
-    cart = [];
-    renderCart();
-    showOrderStatus(data.order_id, data.order_number, 'to_cook');
-    // Receipt link
-    const receiptBtn = document.getElementById('view-receipt-btn');
-    if (receiptBtn) { receiptBtn.href = '/receipt/' + data.order_id; receiptBtn.style.display = 'inline-block'; }
-    // Request notification permission
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission().then(p => {
-        if (p === 'granted') toast('🔔 You\'ll be notified when ready!', 'success');
+  let menuData = [];
+  const productById = {};
+  let cart = [];
+  const socket = io();
+  let waiterCooldown = false;
+  let razorpayCheckoutScriptPromise = null;
+  let activeAddonProduct = null;
+
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+  const emojiMap = { Food: '🍽️', Beverages: '☕', Desserts: '🍰', Snacks: '🥨' };
+
+  function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function escapeAttr(s) {
+    return (s || '').replace(/"/g, '&quot;');
+  }
+
+  function formatMoney(value) {
+    return Number(value || 0).toFixed(0);
+  }
+
+  function normalizeAddon(addon) {
+    return {
+      id: Number(addon?.id || 0),
+      name: addon?.name || '',
+      price: Number(addon?.price || 0)
+    };
+  }
+
+  function normalizeCartItem(item) {
+    if (!item || typeof item !== 'object') return null;
+    const addons = Array.isArray(item.addons) ? item.addons.map(normalizeAddon).filter(a => a.id) : [];
+    const basePrice = Number(item.basePrice ?? item.price ?? 0);
+    const price = Number(item.price ?? (basePrice + addons.reduce((sum, addon) => sum + addon.price, 0)));
+    const productId = Number(item.product_id || 0);
+    if (!productId || !item.name) return null;
+    return {
+      itemKey: item.itemKey || (productId + '_' + JSON.stringify(addons.map(a => a.id).sort())),
+      product_id: productId,
+      name: item.name,
+      basePrice,
+      price,
+      qty: Math.max(1, Number(item.qty || 1)),
+      notes: item.notes || '',
+      addons
+    };
+  }
+
+  function saveCart() {
+    try {
+      localStorage.setItem(LS_CART, JSON.stringify(cart));
+    } catch (e) {}
+  }
+
+  function loadCart() {
+    try {
+      const raw = localStorage.getItem(LS_CART);
+      const parsed = raw ? JSON.parse(raw) : [];
+      cart = Array.isArray(parsed) ? parsed.map(normalizeCartItem).filter(Boolean) : [];
+    } catch (e) {
+      cart = [];
+    }
+  }
+
+  function loadOrderRefs() {
+    try {
+      const raw = localStorage.getItem(LS_ORDERS);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveOrderRefs(refs) {
+    try {
+      localStorage.setItem(LS_ORDERS, JSON.stringify(refs));
+    } catch (e) {}
+  }
+
+  function rememberOrder(orderId, orderNumber) {
+    const refs = loadOrderRefs().filter(r => r.order_id !== orderId);
+    refs.unshift({ order_id: orderId, order_number: orderNumber, table_id: TABLE_ID });
+    saveOrderRefs(refs.slice(0, 40));
+  }
+
+  async function loadMenu() {
+    const res = await fetch('/api/self-order/menu?table_id=' + encodeURIComponent(TABLE_ID));
+    if (!res.ok) {
+      toast('Could not load menu', 'error');
+      return;
+    }
+    menuData = await res.json();
+    menuData.forEach(c => (c.products || []).forEach(p => {
+      productById[p.id] = { ...p, cat: c.name };
+    }));
+    renderCatPills(menuData);
+    renderMenuGrid(menuData);
+  }
+
+  function renderCatPills(cats) {
+    const el = document.getElementById('cat-pills');
+    el.innerHTML = '<button type="button" onclick="showAllCats(this)" class="cat-pill px-3 py-1.5 rounded-full text-xs border border-border active">All</button>' +
+      cats.map(c => `<button type="button" onclick="filterCat(event,${c.id})" class="cat-pill px-3 py-1.5 rounded-full text-xs border border-border">${esc(c.name)}</button>`).join('');
+  }
+
+  window.showAllCats = function (btn) {
+    document.querySelectorAll('.cat-pill').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderMenuGrid(menuData);
+  };
+
+  window.filterCat = function (evt, catId) {
+    document.querySelectorAll('.cat-pill').forEach(b => b.classList.remove('active'));
+    evt.target.classList.add('active');
+    renderMenuGrid(menuData.filter(c => c.id === catId));
+  };
+
+  window.filterMenuSearch = function () {
+    const q = document.getElementById('menu-search').value.toLowerCase();
+    const filtered = menuData.map(c => ({
+      ...c,
+      products: (c.products || []).filter(p => (p.name || '').toLowerCase().includes(q))
+    })).filter(c => c.products.length);
+    renderMenuGrid(filtered);
+  };
+
+  function findProductById(id) {
+    return productById[id] || null;
+  }
+
+  function renderMenuGrid(cats) {
+    const grid = document.getElementById('menu-grid');
+    const rows = cats.flatMap(c => (c.products || []).map(p => {
+      const imgHtml = p.image_b64
+        ? `<img src="${esc(p.image_b64)}" class="prod-img" alt="" loading="lazy" />`
+        : `<div style="font-size:32px; margin-bottom:8px;">${emojiMap[c.name] || '🛒'}</div>`;
+      const addonBadge = p.addons && p.addons.length
+        ? `<div style="font-size:10px; color:#fdba74; margin-top:5px;">Customize +${p.addons.length} addons</div>`
+        : '';
+      return `
+      <div class="menu-product" role="button" tabindex="0" data-pid="${p.id}" onclick="addToCartById(${p.id})" onkeydown="if(event.key==='Enter')addToCartById(${p.id})">
+        ${imgHtml}
+        <div style="font-size:12px; font-weight:700; line-height:1.35; color:#e5e5e5;">${esc(p.name)}</div>
+        <div style="color:#fb923c; font-weight:800; margin-top:6px; font-size:14px;">₹${formatMoney(p.price)}</div>
+        ${addonBadge}
+      </div>`;
+    }));
+    grid.innerHTML = rows.join('');
+  }
+
+  function addToCart(id, selectedAddons = []) {
+    const p = findProductById(id);
+    if (!p) return;
+    const addons = (selectedAddons || []).map(normalizeAddon);
+    if (!addons.length && Array.isArray(p.addons) && p.addons.length) {
+      showAddonModal(p);
+      return;
+    }
+    const price = Number(p.price || 0) + addons.reduce((sum, addon) => sum + addon.price, 0);
+    const itemKey = id + '_' + JSON.stringify(addons.map(a => a.id).sort());
+    const existing = cart.find(item => item.itemKey === itemKey);
+    if (existing) {
+      existing.qty += 1;
+    } else {
+      cart.push({
+        itemKey,
+        product_id: id,
+        name: p.name,
+        basePrice: Number(p.price || 0),
+        price,
+        qty: 1,
+        notes: '',
+        addons
       });
     }
-  } else {
-    if (data.error === 'Please log in to place your order') {
-      window.location.href = '/auth?next=/table/'+TABLE_ID+'/order';
+    renderCart();
+  }
+
+  window.addToCartById = function (id) {
+    addToCart(id, []);
+  };
+
+  function showAddonModal(product) {
+    activeAddonProduct = product;
+    document.getElementById('addon-product-name').textContent = product.name;
+    document.getElementById('addon-product-price').textContent = 'Base price: ₹' + formatMoney(product.price);
+    document.getElementById('addon-list').innerHTML = (product.addons || []).map(addon => `
+      <label style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; border:1px solid rgba(255,255,255,0.06); border-radius:14px; cursor:pointer; background:#111318;">
+        <span style="display:flex; align-items:center; gap:10px; min-width:0;">
+          <input type="checkbox" class="addon-checkbox addon-check" data-id="${addon.id}" data-name="${esc(addon.name)}" data-price="${addon.price}" onchange="updateAddonTotal()" />
+          <span style="font-size:13px; font-weight:700; color:#f3f4f6;">${esc(addon.name)}</span>
+        </span>
+        <span style="font-size:12px; font-weight:800; color:#fb923c;">+₹${formatMoney(addon.price)}</span>
+      </label>
+    `).join('');
+    updateAddonTotal();
+    document.getElementById('addon-confirm-btn').onclick = function () {
+      const selected = Array.from(document.querySelectorAll('.addon-checkbox:checked')).map(cb => ({
+        id: Number(cb.dataset.id || 0),
+        name: cb.dataset.name || '',
+        price: Number(cb.dataset.price || 0)
+      }));
+      addToCart(product.id, selected);
+      closeAddonModal();
+    };
+    document.getElementById('addon-modal').classList.remove('hidden');
+    document.getElementById('addon-modal').classList.add('flex');
+  }
+
+  window.updateAddonTotal = function () {
+    const basePrice = Number(activeAddonProduct?.price || 0);
+    const extra = Array.from(document.querySelectorAll('.addon-checkbox:checked')).reduce((sum, cb) => sum + Number(cb.dataset.price || 0), 0);
+    document.getElementById('addon-total-display').textContent = '₹' + formatMoney(basePrice + extra);
+  };
+
+  window.closeAddonModal = function () {
+    document.getElementById('addon-modal').classList.add('hidden');
+    document.getElementById('addon-modal').classList.remove('flex');
+    activeAddonProduct = null;
+  };
+
+  window.updateQty = function (idx, delta) {
+    if (!cart[idx]) return;
+    cart[idx].qty += delta;
+    if (cart[idx].qty <= 0) cart.splice(idx, 1);
+    renderCart();
+  };
+
+  window.updateNote = function (idx, val) {
+    if (cart[idx]) cart[idx].notes = val;
+  };
+
+  function renderCart() {
+    saveCart();
+    const el = document.getElementById('cart-items-el');
+    const footer = document.getElementById('cart-footer');
+    if (!cart.length) {
+      el.innerHTML = '<div style="color:#6b7280; font-size:13px; text-align:center; padding:28px 8px;">Tap dishes to add them here</div>';
+      footer.style.display = 'none';
+      return;
+    }
+    el.innerHTML = cart.map((item, idx) => `
+      <div class="cart-row" style="flex-wrap:wrap;">
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(item.name)}</div>
+          <div style="font-size:11px; color:#6b7280;">₹${formatMoney(item.price)} each</div>
+          ${item.addons && item.addons.length ? `<div style="font-size:11px; color:#fdba74; margin-top:5px;">+ ${item.addons.map(a => esc(a.name)).join(', ')}</div>` : ''}
+          <input type="text" class="item-note-input" placeholder="Note for kitchen (e.g. no onion)" value="${escapeAttr(item.notes)}" oninput="updateNote(${idx}, this.value)" />
+        </div>
+        <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+          <button type="button" class="qty-btn" onclick="updateQty(${idx},-1)">−</button>
+          <span style="font-size:13px; font-weight:800; min-width:18px; text-align:center;">${item.qty}</span>
+          <button type="button" class="qty-btn" onclick="updateQty(${idx},1)">+</button>
+          <span style="color:#fb923c; font-weight:800; min-width:44px; text-align:right;">₹${formatMoney(item.price * item.qty)}</span>
+        </div>
+      </div>`).join('');
+    const total = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+    document.getElementById('cart-total-el').textContent = '₹' + formatMoney(total);
+    footer.style.display = 'block';
+  }
+
+  function normStatus(s) {
+    const x = (s || '').toLowerCase();
+    if (x === 'to_cook' || x === 'preparing' || x === 'completed') return x;
+    if (x === 'sent') return 'to_cook';
+    return x || 'to_cook';
+  }
+
+  function statusClass(s) {
+    const n = normStatus(s);
+    if (n === 'to_cook') return 'st-to_cook';
+    if (n === 'preparing') return 'st-preparing';
+    if (n === 'completed' || n === 'paid') return 'st-completed';
+    return 'st-other';
+  }
+
+  function progressClass(s) {
+    const n = normStatus(s);
+    if (n === 'to_cook') return 'pf-to_cook';
+    if (n === 'preparing') return 'pf-preparing';
+    if (n === 'completed' || n === 'paid') return 'pf-completed';
+    return 'pf-to_cook';
+  }
+
+  function labelFor(s) {
+    const n = normStatus(s);
+    if (n === 'to_cook') return 'Queued for kitchen';
+    if (n === 'preparing') return 'Being prepared';
+    if (n === 'completed') return 'Ready — enjoy!';
+    if (n === 'paid') return 'Paid';
+    return s || 'In progress';
+  }
+
+  const billState = {};
+  let guestPushRegistered = false;
+
+  function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = atob(base64);
+    return Uint8Array.from([...rawData].map(ch => ch.charCodeAt(0)));
+  }
+
+  async function registerGuestPush() {
+    if (guestPushRegistered) return true;
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || Notification.permission !== 'granted') {
+      return false;
+    }
+    const keyRes = await fetch('/api/push/vapid-public-key');
+    const keyData = await keyRes.json().catch(() => ({}));
+    if (!keyData.key) return false;
+    const registration = await navigator.serviceWorker.register('/sw.js');
+    let subscription = await registration.pushManager.getSubscription();
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(keyData.key)
+      });
+    }
+    const res = await fetch('/api/push/subscribe/table', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+      body: JSON.stringify({ table_id: TABLE_ID, subscription })
+    });
+    const data = await res.json().catch(() => ({}));
+    guestPushRegistered = !!data.ok;
+    return guestPushRegistered;
+  }
+
+  async function maybeEnableGuestPushFromGesture() {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'default') {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') return;
+    }
+    if (Notification.permission === 'granted') {
+      try {
+        await registerGuestPush();
+      } catch (e) {}
+    }
+  }
+
+  function loadRazorpayCheckout() {
+    if (window.Razorpay) return Promise.resolve(true);
+    if (razorpayCheckoutScriptPromise) return razorpayCheckoutScriptPromise;
+    razorpayCheckoutScriptPromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      script.onload = () => resolve(true);
+      script.onerror = () => reject(new Error('Failed to load Razorpay Checkout'));
+      document.head.appendChild(script);
+    });
+    return razorpayCheckoutScriptPromise;
+  }
+
+  function renderRecentBills(orders) {
+    const el = document.getElementById('recent-bills');
+    if (!orders.length) {
+      el.innerHTML = '<div style="color:#6b7280;font-size:13px;">No orders yet. Add items and send to kitchen.</div>';
+      return;
+    }
+    el.innerHTML = orders.map(o => {
+      const st = billState[o.order_id] != null ? billState[o.order_id] : o.status;
+      const pill = statusClass(st);
+      const pc = progressClass(st);
+      const items = (o.items || []).map(i => {
+        const addons = Array.isArray(i.addons) ? i.addons : [];
+        return `<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;color:#9ca3af;margin-top:4px;">
+          <span>
+            ${esc(i.name)} ×${i.qty}
+            ${addons.length ? `<div style="font-size:11px;color:#fdba74;margin-top:3px;">+ ${addons.map(a => esc(a.name)).join(', ')}</div>` : ''}
+          </span>
+        </div>`;
+      }).join('');
+      const receipt = '/receipt/' + o.order_id + '?guest_token=' + encodeURIComponent(guestToken);
+      const payButton = !o.is_paid
+        ? `<button type="button" class="bill-action-btn primary" onclick="payOrderOnline(${o.order_id})">Pay online</button>`
+        : '';
+      return `
+        <div class="bill-card" data-oid="${o.order_id}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+            <div>
+              <div style="font-family:monospace;font-size:18px;font-weight:800;color:#fb923c;">#${esc(o.order_number)}</div>
+              <div style="font-size:12px;color:#6b7280;margin-top:2px;">Table ${esc(String(o.table))} · ₹${formatMoney(o.total)}</div>
+            </div>
+            <span class="status-pill ${pill}">${esc(labelFor(st))}</span>
+          </div>
+          <div class="progress-wrap"><div class="progress-fill ${pc}" data-progress="${o.order_id}"></div></div>
+          <details style="margin-top:12px;">
+            <summary style="cursor:pointer;font-size:12px;color:#9ca3af;">Line items</summary>
+            <div style="margin-top:8px;">${items || '<span style="color:#555;font-size:12px;">No line items</span>'}</div>
+          </details>
+          <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+            <a href="${receipt}" target="_blank" rel="noopener" class="bill-action-btn">View receipt</a>
+            ${payButton}
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  async function refreshGuestOrders() {
+    const path = '/api/self-order/guest/' + encodeURIComponent(guestToken) + '/orders';
+    const res = await fetch(path);
+    if (!res.ok) return;
+    const orders = await res.json();
+    orders.forEach(o => { billState[o.order_id] = o.status; });
+    renderRecentBills(orders);
+  }
+
+  window.placeOrder = async function () {
+    if (!cart.length) { toast('Add items first', 'error'); return; }
+    const btn = document.getElementById('place-order-btn');
+    btn.disabled = true;
+    const prev = btn.textContent;
+    btn.textContent = 'Sending…';
+    const body = {
+      table_id: TABLE_ID,
+      guest_token: guestToken,
+      customer_name: (document.getElementById('cust-name') && document.getElementById('cust-name').value) || '',
+      customer_phone: (document.getElementById('cust-phone') && document.getElementById('cust-phone').value) || '',
+      items: cart.map(i => ({
+        product_id: i.product_id,
+        qty: i.qty,
+        notes: i.notes || '',
+        addons: i.addons || []
+      }))
+    };
+    const res = await fetch('/api/self-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json().catch(() => ({}));
+    btn.disabled = false;
+    btn.textContent = prev;
+    if (data.ok) {
+      rememberOrder(data.order_id, data.order_number);
+      cart = [];
+      saveCart();
+      renderCart();
+      toast('Order sent to the kitchen', 'success');
+      billState[data.order_id] = 'to_cook';
+      await refreshGuestOrders();
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+      await maybeEnableGuestPushFromGesture();
     } else {
-      toast(data.error || 'Error placing order', 'error');
+      toast(data.error || 'Could not place order', 'error');
     }
-  }
-}
+  };
 
-function showOrderStatus(orderId, orderNum, status) {
-  document.getElementById('menu-section').style.marginTop = '0';
-  document.getElementById('order-status-section').style.display = 'block';
-  updateOrderStatusUI(orderId, orderNum, status);
-  window.scrollTo({top:0, behavior:'smooth'});
-}
-
-function updateOrderStatusUI(orderId, orderNum, status) {
-  const card = document.getElementById('order-status-card');
-  const icon = {to_cook:'⏳', preparing:'👨‍🍳', completed:'✅'};
-  const label = {to_cook:'Your order is in the queue', preparing:'Kitchen is preparing your food!', completed:'Your order is ready! 🎉'};
-  card.className = 'status-card status-' + status;
-  document.getElementById('order-status-icon').textContent = icon[status] || '⏳';
-  if (orderNum) document.getElementById('order-status-num').textContent = '#' + orderNum;
-  document.getElementById('order-status-label').textContent = label[status] || status;
-  document.getElementById('order-progress-fill').className = 'progress-fill ' + status;
-  // Trigger browser notification on completed
-  if (status === 'completed') {
-    try { new Notification('POS Cafe 🍽️', { body: `Your order #${orderNum} at Table ${TABLE_NUMBER} is ready!` }); } catch(e) {}
-    toast('🎉 Your order is ready! Please pick it up.', 'success');
-  }
-}
-
-function resetToMenu() {
-  document.getElementById('order-status-section').style.display = 'none';
-  activeOrderId = null;
-  activeOrderNumber = null;
-}
-
-// ─── Socket: listen for status updates ────────────────────
-socket.on('order_update', d => {
-  if (activeOrderNumber && d.order_number === activeOrderNumber) {
-    updateOrderStatusUI(activeOrderId, activeOrderNumber, d.status);
-  }
-});
-
-socket.on('ticket_update', d => {
-  if (activeOrderNumber && d.order_number === activeOrderNumber) {
-    updateOrderStatusUI(activeOrderId, activeOrderNumber, d.status);
-  }
-});
-
-loadMenu();
-{% endif %}
-
-// ─── Call Waiter ───────────────────────────────────────────
-function callWaiter() {
-  if (waiterCooldown) return;
-  const btn = document.getElementById('call-waiter-btn');
-  socket.emit('call_waiter', { table_id: TABLE_ID, table_number: TABLE_NUMBER });
-  toast('🔔 Staff has been notified!', 'success');
-  waiterCooldown = true;
-  btn.disabled = true;
-  btn.classList.add('cooldown');
-  btn.textContent = '⏳ Notified (60s)';
-  let secs = 59;
-  const t = setInterval(() => {
-    btn.textContent = `⏳ Cooldown (${secs}s)`;
-    secs--;
-    if (secs < 0) {
-      clearInterval(t);
-      waiterCooldown = false;
-      btn.disabled = false;
-      btn.classList.remove('cooldown');
-      btn.innerHTML = '🔔 Call Waiter';
+  window.payOrderOnline = async function (orderId) {
+    const res = await fetch(`/api/self-order/${orderId}/razorpay-order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+      body: JSON.stringify({ guest_token: guestToken })
+    });
+    const gateway = await res.json().catch(() => ({}));
+    if (!res.ok || gateway.error) {
+      toast(gateway.error || 'Could not start Razorpay checkout', 'error');
+      return;
     }
-  }, 1000);
-}
 
-async function logout() {
-  const r = await api('/api/logout', 'POST');
-  if (!r || r.error) return;
-  window.location.href = '/auth';
-}
+    try {
+      await loadRazorpayCheckout();
+    } catch (err) {
+      toast(err.message || 'Could not load Razorpay Checkout', 'error');
+      return;
+    }
+
+    const checkout = new window.Razorpay({
+      key: gateway.key_id,
+      amount: gateway.amount,
+      currency: gateway.currency,
+      name: gateway.merchant_name || 'POS Cafe',
+      description: `Order ${gateway.order_number}`,
+      order_id: gateway.razorpay_order_id,
+      prefill: { name: gateway.customer_name || '' },
+      theme: { color: '#f97316' },
+      handler: async function (response) {
+        const verifyRes = await fetch(`/api/self-order/${orderId}/razorpay/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+          body: JSON.stringify({ ...response, guest_token: guestToken })
+        });
+        const verify = await verifyRes.json().catch(() => ({}));
+        if (!verifyRes.ok || verify.error) {
+          toast(verify.error || 'Payment verification failed', 'error');
+          return;
+        }
+        billState[orderId] = 'paid';
+        await refreshGuestOrders();
+        await maybeEnableGuestPushFromGesture();
+        toast('Payment successful', 'success');
+      },
+      modal: {
+        ondismiss: function () {
+          toast('Razorpay checkout closed', 'error');
+        }
+      }
+    });
+    checkout.on('payment.failed', function (resp) {
+      toast(resp?.error?.description || 'Razorpay payment failed', 'error');
+    });
+    checkout.open();
+  };
+
+  function matchesGuestEvent(d) {
+    if (!d) return false;
+    if (d.guest_token) return d.guest_token === guestToken;
+    const refs = loadOrderRefs();
+    const num = d.order_number;
+    return num && refs.some(r => r.order_number === num);
+  }
+
+  socket.on('order_update', function (d) {
+    if (!d || !d.order_number) return;
+    if (!matchesGuestEvent(d)) return;
+    refreshGuestOrders();
+  });
+  socket.on('ticket_update', function (d) {
+    if (!d || !matchesGuestEvent(d)) return;
+    refreshGuestOrders();
+  });
+  socket.on('order_paid', function (d) {
+    if (!d || !d.order_number) return;
+    if (d.guest_token) {
+      if (d.guest_token !== guestToken) return;
+    } else {
+      const refs = loadOrderRefs();
+      if (!refs.some(r => r.order_number === d.order_number)) return;
+    }
+    refreshGuestOrders();
+    try {
+      toast('Bill settled — thank you!', 'success');
+    } catch (e) {}
+  });
+  socket.on('connect', function () {
+    socket.emit('join_scope', { tenant_id: TENANT_ID, branch_id: BRANCH_ID, table_id: TABLE_ID });
+  });
+
+  window.callWaiter = function () {
+    if (waiterCooldown) return;
+    const btn = document.getElementById('call-waiter-btn');
+    socket.emit('call_waiter', { table_id: TABLE_ID, table_number: TABLE_NUMBER, tenant_id: TENANT_ID });
+    toast('Staff has been notified', 'success');
+    waiterCooldown = true;
+    btn.disabled = true;
+    let secs = 59;
+    btn.textContent = '⏳ ' + secs + 's';
+    const t = setInterval(() => {
+      secs--;
+      btn.textContent = '⏳ ' + secs + 's';
+      if (secs < 0) {
+        clearInterval(t);
+        waiterCooldown = false;
+        btn.disabled = false;
+        btn.textContent = '🔔 Call waiter';
+      }
+    }, 1000);
+  };
+
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') refreshGuestOrders();
+  });
+
+  loadCart();
+  if ('Notification' in window && Notification.permission === 'granted') {
+    registerGuestPush().catch(() => {});
+  }
+  loadMenu().then(() => {
+    renderCart();
+  });
+  refreshGuestOrders();
+  setInterval(refreshGuestOrders, 45000);
+})();
 </script>
 {% endblock %}

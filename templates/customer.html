@@ -234,6 +234,7 @@ const socket = io();
 const isPublic = {{ 'true' if is_public else 'false' }};
 const isLoggedIn = {{ 'true' if is_logged_in else 'false' }};
 const tenantId = {{ tenant_id or 'null' }};
+const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
 let orders = {}, orderTimestamps = {}, latestReviewRating = 5, latestReviewOrderId = null;
 const reviewedOrderIds = new Set();
 let menuData = [], preorderCart = [], activeReservationId = null;
@@ -256,6 +257,10 @@ socket.on('new_ticket', t => {
     };
   }
   renderOrders();
+});
+
+socket.on('connect', () => {
+  if (tenantId) socket.emit('join_scope', { tenant_id: tenantId });
 });
 
 socket.on('ticket_update', d => {
@@ -289,6 +294,11 @@ socket.on('order_paid', d => {
   if (tenantId && d.tenant_id != tenantId) return;
   if (orders[d.order_number]) orders[d.order_number].status = 'paid';
   renderOrders();
+});
+
+socket.on('reservation_update', d => {
+  if (tenantId && d.tenant_id != tenantId) return;
+  if (document.getElementById('tab-myres').classList.contains('active')) loadReservations();
 });
 
 
@@ -642,15 +652,16 @@ async function cancelReservation(id) {
 
 // ─── Push Notifications ────────────────────────────────────
 async function setupPushNotifications() {
-  if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
+  if (!isLoggedIn || !('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
   if (Notification.permission === 'default') {
     document.getElementById('push-enable-btn').style.display = 'block';
   } else if (Notification.permission === 'granted') {
-    registerPush();
+    await registerPush();
   }
 }
 
 async function requestPushPermission() {
+  if (!isLoggedIn) return;
   const result = await Notification.requestPermission();
   if (result === 'granted') {
     document.getElementById('push-enable-btn').style.display = 'none';
@@ -659,12 +670,37 @@ async function requestPushPermission() {
   }
 }
 
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map(ch => ch.charCodeAt(0)));
+}
+
 async function registerPush() {
-  // Simple in-page notification (no VAPID required for in-page)
-  // Store that the user wants push
-  if (Notification.permission === 'granted') {
+  if (!isLoggedIn || Notification.permission !== 'granted') return false;
+  const keyRes = await fetch(api('/api/push/vapid-public-key'));
+  const keyData = await keyRes.json().catch(() => ({}));
+  if (!keyData.key) {
     window._pushEnabled = true;
+    return false;
   }
+  const registration = await navigator.serviceWorker.register('/sw.js');
+  let subscription = await registration.pushManager.getSubscription();
+  if (!subscription) {
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(keyData.key)
+    });
+  }
+  const res = await fetch(api('/api/push/subscribe'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+    body: JSON.stringify({ subscription })
+  });
+  const data = await res.json().catch(() => ({}));
+  window._pushEnabled = !!data.ok;
+  return window._pushEnabled;
 }
 
 function showInPageAlert(msg) {

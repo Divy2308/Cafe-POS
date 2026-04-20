@@ -8,12 +8,13 @@ if not IS_WINDOWS:
     import gevent.monkey
     gevent.monkey.patch_all()
 
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_from_directory
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_from_directory, abort
 from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO, emit, join_room
 from flask_cors import CORS
 from flask_wtf.csrf import CSRFProtect, generate_csrf
 from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy import or_
 import qrcode, io, base64, json
 import sqlite3
 import os
@@ -33,6 +34,12 @@ try:
     import resend
 except ImportError:
     resend = None
+
+try:
+    from pywebpush import webpush, WebPushException
+except ImportError:
+    webpush = None
+    WebPushException = Exception
 
 env_path = os.path.join(os.path.dirname(__file__), '.env')
 if os.path.exists(env_path):
@@ -155,6 +162,15 @@ def emit_scoped(event, payload, tenant_id=None, branch_id=None):
     else:
         socketio.emit(event, payload)
 
+
+def _safe_json_loads(value, default):
+    if not value:
+        return default
+    try:
+        return json.loads(value)
+    except Exception:
+        return default
+
 @app.template_filter('from_json')
 def from_json_filter(s):
     try:
@@ -171,6 +187,11 @@ def inject_csrf_token():
 def get_csrf_token():
     """Return a CSRF token for use by JS SPAs that can't use Jinja2."""
     return jsonify({'csrf_token': generate_csrf()})
+
+
+@app.route('/sw.js')
+def service_worker():
+    return send_from_directory('static', 'sw.js', mimetype='application/javascript')
 
 
 # ─── Models ───────────────────────────────────────────────
@@ -1460,13 +1481,13 @@ def transfer_table(source_tid):
     target.status = 'occupied'
     db.session.commit()
 
-    socketio.emit('table_transfer', {
+    emit_scoped('table_transfer', {
         'source_table_id': source.id,
         'source_table_number': source.number,
         'target_table_id': target.id,
         'target_table_number': target.number,
         'order_ids': [o.id for o in active_orders],
-    })
+    }, tenant_id=tid, branch_id=get_active_branch_id())
     return jsonify({
         'ok': True,
         'source_table_id': source.id,
@@ -1610,6 +1631,23 @@ def create_razorpay_order():
         'payment_link': payment_link,
     })
 
+
+def _find_order_for_razorpay(razorpay_order_id=None, local_order_id=None, order_number=None, notes=None):
+    notes = notes or {}
+    local_order_id = local_order_id or notes.get('order_id')
+    if local_order_id is not None:
+        try:
+            return Order.query.get(int(local_order_id))
+        except (TypeError, ValueError):
+            pass
+    order_number = (order_number or notes.get('order_number') or '').strip()
+    if order_number:
+        return Order.query.filter_by(order_number=order_number).order_by(Order.created_at.desc()).first()
+    razorpay_order_id = (razorpay_order_id or '').strip()
+    if razorpay_order_id:
+        return Order.query.filter_by(razorpay_order_id=razorpay_order_id).order_by(Order.created_at.desc()).first()
+    return None
+
 @app.route('/api/razorpay/verify', methods=['POST'])
 @staff_required
 def verify_razorpay_payment():
@@ -1618,11 +1656,84 @@ def verify_razorpay_payment():
     payment_id = d.get('razorpay_payment_id')
     signature = d.get('razorpay_signature')
     order_number = d.get('order_number')
+    local_order_id = d.get('local_order_id') or d.get('order_id')
     if not order_id or not payment_id or not signature:
         return jsonify({'error': 'Missing Razorpay verification fields'}), 400
     if not verify_razorpay_signature(order_id, payment_id, signature):
         return jsonify({'error': 'Invalid Razorpay signature'}), 400
-    return jsonify({'ok': True, 'order_number': order_number})
+    order = _find_order_for_razorpay(
+        razorpay_order_id=order_id,
+        local_order_id=local_order_id,
+        order_number=order_number,
+    )
+    if not order or order.tenant_id != get_current_tenant_id():
+        return jsonify({'error': 'Order not found'}), 404
+    access_error = require_branch_access_or_403(order.branch_id)
+    if access_error:
+        return access_error
+    _finalize_paid_order(order, 'razorpay', razorpay_payment_id=payment_id)
+    return jsonify({'ok': True, 'order_number': order.order_number, 'status': order.status})
+
+
+@app.route('/api/self-order/<int:oid>/razorpay-order', methods=['POST'])
+def create_guest_razorpay_order(oid):
+    d = request.json or {}
+    guest_token = (d.get('guest_token') or '').strip()
+    order = Order.query.get_or_404(oid)
+    if not guest_token or (order.razorpay_order_id or '') != f'GUEST:{guest_token}':
+        return jsonify({'error': 'forbidden'}), 403
+    if order.status == 'paid':
+        return jsonify({'error': 'Order is already paid'}), 400
+    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
+        return jsonify({'error': 'Razorpay keys are not configured'}), 400
+
+    payload = {
+        'amount': int(round(float(order.total or 0) * 100)),
+        'currency': RAZORPAY_CURRENCY,
+        'receipt': order.order_number,
+        'payment_capture': 1,
+        'notes': {
+            'order_id': str(order.id),
+            'order_number': order.order_number,
+            'guest_token': guest_token,
+            'source': 'self-order',
+        },
+    }
+    result, err = call_razorpay_api('orders', payload)
+    if err:
+        message = err.get('error') if isinstance(err, dict) else str(err)
+        return jsonify({'error': message or 'Unable to create Razorpay order'}), 400
+
+    return jsonify({
+        'ok': True,
+        'razorpay_order_id': result.get('id'),
+        'amount': result.get('amount'),
+        'currency': result.get('currency'),
+        'key_id': RAZORPAY_KEY_ID,
+        'merchant_name': RAZORPAY_MERCHANT_NAME,
+        'order_number': order.order_number,
+        'customer_name': order.customer_name or f'Table {order.table.number if order.table else ""}'.strip(),
+    })
+
+
+@app.route('/api/self-order/<int:oid>/razorpay/verify', methods=['POST'])
+def verify_guest_razorpay_payment(oid):
+    d = request.json or {}
+    guest_token = (d.get('guest_token') or '').strip()
+    order_id = d.get('razorpay_order_id')
+    payment_id = d.get('razorpay_payment_id')
+    signature = d.get('razorpay_signature')
+    if not guest_token:
+        return jsonify({'error': 'guest_token required'}), 400
+    if not order_id or not payment_id or not signature:
+        return jsonify({'error': 'Missing Razorpay verification fields'}), 400
+    if not verify_razorpay_signature(order_id, payment_id, signature):
+        return jsonify({'error': 'Invalid Razorpay signature'}), 400
+    order = Order.query.get_or_404(oid)
+    if (order.razorpay_order_id or '') != f'GUEST:{guest_token}':
+        return jsonify({'error': 'forbidden'}), 403
+    _finalize_paid_order(order, 'razorpay', razorpay_payment_id=payment_id)
+    return jsonify({'ok': True, 'order_number': order.order_number, 'status': order.status})
 
 # ─── API: QR Code ──────────────────────────────────────────
 @app.route('/api/qr/<string:upi_id>/<float:amount>')
@@ -1670,63 +1781,18 @@ def razorpay_webhook():
         event = json.loads(event_data)
         event_type = event.get('event', '')
         
-        # Handle payment.authorized event (payment successful)
-        if event_type == 'payment.authorized':
+        if event_type in ('payment.authorized', 'payment.captured'):
             payment = event.get('payload', {}).get('payment', {}).get('entity', {})
             razorpay_order_id = payment.get('order_id', '')
             payment_id = payment.get('id', '')
-            
-            # Find order by Razorpay order ID
-            o = Order.query.filter_by(razorpay_order_id=razorpay_order_id).first()
+            notes = payment.get('notes') or {}
+            o = _find_order_for_razorpay(
+                razorpay_order_id=razorpay_order_id,
+                notes=notes,
+            )
             if not o:
                 return jsonify({'error': 'Order not found'}), 404
-            
-            # Mark order as paid
-            if o.status != 'paid':
-                o.status = 'paid'
-                o.payment_method = 'razorpay'
-                if o.table:
-                    o.table.status = 'free'
-                process_loyalty_earning(o)
-                db.session.commit()
-                
-                # Notify via WebSocket
-                socketio.emit('order_paid', {
-                    'order_number': o.order_number,
-                    'total': o.total,
-                    'tip': o.tip,
-                    'method': 'razorpay',
-                    'razorpay_payment_id': payment_id
-                })
-        
-        # Handle payment.captured event (payment captured)
-        elif event_type == 'payment.captured':
-            payment = event.get('payload', {}).get('payment', {}).get('entity', {})
-            razorpay_order_id = payment.get('order_id', '')
-            payment_id = payment.get('id', '')
-            
-            # Find order by Razorpay order ID
-            o = Order.query.filter_by(razorpay_order_id=razorpay_order_id).first()
-            if not o:
-                return jsonify({'error': 'Order not found'}), 404
-            
-            # Mark order as paid
-            if o.status != 'paid':
-                o.status = 'paid'
-                o.payment_method = 'razorpay'
-                if o.table:
-                    o.table.status = 'free'
-                process_loyalty_earning(o)
-                db.session.commit()
-                
-                # Notify via WebSocket
-                socketio.emit('order_paid', {
-                    'order_number': o.order_number,
-                    'total': o.total,
-                    'tip': o.tip,
-                    'method': 'razorpay',
-                    'razorpay_payment_id': payment_id
-                })
+            _finalize_paid_order(o, 'razorpay', razorpay_payment_id=payment_id)
         
         return jsonify({'status': 'ok'}), 200
     except Exception as exc:
@@ -1797,7 +1863,8 @@ def lookup_customer():
 # ─── Inventory Deduction Helper ────────────────────────
 def deduct_inventory_for_order(order):
     """Deduct stock from ingredients based on product recipes."""
-    if not order: return
+    if not order:
+        return
     
     for item in order.items:
         # Get recipe for this product
@@ -1806,7 +1873,7 @@ def deduct_inventory_for_order(order):
             ing = InventoryItem.query.get(r_item.inventory_item_id)
             if ing:
                 total_deduction = r_item.quantity * item.qty
-                ing.current_stock -= total_deduction
+                ing.current_stock = (ing.current_stock or 0) - total_deduction
                 
                 # Log the deduction
                 log = InventoryLog(
@@ -1817,23 +1884,158 @@ def deduct_inventory_for_order(order):
                     tenant_id=order.tenant_id
                 )
                 db.session.add(log)
-    db.session.commit()
 
 # ─── Loyalty Helper ──────────────────────────────────
 def process_loyalty_earning(order):
     """Calculate and grant loyalty points based on order total."""
-    if not order or not order.customer_id: return
+    if not order or not order.customer_id:
+        return
     
     settings = CafeSettings.query.filter_by(tenant_id=order.tenant_id).first()
-    if not settings: return
+    if not settings:
+        return
     
     ratio = settings.loyalty_points_per_100 or 10.0
     points_earned = (order.total / 100.0) * ratio
     
     customer = Customer.query.get(order.customer_id)
     if customer:
-        customer.loyalty_points += points_earned
-        db.session.commit()
+        customer.loyalty_points = (customer.loyalty_points or 0) + points_earned
+
+
+def _build_order_paid_payload(order, razorpay_payment_id=None):
+    payload = {
+        'order_number': order.order_number,
+        'total': order.total,
+        'tip': order.tip,
+        'method': order.payment_method,
+        'tenant_id': order.tenant_id,
+        'branch_id': order.branch_id,
+    }
+    guest_token = _guest_token_from_order(order)
+    if guest_token:
+        payload['guest_token'] = guest_token
+    if razorpay_payment_id:
+        payload['razorpay_payment_id'] = razorpay_payment_id
+    return payload
+
+
+def _webpush_ready():
+    return bool(webpush and os.getenv('VAPID_PUBLIC_KEY', '').strip() and os.getenv('VAPID_PRIVATE_KEY', '').strip())
+
+
+def _send_web_push(record, payload):
+    if not _webpush_ready():
+        return False
+    subscription = _safe_json_loads(record.subscription_json, {})
+    if not isinstance(subscription, dict) or not subscription.get('endpoint'):
+        return False
+    try:
+        webpush(
+            subscription_info=subscription,
+            data=json.dumps(payload),
+            vapid_private_key=os.getenv('VAPID_PRIVATE_KEY', '').strip(),
+            vapid_claims={'sub': os.getenv('VAPID_SUBJECT', 'mailto:no-reply@pos-cafe.local').strip() or 'mailto:no-reply@pos-cafe.local'},
+            ttl=60,
+        )
+        return True
+    except WebPushException as exc:
+        response = getattr(exc, 'response', None)
+        status_code = getattr(response, 'status_code', None)
+        if status_code in (404, 410):
+            db.session.delete(record)
+            db.session.commit()
+        return False
+    except Exception:
+        return False
+
+
+def _iter_push_subscriptions_for_order(order):
+    seen = set()
+    if order.table_id:
+        for record in PushSubscription.query.filter_by(table_id=order.table_id, user_id=None).all():
+            key = ('table', record.table_id)
+            if key not in seen:
+                seen.add(key)
+                yield record
+    if order.tenant_id:
+        q = (
+            PushSubscription.query
+            .join(User, PushSubscription.user_id == User.id)
+            .filter(User.tenant_id == order.tenant_id)
+        )
+        if order.branch_id is not None:
+            q = q.filter(or_(User.branch_id == order.branch_id, User.branch_id.is_(None)))
+        for record in q.all():
+            key = ('user', record.user_id)
+            if key not in seen:
+                seen.add(key)
+                yield record
+
+
+def _send_order_push(order, title, body, event_name, extra=None):
+    if not order or not _webpush_ready():
+        return
+    guest_token = _guest_token_from_order(order)
+    url = '/pos'
+    if guest_token:
+        url = f'/receipt/{order.id}?guest_token={guest_token}'
+    elif event_name == 'ticket_update':
+        url = '/kitchen'
+    payload = {
+        'title': title,
+        'body': body,
+        'tag': f'{event_name}:{order.id}',
+        'data': {
+            'event': event_name,
+            'order_id': order.id,
+            'order_number': order.order_number,
+            'tenant_id': order.tenant_id,
+            'branch_id': order.branch_id,
+            'guest_token': guest_token,
+            'url': url,
+        },
+    }
+    if extra:
+        payload['data'].update(extra)
+    for record in _iter_push_subscriptions_for_order(order):
+        _send_web_push(record, payload)
+
+
+def _emit_order_paid(order, razorpay_payment_id=None):
+    emit_scoped(
+        'order_paid',
+        _build_order_paid_payload(order, razorpay_payment_id=razorpay_payment_id),
+        tenant_id=order.tenant_id,
+        branch_id=order.branch_id,
+    )
+
+
+def _finalize_paid_order(order, payment_method, tip=None, razorpay_payment_id=None):
+    if not order:
+        return False
+    was_paid = order.status == 'paid'
+    if tip is not None:
+        order.tip = float(tip or 0)
+    if payment_method:
+        order.payment_method = payment_method
+    if order.table:
+        order.table.status = 'free'
+    if not was_paid:
+        order.status = 'paid'
+        deduct_inventory_for_order(order)
+        process_loyalty_earning(order)
+    db.session.commit()
+    if not was_paid:
+        _emit_order_paid(order, razorpay_payment_id=razorpay_payment_id)
+        _send_order_push(
+            order,
+            'Payment received',
+            f'Order {order.order_number} has been marked as paid.',
+            'order_paid',
+            {'payment_method': order.payment_method, 'razorpay_payment_id': razorpay_payment_id},
+        )
+    return not was_paid
 
 @app.route('/api/orders', methods=['POST'])
 @staff_required
@@ -2061,6 +2263,7 @@ def serialize_bill(order):
             total_tax = sum(tax_breakdown.values())
         except: pass
 
+    grand = (order.total or 0) + (order.tip or 0)
     return {
         'id': order.id,
         'order_number': order.order_number,
@@ -2075,8 +2278,10 @@ def serialize_bill(order):
         'tax_breakdown': tax_breakdown,
         'round_off': order.round_off or 0,
         'total': order.total if is_sent else 0,
+        'grand_total': grand,
         'total_qty': order.total_qty or sum(i.qty for i in order.items),
         'tip': order.tip or 0,
+        'payment_method': getattr(order, 'payment_method', None) or '',
         'created_at': order.created_at.isoformat() if order.created_at else None,
         'sent_to_kitchen_at': order.sent_to_kitchen_at.isoformat() if order.sent_to_kitchen_at else None,
         'items': [{
@@ -2089,6 +2294,81 @@ def serialize_bill(order):
             'notes': i.notes or '',
         } for i in order.items],
     }
+
+
+def _resolve_self_order_branch_id(table_obj, tenant_id=None):
+    """Best-effort branch resolution for QR/self-orders.
+
+    Tables are not branch-scoped in the schema, so we infer branch from the
+    last staff-owned order on the same table, then from an open staff session,
+    then finally from the tenant's first branch.
+    """
+    tid = tenant_id or getattr(table_obj, 'tenant_id', None)
+    if not tid:
+        return None
+
+    table_id = getattr(table_obj, 'id', None)
+    if table_id:
+        recent_staff_branch = (
+            Order.query
+            .filter(
+                Order.table_id == table_id,
+                Order.tenant_id == tid,
+                Order.user_id.isnot(None),
+                Order.branch_id.isnot(None),
+            )
+            .order_by(Order.created_at.desc(), Order.id.desc())
+            .with_entities(Order.branch_id)
+            .first()
+        )
+        if recent_staff_branch and recent_staff_branch[0]:
+            return recent_staff_branch[0]
+
+    open_session_branch = (
+        Session.query
+        .join(User, Session.user_id == User.id)
+        .filter(
+            Session.status == 'open',
+            User.tenant_id == tid,
+            User.branch_id.isnot(None),
+        )
+        .order_by(Session.opened_at.desc(), Session.id.desc())
+        .with_entities(User.branch_id)
+        .first()
+    )
+    if open_session_branch and open_session_branch[0]:
+        return open_session_branch[0]
+
+    branch = Branch.query.filter_by(tenant_id=tid).order_by(Branch.id.asc()).first()
+    return branch.id if branch else None
+
+
+def _repair_open_self_orders_for_tenant(tenant_id):
+    """Backfill branch IDs for live QR/self-orders so POS and kitchen can see them."""
+    if not tenant_id:
+        return 0
+
+    guest_orders = (
+        Order.query
+        .filter(
+            Order.tenant_id == tenant_id,
+            Order.status == 'sent',
+            Order.table_id.isnot(None),
+            Order.razorpay_order_id.like('GUEST:%'),
+        )
+        .all()
+    )
+
+    changed = 0
+    for order in guest_orders:
+        branch_id = _resolve_self_order_branch_id(order.table, tenant_id=tenant_id)
+        if branch_id and order.branch_id != branch_id:
+            order.branch_id = branch_id
+            changed += 1
+
+    if changed:
+        db.session.commit()
+    return changed
 
 @app.route('/api/orders/<int:oid>/send-kitchen', methods=['POST'])
 @staff_required
@@ -2126,13 +2406,23 @@ def send_to_kitchen(oid):
             'status': kt.status if kt.status in ('to_cook', 'preparing', 'completed') else 'to_cook',
             'total': o.total,
             'sent_at': kt.sent_at.isoformat(),
-            'items': [{'id':i.id,'name':i.product_name,'qty':i.qty,'price':i.price,'status':i.kitchen_status} for i in o.items]
+            'tenant_id': o.tenant_id,
+            'branch_id': o.branch_id,
+            'items': [{'id':i.id,'name':i.product_name,'qty':i.qty,'price':i.price,'status':i.kitchen_status, 'addons_json': i.addons_json or '[]'} for i in o.items]
         }
         if created_new_ticket:
-            socketio.emit('new_ticket', ticket_data)
+            emit_scoped('new_ticket', ticket_data, tenant_id=o.tenant_id, branch_id=o.branch_id)
         else:
-            socketio.emit('ticket_update', {'id': kt.id, 'status': kt.status, 'items': ticket_data['items'], 'order_number': o.order_number})
-        socketio.emit('order_update', {'order_number': o.order_number, 'status': 'preparing'})
+            tu = {'id': kt.id, 'status': kt.status, 'items': ticket_data['items'], 'order_number': o.order_number, 'tenant_id': o.tenant_id, 'branch_id': o.branch_id}
+            gt = _guest_token_from_order(o)
+            if gt:
+                tu['guest_token'] = gt
+            emit_scoped('ticket_update', tu, tenant_id=o.tenant_id, branch_id=o.branch_id)
+        ou = {'order_number': o.order_number, 'status': 'preparing', 'tenant_id': o.tenant_id, 'branch_id': o.branch_id}
+        gt = _guest_token_from_order(o)
+        if gt:
+            ou['guest_token'] = gt
+        emit_scoped('order_update', ou, tenant_id=o.tenant_id, branch_id=o.branch_id)
         return jsonify({'ok': True, 'message': 'Order sent to kitchen'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -2140,6 +2430,7 @@ def send_to_kitchen(oid):
 @app.route('/api/bills', methods=['GET'])
 @staff_required
 def get_bills():
+    _repair_open_self_orders_for_tenant(get_current_tenant_id())
     orders = (
         apply_branch_scope(
             apply_tenant_scope(Order.query.filter_by(status='sent'), Order),
@@ -2161,6 +2452,7 @@ def get_all_orders():
 @app.route('/api/bills/table/<int:tid>', methods=['GET'])
 @staff_required
 def get_bill_for_table(tid):
+    _repair_open_self_orders_for_tenant(get_current_tenant_id())
     order = (
         Order.query
         .filter_by(table_id=tid, status='sent', branch_id=get_active_branch_id(), tenant_id=get_current_tenant_id())
@@ -2178,20 +2470,12 @@ def pay_order(oid):
     access_error = require_branch_access_or_403(o.branch_id)
     if access_error:
         return access_error
-    d = request.json
-    
-    o.status = 'paid'
-    o.payment_method = d.get('method','cash')
-    o.tip = float(d.get('tip', 0) or 0)
-    
-    # Recalculate grand total based on persisted total (Sub + Taxes) + Tip
-    # Actually, order.total already has Sub + Taxes + RoundOff (calculated in create_order)
-    # We just need to ensure tip is part of the final captured amount if needed for reporting.
-    
-    if o.table:
-        o.table.status = 'free'
-    db.session.commit()
-    socketio.emit('order_paid', {'order_number': o.order_number, 'total': o.total, 'tip': o.tip, 'method': o.payment_method})
+    d = request.json or {}
+    _finalize_paid_order(
+        o,
+        d.get('method', 'cash'),
+        tip=d.get('tip', 0),
+    )
     return jsonify({'ok':True})
 
 @app.route('/api/orders/<int:oid>', methods=['DELETE'])
@@ -2220,7 +2504,7 @@ def delete_order(oid):
                 table.status = 'free'
 
     db.session.commit()
-    socketio.emit('order_deleted', {'order_id': oid, 'table_id': table_id})
+    emit_scoped('order_deleted', {'order_id': oid, 'table_id': table_id}, tenant_id=o.tenant_id, branch_id=o.branch_id)
     return jsonify({'ok': True})
 
 @app.route('/api/orders/table/<int:tid>', methods=['GET'])
@@ -2261,6 +2545,7 @@ def get_avg_prep_minutes():
 @app.route('/api/kitchen/orders', methods=['GET'])
 @app.route('/api/kitchen/tickets', methods=['GET'])
 def get_tickets():
+    _repair_open_self_orders_for_tenant(get_current_tenant_id())
     tickets = (
         KitchenTicket.query
         .join(Order, Order.id == KitchenTicket.order_id)
@@ -2304,6 +2589,7 @@ def get_tickets():
                 'qty': i.qty,
                 'price': i.price,
                 'notes': i.notes or '',
+                'addons_json': i.addons_json or '[]',
                 'status': i.kitchen_status,
                 'started_at': i.started_at.isoformat() if i.started_at else None,
                 'completed_at': i.completed_at.isoformat() if i.completed_at else None
@@ -2342,8 +2628,31 @@ def advance_ticket(kid):
                     item.completed_at = datetime.utcnow()
         
         db.session.commit()
-        socketio.emit('ticket_update', {'id': kid, 'status': kt.status, 'started_at': kt.started_at.isoformat() if kt.started_at else None})
-        socketio.emit('order_update', {'order_number': o.order_number, 'status': new_stage, 'started_at': o.started_at.isoformat() if o.started_at else None, 'completed_at': o.completed_at.isoformat() if o.completed_at else None})
+        tu = {'id': kid, 'status': kt.status, 'order_number': o.order_number, 'started_at': kt.started_at.isoformat() if kt.started_at else None, 'tenant_id': o.tenant_id, 'branch_id': o.branch_id}
+        gt = _guest_token_from_order(o)
+        if gt:
+            tu['guest_token'] = gt
+        emit_scoped('ticket_update', tu, tenant_id=o.tenant_id, branch_id=o.branch_id)
+        ou = {'order_number': o.order_number, 'status': new_stage, 'started_at': o.started_at.isoformat() if o.started_at else None, 'completed_at': o.completed_at.isoformat() if o.completed_at else None, 'tenant_id': o.tenant_id, 'branch_id': o.branch_id}
+        if gt:
+            ou['guest_token'] = gt
+        emit_scoped('order_update', ou, tenant_id=o.tenant_id, branch_id=o.branch_id)
+        if new_stage == 'preparing':
+            _send_order_push(
+                o,
+                'Kitchen started your order',
+                f'Order {o.order_number} is now being prepared.',
+                'ticket_update',
+                {'status': new_stage},
+            )
+        elif new_stage == 'completed':
+            _send_order_push(
+                o,
+                'Order ready',
+                f'Order {o.order_number} is ready to serve.',
+                'order_update',
+                {'status': new_stage},
+            )
     return jsonify({'ok':True,'status':kt.status})
 
 @app.route('/api/kitchen/items/<int:item_id>/complete', methods=['POST'])
@@ -2371,10 +2680,24 @@ def mark_item_complete(item_id):
                 kt.completed_at = datetime.utcnow()
                 order.completed_at = datetime.utcnow()
                 db.session.commit()
-                socketio.emit('ticket_update', {'id': kt.id, 'status': 'completed'})
-                socketio.emit('order_update', {'order_number': order.order_number, 'status': 'completed', 'completed_at': order.completed_at.isoformat()})
+                tu = {'id': kt.id, 'status': 'completed', 'order_number': order.order_number, 'tenant_id': order.tenant_id, 'branch_id': order.branch_id}
+                gt = _guest_token_from_order(order)
+                if gt:
+                    tu['guest_token'] = gt
+                emit_scoped('ticket_update', tu, tenant_id=order.tenant_id, branch_id=order.branch_id)
+                ou = {'order_number': order.order_number, 'status': 'completed', 'completed_at': order.completed_at.isoformat(), 'tenant_id': order.tenant_id, 'branch_id': order.branch_id}
+                if gt:
+                    ou['guest_token'] = gt
+                emit_scoped('order_update', ou, tenant_id=order.tenant_id, branch_id=order.branch_id)
+                _send_order_push(
+                    order,
+                    'Order ready',
+                    f'Order {order.order_number} is ready to serve.',
+                    'order_update',
+                    {'status': 'completed'},
+                )
         
-        socketio.emit('item_update', {'item_id': item_id, 'status': 'completed'})
+        emit_scoped('item_update', {'item_id': item_id, 'status': 'completed', 'tenant_id': order.tenant_id, 'branch_id': order.branch_id}, tenant_id=order.tenant_id, branch_id=order.branch_id)
     return jsonify({'ok': True, 'item_id': item_id})
 
 # ─── API: Reservations ────────────────────────────────────
@@ -2429,6 +2752,18 @@ def _serialize_reservation(r):
             'notes': i.notes or '',
         } for i in r.items]
     }
+
+
+def _emit_reservation_update(reservation, action='updated'):
+    emit_scoped(
+        'reservation_update',
+        {
+            'action': action,
+            'reservation': _serialize_reservation(reservation),
+            'tenant_id': reservation.tenant_id,
+        },
+        tenant_id=reservation.tenant_id,
+    )
 
 @app.route('/api/reservations', methods=['POST'])
 def create_reservation():
@@ -2533,6 +2868,7 @@ def create_reservation():
         
         db.session.commit()
         print(f"[SUCCESS] reservation {r.id} committed")
+        _emit_reservation_update(r, action='created')
         return jsonify({'ok': True, 'id': r.id, 'reservation': _serialize_reservation(r)})
     
     except Exception as e:
@@ -2592,6 +2928,7 @@ def update_reservation(rid):
             )
             db.session.add(ri)
     db.session.commit()
+    _emit_reservation_update(r, action='updated')
     return jsonify({'ok': True, 'reservation': _serialize_reservation(r)})
 
 @app.route('/api/reservations/<int:rid>', methods=['DELETE'])
@@ -2606,6 +2943,7 @@ def cancel_reservation(rid):
         return jsonify({'error': 'forbidden'}), 403
     r.status = 'cancelled'
     db.session.commit()
+    _emit_reservation_update(r, action='cancelled')
     return jsonify({'ok': True})
 
 @app.route('/api/reservations/<int:rid>/seat', methods=['POST'])
@@ -2664,11 +3002,14 @@ def seat_reservation(rid):
             'status': 'to_cook',
             'total': total,
             'sent_at': kt.sent_at.isoformat(),
+            'tenant_id': o.tenant_id,
+            'branch_id': o.branch_id,
             'items': [{'id': i.id, 'name': i.product_name, 'qty': i.qty, 'price': i.price, 'notes': i.notes or '', 'status': i.kitchen_status} for i in o.items]
         }
-        socketio.emit('new_ticket', ticket_data)
+        emit_scoped('new_ticket', ticket_data, tenant_id=o.tenant_id, branch_id=o.branch_id)
     else:
         db.session.commit()
+    _emit_reservation_update(r, action='seated')
     return jsonify({'ok': True})
 
 @app.route('/api/reservations/<int:rid>/confirm', methods=['POST'])
@@ -2679,6 +3020,7 @@ def confirm_reservation(rid):
         return jsonify({'error': 'forbidden'}), 403
     r.status = 'confirmed'
     db.session.commit()
+    _emit_reservation_update(r, action='confirmed')
     return jsonify({'ok': True})
 
 @app.route('/api/reservations/<int:rid>/done', methods=['POST'])
@@ -2693,8 +3035,8 @@ def finish_reservation(rid):
     # Mark table as free
     if r.table:
         r.table.status = 'free'
-    
     db.session.commit()
+    _emit_reservation_update(r, action='completed')
     return jsonify({'ok': True})
 
 @app.route('/api/tables/availability', methods=['GET'])
@@ -2731,64 +3073,233 @@ def table_availability():
         result.append({'id': f.id, 'name': f.name, 'tables': tables})
     return jsonify(result)
 
-# ─── API: Self-Order (Customer QR) ────────────────────────
+# ─── API: Self-Order (Customer QR – Guest Mode) ───────────
+def _guest_token_from_order(o):
+    """Extract browser guest UUID from Order.razorpay_order_id when stored as GUEST:<uuid>."""
+    rid = (getattr(o, 'razorpay_order_id', None) or '').strip()
+    if rid.startswith('GUEST:'):
+        return rid[6:]
+    return None
+
+
 @app.route('/table/<int:table_id>/order')
 def self_order_page(table_id):
-    t = Table.query.filter_by(id=table_id, tenant_id=get_current_tenant_id()).first_or_404()
+    """Table QR landing page – no login required for customers."""
+    t = Table.query.get_or_404(table_id)
+    tenant = Tenant.query.get(t.tenant_id)
+    cafe_name = tenant.name if tenant else 'POS Cafe'
+    branch_id = _resolve_self_order_branch_id(t, tenant_id=t.tenant_id)
     return render_template('self_order.html',
         table_id=table_id,
         table_number=t.number,
-        user_name=session.get('user_name'),
-        user_role=session.get('user_role'),
-        is_logged_in='user_id' in session,
+        tenant_id=t.tenant_id,
+        branch_id=branch_id,
+        cafe_name=cafe_name,
     )
+
+
+def _normalize_self_order_items(items, tenant_id, branch_id=None):
+    normalized = []
+    line_total = 0.0
+    if not isinstance(items, list) or not items:
+        return None, 0.0, 'No items in order'
+
+    for raw_item in items:
+        try:
+            product_id = int(raw_item.get('product_id'))
+            qty = int(raw_item.get('qty', 1))
+        except (TypeError, ValueError):
+            return None, 0.0, 'Invalid item payload'
+        if qty <= 0:
+            return None, 0.0, 'Quantity must be at least 1'
+
+        product = Product.query.filter_by(id=product_id, tenant_id=tenant_id, active=True).first()
+        if not product:
+            return None, 0.0, 'One or more products are unavailable'
+        if branch_id is not None and product.branch_id not in (None, branch_id):
+            return None, 0.0, f'{product.name} is not available at this table'
+
+        requested_addons = raw_item.get('addons') or []
+        addon_ids = []
+        for raw_addon in requested_addons:
+            try:
+                addon_ids.append(int(raw_addon.get('id')))
+            except (AttributeError, TypeError, ValueError):
+                return None, 0.0, 'Invalid addon selection'
+        addon_map = {}
+        if addon_ids:
+            addon_rows = Addon.query.filter(Addon.product_id == product.id, Addon.id.in_(addon_ids)).all()
+            addon_map = {addon.id: addon for addon in addon_rows}
+            if len(addon_map) != len(set(addon_ids)):
+                return None, 0.0, f'One or more addons are unavailable for {product.name}'
+        selected_addons = []
+        for addon_id in addon_ids:
+            addon = addon_map.get(addon_id)
+            if addon:
+                selected_addons.append({
+                    'id': addon.id,
+                    'name': addon.name,
+                    'price': float(addon.price or 0),
+                })
+
+        unit_price = float(product.price or 0) + sum(addon['price'] for addon in selected_addons)
+        line_total += unit_price * qty
+        normalized.append({
+            'product_id': product.id,
+            'name': product.name,
+            'qty': qty,
+            'price': unit_price,
+            'notes': (raw_item.get('notes') or '').strip()[:250],
+            'addons': selected_addons,
+        })
+
+    return normalized, round(line_total, 2), None
 
 @app.route('/api/self-order', methods=['POST'])
 def create_self_order():
-    """Customer QR self-order: creates an order and sends directly to kitchen.
-    Requires login (customer or any role)."""
-    if 'user_id' not in session:
-        return jsonify({'error': 'Please log in to place your order'}), 401
+    """Guest QR self-order – no login required.
+    A browser-generated UUID (guest_token) is stored on the order so each
+    customer sees ONLY their own bills.
+    Tenant is resolved from the table record, not the Flask session.
+    """
     d = request.json or {}
-    table_id = d.get('table_id')
-    items = d.get('items', [])
-    if not items:
-        return jsonify({'error': 'No items in order'}), 400
-    if not table_id:
-        return jsonify({'error': 'Table ID required'}), 400
-    t = Table.query.get_or_404(table_id)
-    total = sum(item['price'] * item['qty'] for item in items)
-    # Use or create a session for this user
-    s = Session.query.filter_by(user_id=session['user_id'], status='open').first()
-    if not s:
-        # Find or create a staff/admin session to attach to
-        from sqlalchemy import or_
-        staff = User.query.filter(
-            User.role.in_(['restaurant', 'cashier', 'manager'])
-        ).first()
-        if staff:
-            s = Session.query.filter_by(user_id=staff.id, status='open').first()
-        if not s:
-            s = Session(user_id=session['user_id'])
-            db.session.add(s)
+    table_id       = d.get('table_id')
+    items          = d.get('items', [])
+    guest_token    = (d.get('guest_token') or '').strip()
+    customer_name  = (d.get('customer_name') or '').strip()[:100]
+    customer_phone = (d.get('customer_phone') or '').strip()[:20]
+
+    if not table_id:     return jsonify({'error': 'Table ID required'}), 400
+    if not guest_token:  return jsonify({'error': 'Guest token missing'}), 400
+
+    t   = Table.query.get_or_404(table_id)
+    tid = t.tenant_id   # always from table, never Flask session
+
+    # Find an open staff session for this tenant to attach the order to
+    staff_session = (
+        Session.query
+        .join(User, Session.user_id == User.id)
+        .filter(Session.status == 'open', User.tenant_id == tid)
+        .first()
+    )
+    if not staff_session:
+        admin = User.query.filter_by(tenant_id=tid, role='restaurant').first()
+        if not admin:
+            admin = User.query.filter_by(tenant_id=tid).first()
+        if admin:
+            staff_session = Session(user_id=admin.id, tenant_id=tid)
+            db.session.add(staff_session)
             db.session.flush()
+        else:
+            return jsonify({'error': 'No staff session open. Please ask a staff member to open the register.'}), 400
+
+    branch_id = getattr(staff_session.user, 'branch_id', None) or _resolve_self_order_branch_id(t, tenant_id=tid)
+    normalized_items, line_total, item_error = _normalize_self_order_items(items, tid, branch_id=branch_id)
+    if item_error:
+        return jsonify({'error': item_error}), 400
+
+    marker = f'GUEST:{guest_token}'
+    existing = (
+        Order.query.filter_by(
+            table_id=table_id,
+            tenant_id=tid,
+            status='sent',
+            razorpay_order_id=marker,
+        )
+        .order_by(Order.created_at.asc())
+        .first()
+    )
+
+    def _serialize_ticket_items(order_obj):
+        return [
+            {
+                'id': i.id,
+                'name': i.product_name,
+                'qty': i.qty,
+                'price': i.price,
+                'notes': i.notes or '',
+                'addons_json': i.addons_json or '[]',
+                'addons': _safe_json_loads(i.addons_json, []),
+                'status': i.kitchen_status,
+            }
+            for i in order_obj.items
+        ]
+
+    if existing:
+        o = existing
+        if branch_id is not None and o.branch_id != branch_id:
+            o.branch_id = branch_id
+        for item in normalized_items:
+            oi = OrderItem(
+                order_id=o.id,
+                product_id=item.get('product_id'),
+                product_name=item['name'],
+                qty=item['qty'],
+                price=item['price'],
+                notes=item.get('notes', ''),
+                addons_json=json.dumps(item.get('addons', [])),
+                kitchen_status='to_cook',
+            )
+            db.session.add(oi)
+        db.session.flush()
+        o.total = round(sum(i.qty * i.price for i in o.items), 2)
+        if customer_name:
+            o.customer_name = customer_name
+        if customer_phone:
+            o.customer_phone = customer_phone
+
+        kt = KitchenTicket.query.filter_by(order_id=o.id).order_by(KitchenTicket.sent_at.desc()).first()
+        if not kt:
+            kt = KitchenTicket(order_id=o.id, tenant_id=tid, status='to_cook')
+            db.session.add(kt)
+        elif kt.status == 'completed':
+            kt.status = 'to_cook'
+            kt.completed_at = None
+
+        t.status = 'occupied'
+        db.session.commit()
+
+        items_payload = _serialize_ticket_items(o)
+        tu = {
+            'id': kt.id,
+            'status': kt.status,
+            'order_number': o.order_number,
+            'items': items_payload,
+            'total': o.total,
+        }
+        gt = guest_token
+        if gt:
+            tu['guest_token'] = gt
+        emit_scoped('ticket_update', tu, tenant_id=tid, branch_id=o.branch_id)
+        emit_scoped('order_update', {
+            'order_number': o.order_number,
+            'status': kt.status,
+            'tenant_id': tid,
+            'guest_token': guest_token,
+        }, tenant_id=tid, branch_id=o.branch_id)
+        return jsonify({'ok': True, 'order_id': o.id, 'order_number': o.order_number, 'merged': True})
+
     count = Order.query.count() + 1
     order_num = f'ORD-{count:04d}'
-    tid = get_current_tenant_id()
+
     o = Order(
         order_number=order_num,
         table_id=table_id,
-        session_id=s.id,
-        user_id=session['user_id'],
-        branch_id=get_active_branch_id() or getattr(get_current_user(), 'branch_id', None),
+        session_id=staff_session.id,
+        user_id=None,
+        branch_id=branch_id,
         tenant_id=tid,
-        total=total,
+        total=line_total,
         status='sent',
+        customer_name=customer_name or f'Table {t.number}',
+        customer_phone=customer_phone,
         sent_to_kitchen_at=datetime.utcnow(),
+        razorpay_order_id=marker,
     )
     db.session.add(o)
     db.session.flush()
-    for item in items:
+
+    for item in normalized_items:
         oi = OrderItem(
             order_id=o.id,
             product_id=item.get('product_id'),
@@ -2796,13 +3307,16 @@ def create_self_order():
             qty=item['qty'],
             price=item['price'],
             notes=item.get('notes', ''),
+            addons_json=json.dumps(item.get('addons', [])),
             kitchen_status='to_cook',
         )
         db.session.add(oi)
+
     t.status = 'occupied'
     kt = KitchenTicket(order_id=o.id, tenant_id=tid)
     db.session.add(kt)
     db.session.commit()
+
     ticket_data = {
         'id': kt.id,
         'order_id': o.id,
@@ -2810,30 +3324,104 @@ def create_self_order():
         'table': t.number,
         'is_takeaway': False,
         'status': 'to_cook',
-        'total': total,
+        'total': line_total,
+        'tenant_id': tid,
+        'customer_name': customer_name or f'Table {t.number}',
         'sent_at': kt.sent_at.isoformat(),
-        'items': [{
-            'id': i.id, 'name': i.product_name, 'qty': i.qty,
-            'price': i.price, 'notes': i.notes or '', 'status': i.kitchen_status
-        } for i in o.items]
+        'items': _serialize_ticket_items(o),
     }
-    socketio.emit('new_ticket', ticket_data)
-    socketio.emit('order_update', {'order_number': o.order_number, 'status': 'to_cook'})
-    return jsonify({'ok': True, 'order_id': o.id, 'order_number': o.order_number})
+    emit_scoped('new_ticket', ticket_data, tenant_id=tid, branch_id=o.branch_id)
+    emit_scoped('order_update', {
+        'order_number': o.order_number,
+        'status': 'to_cook',
+        'tenant_id': tid,
+        'guest_token': guest_token,
+    }, tenant_id=tid, branch_id=o.branch_id)
+    return jsonify({'ok': True, 'order_id': o.id, 'order_number': o.order_number, 'merged': False})
+
+
+@app.route('/api/self-order/guest/<path:guest_token>/orders', methods=['GET'])
+def guest_order_list(guest_token):
+    """Return ALL orders belonging to this guest browser session.
+    Customers see only THEIR own bills – no login needed."""
+    marker   = f'GUEST:{guest_token}'
+    qs       = Order.query.filter_by(razorpay_order_id=marker).order_by(Order.created_at.desc()).all()
+    result   = []
+    for o in qs:
+        kt = (KitchenTicket.query
+              .filter_by(order_id=o.id)
+              .order_by(KitchenTicket.sent_at.desc())
+              .first())
+        result.append({
+            'order_id'    : o.id,
+            'order_number': o.order_number,
+            'status'      : 'paid' if o.status == 'paid' else (kt.status if kt else o.status),
+            'is_paid'     : o.status == 'paid',
+            'table'       : o.table.number if o.table else '?',
+            'total'       : o.total,
+            'created_at'  : o.created_at.isoformat(),
+            'items'       : [{'name': i.product_name, 'qty': i.qty,
+                              'price': i.price, 'notes': i.notes or '',
+                              'addons': _safe_json_loads(i.addons_json, []),
+                              'addons_json': i.addons_json or '[]'}
+                             for i in o.items],
+        })
+    return jsonify(result)
+
+
+@app.route('/api/self-order/menu', methods=['GET'])
+def self_order_menu():
+    """Public menu for QR self-order — scoped to the table's tenant (no login session)."""
+    table_id = request.args.get('table_id', type=int)
+    if not table_id:
+        return jsonify({'error': 'table_id required'}), 400
+    tbl = Table.query.get_or_404(table_id)
+    tid = tbl.tenant_id
+    if not tid:
+        return jsonify({'error': 'Invalid table'}), 400
+    bid = _resolve_self_order_branch_id(tbl, tenant_id=tid)
+    q = Product.query.filter_by(tenant_id=tid, active=True)
+    if bid is not None:
+        q = q.filter((Product.branch_id.is_(None)) | (Product.branch_id == bid))
+    products = q.all()
+    products_by_category = {}
+    for product in products:
+        products_by_category.setdefault(product.category_id, []).append(product)
+    cats = Category.query.filter_by(tenant_id=tid).order_by(Category.id.asc()).all()
+    result = []
+    for c in cats:
+        prods = [{
+            'id': p.id,
+            'name': p.name,
+            'price': p.price,
+            'description': p.description,
+            'tax': p.tax,
+            'unit': p.unit,
+            'image_b64': p.image_b64 or '',
+            'branch_id': p.branch_id or bid,
+            'addons': [{'id': a.id, 'name': a.name, 'price': a.price} for a in p.addons]
+        } for p in products_by_category.get(c.id, [])]
+        if prods:
+            result.append({'id': c.id, 'name': c.name, 'products': prods})
+    return jsonify(result)
+
 
 @app.route('/api/self-order/<int:oid>/status', methods=['GET'])
 def self_order_status(oid):
-    o = Order.query.filter_by(id=oid, tenant_id=get_current_tenant_id()).first_or_404()
-    access_error = require_branch_access_or_403(o.branch_id)
-    if access_error:
-        return access_error
+    guest_token = (request.args.get('guest_token') or '').strip()
+    if not guest_token:
+        return jsonify({'error': 'guest_token required'}), 400
+    o = Order.query.get_or_404(oid)
+    if (o.razorpay_order_id or '') != f'GUEST:{guest_token}':
+        return jsonify({'error': 'forbidden'}), 403
     kt = KitchenTicket.query.filter_by(order_id=oid).order_by(KitchenTicket.sent_at.desc()).first()
+    st = kt.status if kt else o.status
     return jsonify({
         'order_id': o.id,
         'order_number': o.order_number,
-        'status': kt.status if kt else o.status,
+        'status': 'paid' if o.status == 'paid' else st,
         'table': o.table.number if o.table else 'Takeaway',
-        'items': [{'name': i.product_name, 'qty': i.qty, 'notes': i.notes or ''} for i in o.items],
+        'items': [{'name': i.product_name, 'qty': i.qty, 'notes': i.notes or '', 'addons': _safe_json_loads(i.addons_json, [])} for i in o.items],
         'total': o.total,
     })
 
@@ -3635,9 +4223,50 @@ def check_review(oid):
 # ─── Receipt Page ─────────────────────────────────────────
 @app.route('/receipt/<int:order_id>')
 def receipt_page(order_id):
-    o = Order.query.filter_by(id=order_id, tenant_id=get_current_tenant_id()).first_or_404()
-    settings = CafeSettings.query.filter_by(tenant_id=get_current_tenant_id()).first()
-    return render_template('receipt.html', order=o, cafe_settings=settings)
+    o = Order.query.get_or_404(order_id)
+    tid = get_current_tenant_id()
+    guest_token = (request.args.get('guest_token') or '').strip()
+    if tid:
+        if o.tenant_id != tid:
+            abort(404)
+    else:
+        if not guest_token or (o.razorpay_order_id or '') != f'GUEST:{guest_token}':
+            abort(404)
+    settings = CafeSettings.query.filter_by(tenant_id=o.tenant_id).first()
+    paper = (request.args.get('paper') or '58').strip()
+    if paper not in ('58', '80'):
+        paper = '58'
+    return render_template(
+        'receipt.html',
+        order=o,
+        cafe_settings=settings,
+        paper_width=paper,
+    )
+
+@app.route('/api/receipt-data/<int:order_id>', methods=['GET'])
+@staff_required
+def get_receipt_data(order_id):
+    """JSON bundle for browser ESC/POS and QZ Tray printing (same tenant/branch as POS)."""
+    o = Order.query.get_or_404(order_id)
+    if o.tenant_id != get_current_tenant_id():
+        return jsonify({'error': 'forbidden'}), 403
+    access_error = require_branch_access_or_403(o.branch_id)
+    if access_error:
+        return access_error
+    settings = CafeSettings.query.filter_by(tenant_id=o.tenant_id).first()
+    cafe = {
+        'name': settings.name if settings else 'POS Cafe',
+        'address': (settings.address or '') if settings else '',
+        'phone': (settings.phone or '') if settings else '',
+        'email': (settings.email or '') if settings else '',
+        'gst_no': (settings.gst_no or '') if settings else '',
+        'fssai_no': (settings.fssai_no or '') if settings else '',
+        'footer_note': (settings.footer_note or '') if settings else '',
+        'invoice_title': (settings.invoice_title or 'RETAIL INVOICE') if settings else 'RETAIL INVOICE',
+        'show_tax_rows': settings.show_tax_rows if settings else True,
+        'show_round_off': settings.show_round_off if settings else True,
+    }
+    return jsonify({'order': serialize_bill(o), 'cafe': cafe})
 
 # ─── CSV Export ────────────────────────────────────────────
 import csv
@@ -3693,10 +4322,64 @@ def on_connect():
         join_room(branch_room)
     emit('connected', {'status':'ok'})
 
+
+@socketio.on('join_scope')
+def on_join_scope(data):
+    data = data or {}
+    tenant_id = get_current_tenant_id()
+    branch_id = get_active_branch_id()
+    if not tenant_id:
+        raw_tenant_id = data.get('tenant_id')
+        if raw_tenant_id is not None:
+            try:
+                tenant_id = int(raw_tenant_id)
+            except (TypeError, ValueError):
+                tenant_id = None
+    table_id = data.get('table_id')
+    if table_id and not tenant_id:
+        try:
+            tbl = Table.query.get(int(table_id))
+        except (TypeError, ValueError):
+            tbl = None
+        if tbl:
+            tenant_id = tbl.tenant_id
+            if branch_id is None:
+                branch_id = _resolve_self_order_branch_id(tbl, tenant_id=tenant_id)
+    if branch_id is None and data.get('branch_id') is not None:
+        try:
+            branch_id = int(data.get('branch_id'))
+        except (TypeError, ValueError):
+            branch_id = None
+    tenant_room = _tenant_room(tenant_id)
+    branch_room = _branch_room(tenant_id, branch_id)
+    if tenant_room:
+        join_room(tenant_room)
+    if branch_room and branch_room != tenant_room:
+        join_room(branch_room)
+    emit('scope_joined', {'tenant_id': tenant_id, 'branch_id': branch_id})
+
 @socketio.on('call_waiter')
 def on_call_waiter(data):
-    """Relay call-waiter event to all connected staff."""
-    emit_scoped('call_waiter', data, tenant_id=get_current_tenant_id(), branch_id=get_active_branch_id())
+    """Relay call-waiter to the correct tenant/branch room.
+    Guests have no Flask session — resolve tenant from payload (tenant_id or table_id)."""
+    data = data or {}
+    tid = get_current_tenant_id()
+    bid = get_active_branch_id()
+    if not tid:
+        raw_tid = data.get('tenant_id')
+        if raw_tid is not None:
+            try:
+                tid = int(raw_tid)
+            except (TypeError, ValueError):
+                tid = None
+    if not tid and data.get('table_id'):
+        tbl = Table.query.get(data['table_id'])
+        if tbl:
+            tid = tbl.tenant_id
+    if tid and bid is None:
+        br = Branch.query.filter_by(tenant_id=tid).order_by(Branch.id.asc()).first()
+        bid = br.id if br else None
+    emit_scoped('call_waiter', data, tenant_id=tid, branch_id=bid)
 
 # ─── Seed Data ─────────────────────────────────────────────
 def seed_data():

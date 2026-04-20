@@ -261,8 +261,13 @@ async function logout() {
 document.addEventListener('DOMContentLoaded', () => {
   const saved = localStorage.getItem(THEME_STORAGE_KEY) || 'dark';
   applyTheme(saved);
+  if (typeof refreshPrinterStatus === 'function') {
+    try { refreshPrinterStatus(); } catch (e) {}
+  }
 });
 </script>
+<script src="https://unpkg.com/qz-tray@2.2.5/qz-tray.js" defer></script>
+<script src="{{ url_for('static', filename='js/thermal-print.js') }}" defer></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>
