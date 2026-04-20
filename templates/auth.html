@@ -1872,6 +1872,7 @@
       <div class="tab-bar">
         <button class="tab-btn active" id="tab-login" onclick="switchTab('login')">Login</button>
         <button class="tab-btn" id="tab-register" onclick="switchTab('register')">Start Business</button>
+        <button class="tab-btn" id="tab-customer" onclick="switchTab('customer')">Customer</button>
       </div>
 
       <!-- FORM CARD -->
@@ -1975,6 +1976,68 @@
               onclick="doRegisterRestaurant()" style="margin-top:8px">
               Create Restaurant Account →
             </button>
+          </div>
+        </div>
+
+        <!-- ── CUSTOMER SIGNUP ── -->
+        <div class="form-panel" id="form-customer">
+          <div class="form-card-head">
+            <div class="form-eyebrow">Guests</div>
+            <div class="form-title">Reserve <em>tables.</em></div>
+            <div class="form-sub">Create a customer account to discover restaurants and reserve tables.</div>
+          </div>
+          <div class="form-card-body">
+            <div class="alert error" id="cust-register-alert" style="display:none;">
+              <span>⚠</span><span id="cust-register-alert-msg">Something went wrong.</span>
+            </div>
+            <div class="alert success" id="cust-register-success" style="display:none;">
+              <span>✓</span><span id="cust-register-success-msg">Account created. Redirecting…</span>
+            </div>
+
+            <div class="two-col" style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+              <div class="field" style="margin-bottom:0;">
+                <label>Your Name</label>
+                <input type="text" id="cust-register-name" placeholder="Full name" autocomplete="name">
+              </div>
+              <div class="field" style="margin-bottom:0;">
+                <label>Email</label>
+                <input type="email" id="cust-register-email" placeholder="you@gmail.com" autocomplete="email"
+                  oninput="renderPasswordPolicy('cust-register')">
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Password</label>
+              <div class="pw-wrap">
+                <input type="password" id="cust-register-password" placeholder="Create a strong password"
+                  autocomplete="new-password" oninput="renderPasswordPolicy('cust-register')">
+                <button type="button" class="pw-toggle"
+                  onclick="togglePassword('cust-register-password', this)">Show</button>
+              </div>
+              <div class="strength-wrap">
+                <div class="strength-bars">
+                  <div class="strength-bar" id="cust-b1"></div>
+                  <div class="strength-bar" id="cust-b2"></div>
+                  <div class="strength-bar" id="cust-b3"></div>
+                  <div class="strength-bar" id="cust-b4"></div>
+                </div>
+                <div class="strength-meta">
+                  <span class="strength-label" id="cust-strength-label">Enter a password</span>
+                </div>
+              </div>
+              <div class="policy-grid" id="cust-register-rules"></div>
+            </div>
+
+            <button class="btn-primary" id="cust-register-btn" data-label="Create Customer Account →"
+              onclick="doRegisterCustomer()" style="margin-top:8px">
+              Create Customer Account →
+            </button>
+            <div style="margin-top:10px; font-size:12px; color:rgba(255,255,255,0.55);">
+              After signup you can browse restaurants at <span style="color:#f97316; font-weight:700;">/discover</span>.
+            </div>
+            <div class="btn-row" style="margin-top:14px;">
+              <button class="btn-ghost" onclick="switchTab('login')">Back</button>
+            </div>
           </div>
         </div>
 
@@ -2124,7 +2187,7 @@
      TAB SWITCHER
   ══════════════════════════════════ */
   function switchTab(tab) {
-    ['login', 'register', 'reset'].forEach(t => {
+    ['login', 'register', 'customer', 'reset'].forEach(t => {
       const panel = document.getElementById('form-' + t);
       const btn = document.getElementById('tab-' + t);
       if (panel) panel.classList.toggle('active', t === tab);
@@ -2132,6 +2195,7 @@
     });
     clearAlerts();
     if (tab === 'register') renderPasswordPolicy('register');
+    if (tab === 'customer') renderPasswordPolicy('cust-register');
     if (tab === 'reset') { renderPasswordPolicy('reset'); resetStepDots(1); }
   }
 
@@ -2199,7 +2263,11 @@
     /* bars */
     const barIds = prefix === 'register'
       ? ['reg-b1', 'reg-b2', 'reg-b3', 'reg-b4']
-      : ['rs-b1', 'rs-b2', 'rs-b3', 'rs-b4'];
+      : prefix === 'reset'
+        ? ['rs-b1', 'rs-b2', 'rs-b3', 'rs-b4']
+        : prefix === 'cust-register'
+          ? ['cust-b1', 'cust-b2', 'cust-b3', 'cust-b4']
+          : [];
     const cls = passed <= 2 ? 'weak' : passed <= 4 ? 'fair' : 'strong';
     barIds.forEach((id, i) => {
       const bar = document.getElementById(id);
@@ -2208,7 +2276,15 @@
     });
 
     /* label */
-    const sLabel = document.getElementById((prefix === 'register' ? 'reg' : 'rs') + '-strength-label');
+    const sLabel = document.getElementById(
+      prefix === 'register'
+        ? 'reg-strength-label'
+        : prefix === 'reset'
+          ? 'rs-strength-label'
+          : prefix === 'cust-register'
+            ? 'cust-strength-label'
+            : ''
+    );
     if (sLabel) {
       sLabel.textContent = !pw ? 'Enter a password' : passed <= 2 ? 'Weak' : passed <= 4 ? 'Fair' : 'Strong';
       sLabel.className = 'strength-label' + (pw ? ' ' + cls : '');
@@ -2400,6 +2476,36 @@
     }, interval);
   }
 
+  function showCustAlert(msg, type='error') {
+    const a = document.getElementById('cust-register-alert');
+    const s = document.getElementById('cust-register-success');
+    if (a) a.style.display = 'none';
+    if (s) s.style.display = 'none';
+    if (type === 'success') {
+      if (s) { s.style.display = ''; document.getElementById('cust-register-success-msg').textContent = msg; }
+    } else {
+      if (a) { a.style.display = ''; document.getElementById('cust-register-alert-msg').textContent = msg; }
+    }
+  }
+
+  async function doRegisterCustomer() {
+    showCustAlert('', 'error');
+    const name = document.getElementById('cust-register-name').value.trim();
+    const email = document.getElementById('cust-register-email').value.trim();
+    const pw = document.getElementById('cust-register-password').value;
+    if (!name || !email || !pw) return showCustAlert('Please fill in name, email, and password.');
+
+    const checks = getPasswordChecks(pw, email);
+    if (checks.some(c => !c.ok)) return showCustAlert('Strengthen your password — all checks must pass.');
+
+    setLoading('cust-register-btn', true);
+    const r = await api('/api/register-customer', 'POST', { name, email, password: pw });
+    setLoading('cust-register-btn', false);
+    if (r.error) return showCustAlert(r.error);
+    showCustAlert('Account created. Redirecting to restaurants…', 'success');
+    setTimeout(() => location.href = '/discover', 700);
+  }
+
   /* ══════════════════════════════════
      RESET — SEND OTP
   ══════════════════════════════════ */
@@ -2456,6 +2562,7 @@
     switchTab('login');
     renderPasswordPolicy('register');
     renderPasswordPolicy('reset');
+    renderPasswordPolicy('cust-register');
 
     /* pre-fill tab from hash */
     const hash = location.hash.replace('#', '');

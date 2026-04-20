@@ -731,6 +731,7 @@ setInterval(loadOrders, 15000);
 init();
 
 async function logout() {
+  if (!confirm('Log out from Customer Portal?')) return;
   const r = await api('/api/logout', 'POST');
   if (!r || r.error) return;
   window.location.href = '/auth';

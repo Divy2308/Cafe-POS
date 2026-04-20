@@ -495,6 +495,23 @@
                 </div>
               </div>
 
+              <div class="border-t border-border pt-4 mt-4">
+                <h3 class="text-sm font-bold text-white mb-3">Reservations</h3>
+                <div class="flex items-center justify-between gap-3 p-4 rounded-xl border border-white/5 bg-black/20">
+                  <div>
+                    <div class="text-xs font-bold text-white">Auto-confirm reservations</div>
+                    <div class="text-[10px] text-gray-500 mt-1 max-w-[420px]">
+                      If enabled, customer reservations become <strong class="text-gray-300">Confirmed</strong> immediately.
+                      If disabled, reservations stay <strong class="text-gray-300">Pending</strong> until you confirm them from POS.
+                    </div>
+                  </div>
+                  <label class="toggle">
+                    <input type="checkbox" id="s-res-auto-confirm">
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+
               <div class="pt-4">
                 <button onclick="saveSettings()" class="btn-primary w-full py-3 rounded-xl text-white font-medium">Save Settings</button>
               </div>
@@ -712,6 +729,8 @@ function fillSettings(st) {
 
   document.getElementById('s-loyalty-ratio').value=st.loyalty_points_per_100||10.0;
   document.getElementById('s-point-value').value=st.points_redemption_value||0.5;
+  const rac = document.getElementById('s-res-auto-confirm');
+  if (rac) rac.checked = !!st.reservation_auto_confirm;
   
   if (st.tenant_id) loadReservationQR(st.tenant_id);
 }
@@ -738,7 +757,8 @@ async function saveSettings() {
     receipt_alignment:document.getElementById('s-alignment').value,
 
     loyalty_points_per_100:document.getElementById('s-loyalty-ratio').value,
-    points_redemption_value:document.getElementById('s-point-value').value
+    points_redemption_value:document.getElementById('s-point-value').value,
+    reservation_auto_confirm: (document.getElementById('s-res-auto-confirm') && document.getElementById('s-res-auto-confirm').checked) || false
   };
   const r=await api('/api/cafe-settings','POST',d);
   if (r.ok) toast('Settings saved successfully!');

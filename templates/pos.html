@@ -1087,6 +1087,24 @@
           <div class="text-xs text-gray-500">{{ user_name }}</div>
         </div>
       </div>
+
+      <div class="mt-4 card p-3" style="border-radius:14px; background:#0c0c0f;">
+        <div class="text-[10px] text-gray-500 uppercase tracking-wider font-bold">My Today</div>
+        <div class="grid grid-cols-3 gap-2 mt-2">
+          <div class="p-2 rounded-lg border border-white/5 bg-white/5">
+            <div class="text-[10px] text-gray-500">Orders</div>
+            <div class="text-sm font-800 text-white" id="today-total-orders">—</div>
+          </div>
+          <div class="p-2 rounded-lg border border-white/5 bg-white/5">
+            <div class="text-[10px] text-gray-500">Paid</div>
+            <div class="text-sm font-800 text-emerald-400" id="today-paid-orders">—</div>
+          </div>
+          <div class="p-2 rounded-lg border border-white/5 bg-white/5">
+            <div class="text-[10px] text-gray-500">Sales</div>
+            <div class="text-sm font-800 text-brand-500" id="today-sales">—</div>
+          </div>
+        </div>
+      </div>
     </div>
     <nav class="flex-1 p-3 space-y-1">
       <a onclick="showView('floor')"
@@ -1647,6 +1665,24 @@
     sessionId = s.id;
     document.getElementById('session-status').textContent = 'Session #' + sessionId + ' open';
     await reloadData();
+    await loadMyTodayStats();
+  }
+
+  function formatCurrencyShort(n) {
+    try { return '₹' + Number(n || 0).toFixed(0); } catch (e) { return '₹0'; }
+  }
+
+  async function loadMyTodayStats() {
+    try {
+      const r = await api('/api/staff/today');
+      if (!r || r.error || !r.ok) return;
+      const a = document.getElementById('today-total-orders');
+      const b = document.getElementById('today-paid-orders');
+      const c = document.getElementById('today-sales');
+      if (a) a.textContent = String(r.total_orders ?? '0');
+      if (b) b.textContent = String(r.paid_orders ?? '0');
+      if (c) c.textContent = formatCurrencyShort(r.sales ?? 0);
+    } catch (e) { }
   }
 
   async function reloadData() {
@@ -1658,6 +1694,7 @@
     }
     renderFloors(); renderProducts();
     renderBills();
+    loadMyTodayStats();
     try { if (typeof refreshPrinterStatus === 'function') refreshPrinterStatus(); } catch (e) {}
   }
 
