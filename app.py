@@ -14,7 +14,7 @@ from flask_socketio import SocketIO, emit, join_room
 from flask_cors import CORS
 from flask_wtf.csrf import CSRFProtect, generate_csrf
 from werkzeug.security import generate_password_hash, check_password_hash
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 import qrcode, io, base64, json
 import sqlite3
 import os
@@ -103,7 +103,7 @@ SMTP_USE_TLS = os.getenv('SMTP_USE_TLS', '1').strip() != '0'
 RESEND_API_KEY = os.getenv('RESEND_API_KEY', '').strip()
 RESEND_FROM = os.getenv(
     'RESEND_FROM',
-    os.getenv('EMAIL_FROM', 'POS Cafe <onboarding@resend.dev>')
+    os.getenv('EMAIL_FROM', 'POS Cafè <onboarding@resend.dev>')
 ).strip()
 if RESEND_API_KEY and resend is not None:
     resend.api_key = RESEND_API_KEY
@@ -111,7 +111,7 @@ if RESEND_API_KEY and resend is not None:
 RAZORPAY_KEY_ID = os.getenv('RAZORPAY_KEY_ID', '').strip()
 RAZORPAY_KEY_SECRET = os.getenv('RAZORPAY_KEY_SECRET', '').strip()
 RAZORPAY_CURRENCY = os.getenv('RAZORPAY_CURRENCY', 'INR').strip().upper() or 'INR'
-RAZORPAY_MERCHANT_NAME = os.getenv('RAZORPAY_MERCHANT_NAME', 'POS Cafe').strip() or 'POS Cafe'
+RAZORPAY_MERCHANT_NAME = os.getenv('RAZORPAY_MERCHANT_NAME', 'POS Cafè').strip() or 'POS Cafè'
 PASSWORD_RESET_CODES = {}
 
 db = SQLAlchemy(app)
@@ -135,6 +135,15 @@ if _allowed_origins != '*':
 else:
     import logging
     logging.warning('[SECURITY] SocketIO cors_allowed_origins is "*". Set ALLOWED_ORIGINS in .env for production.')
+
+def get_public_url_root():
+    """Returns the base URL, favoring X-Forwarded headers from dev tunnels/proxies."""
+    # Try to get the tunnel host from headers
+    forwarded_host = request.headers.get('X-Forwarded-Host')
+    forwarded_proto = request.headers.get('X-Forwarded-Proto', 'http')
+    if forwarded_host:
+        return f"{forwarded_proto}://{forwarded_host}"
+    return request.url_root.rstrip('/')
 
 # Warn if running with the default insecure key
 if _secret_key == 'pos-cafe-default-insecure-key':
@@ -289,7 +298,7 @@ class PaymentMethod(db.Model):
 
 class CafeSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), default='POS Cafe')
+    name = db.Column(db.String(100), default='POS Cafè')
     phone = db.Column(db.String(20), default='')
     email = db.Column(db.String(120), default='')
     address = db.Column(db.Text, default='')
@@ -476,14 +485,6 @@ class InventoryItem(db.Model):
     branch_id = db.Column(db.Integer, db.ForeignKey('branch.id'), nullable=True)
     branch = db.relationship('Branch', backref='inventory_items')
 
-class ProductRecipe(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
-    inventory_item_id = db.Column(db.Integer, db.ForeignKey('inventory_item.id'), nullable=False)
-    quantity = db.Column(db.Float, default=1.0)  # Amount of inventory item used per product unit
-    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
-    product = db.relationship('Product', backref='recipe_items')
-    inventory_item = db.relationship('InventoryItem')
 
 class InventoryLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -516,13 +517,12 @@ def login_required(f):
     return decorated
 
 def normalize_role(role):
-    role = (role or 'cashier').strip().lower()
-    if role == 'admin':
+    role = (role or 'staff').strip().lower()
+    if role in ('admin', 'owner', 'restaurant'):
         return 'restaurant'
-    if role in ('user', 'staff', 'pos'):
+    if role in ('user', 'staff', 'pos', 'cashier'):
         return 'cashier'
-    if role not in ('cashier', 'restaurant', 'kitchen', 'manager', 'customer'):
-        return 'cashier'
+    # Keep other roles as-is (dynamic roles)
     return role
 
 def role_home(role):
@@ -548,6 +548,17 @@ def page_login_required(allowed_roles=None, redirect_to=None):
         return decorated
     return decorator
 
+def staff_page_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('auth'))
+        role = normalize_role(session.get('user_role'))
+        if role == 'customer':
+            return redirect(url_for('customer'))
+        return f(*args, **kwargs)
+    return decorated
+
 def staff_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -562,13 +573,24 @@ def staff_required(f):
 def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+        is_api = (
+            request.path.startswith('/api/') or
+            request.headers.get('X-Requested-With') == 'XMLHttpRequest' or
+            'application/json' in request.headers.get('Accept', '')
+        )
         if 'user_id' not in session:
+            if is_api:
+                return jsonify({'error': 'unauthorized'}), 401
             return redirect(url_for('auth'))
         user = User.query.get(session['user_id'])
         if not user:
+            if is_api:
+                return jsonify({'error': 'unauthorized'}), 401
             return redirect(url_for('auth'))
         role = normalize_role(user.role)
         if role not in ('restaurant', 'manager') and not user.is_superadmin:
+            if is_api:
+                return jsonify({'error': 'forbidden'}), 403
             return redirect(role_home(normalize_role(session.get('user_role'))))
         return f(*args, **kwargs)
     return decorated
@@ -823,9 +845,9 @@ def strong_password_error(password, email=''):
     )
 
 def send_reset_email(email, otp):
-    subject = 'POS Cafe password reset code'
+    subject = 'POS Cafè password reset code'
     body = (
-        f'Your POS Cafe password reset code is {otp}. '
+        f'Your POS Cafè password reset code is {otp}. '
         'This code expires in 10 minutes.'
     )
 
@@ -1017,7 +1039,8 @@ def tenant_reservation_page(slug):
 def reservation_qr_code(tenant_id):
     """Generate a QR code for the restaurant's reservation URL."""
     tenant = Tenant.query.get_or_404(tenant_id)
-    url = request.host_url.rstrip('/') + f'/r/{tenant.slug}/reservations'
+    base_url = get_public_url_root()
+    url = base_url + f'/r/{tenant.slug}/reservations'
     qr = qrcode.QRCode(box_size=8, border=2)
     qr.add_data(url)
     qr.make(fit=True)
@@ -1207,7 +1230,7 @@ def password_reset_complete():
 
 # ─── Pages ────────────────────────────────────────────────
 @app.route('/pos')
-@page_login_required(allowed_roles=('cashier', 'kitchen', 'manager', 'restaurant'))
+@staff_page_required
 def pos():
     return render_template(
         'pos.html',
@@ -1230,7 +1253,7 @@ def admin_redirect():
     return redirect(url_for('dashboard'))
 
 @app.route('/kitchen')
-@page_login_required(allowed_roles=('cashier', 'kitchen', 'manager', 'restaurant'))
+@staff_page_required
 def kitchen():
     return render_template('kitchen.html', user_role=session.get('user_role'))
 
@@ -2027,31 +2050,7 @@ def lookup_customer():
 # ─── API: Orders ───────────────────────────────────────────
 # ─── Inventory Deduction Helper ────────────────────────
 def deduct_inventory_for_order(order):
-    """Deduct stock from ingredients based on product recipes."""
-    if not order or order.branch_id is None:
-        return
-    
-    for item in order.items:
-        # Get recipe for this product
-        recipe = ProductRecipe.query.filter_by(product_id=item.product_id).all()
-        for r_item in recipe:
-            ing = InventoryItem.query.filter_by(
-                id=r_item.inventory_item_id,
-                branch_id=order.branch_id
-            ).first()
-            if ing:
-                total_deduction = r_item.quantity * item.qty
-                ing.current_stock = (ing.current_stock or 0) - total_deduction
-                
-                # Log the deduction
-                log = InventoryLog(
-                    inventory_item_id=ing.id,
-                    action='sale',
-                    quantity=-total_deduction,
-                    note=f'Order #{order.order_number}',
-                    tenant_id=order.tenant_id
-                )
-                db.session.add(log)
+    return
 
 # ─── Loyalty Helper ──────────────────────────────────
 def process_loyalty_earning(order):
@@ -2190,7 +2189,7 @@ def _emit_order_paid(order, razorpay_payment_id=None):
     )
 
 
-def _finalize_paid_order(order, payment_method, tip=None, razorpay_payment_id=None):
+def _finalize_paid_order(order, payment_method, tip=None, razorpay_payment_id=None, processed_by_id=None):
     if not order:
         return False
     was_paid = order.status == 'paid'
@@ -2198,6 +2197,8 @@ def _finalize_paid_order(order, payment_method, tip=None, razorpay_payment_id=No
         order.tip = float(tip or 0)
     if payment_method:
         order.payment_method = payment_method
+    if processed_by_id:
+        order.user_id = processed_by_id
     if order.table:
         order.table.status = 'free'
     if not was_paid:
@@ -2353,6 +2354,7 @@ def create_order():
             o.total = (o.total or 0) + final_total
             o.round_off = (o.round_off or 0) + round_off
             o.total_qty = (o.total_qty or 0) + total_qty
+            o.user_id = session.get('user_id')
             
             # Merge tax breakdown
             try:
@@ -2654,6 +2656,7 @@ def pay_order(oid):
         o,
         d.get('method', 'cash'),
         tip=d.get('tip', 0),
+        processed_by_id=session.get('user_id'),
     )
     return jsonify({'ok':True})
 
@@ -3275,7 +3278,7 @@ def self_order_page(table_id):
     """Table QR landing page – no login required for customers."""
     t = Table.query.get_or_404(table_id)
     tenant = Tenant.query.get(t.tenant_id)
-    cafe_name = tenant.name if tenant else 'POS Cafe'
+    cafe_name = tenant.name if tenant else 'POS Cafè'
     branch_id = _resolve_self_order_branch_id(t, tenant_id=t.tenant_id)
     return render_template('self_order.html',
         table_id=table_id,
@@ -3617,7 +3620,8 @@ def self_order_status(oid):
 def table_qr_code(table_id):
     """Generate a QR code for the table's self-order URL."""
     t = Table.query.get_or_404(table_id)
-    url = request.host_url.rstrip('/') + f'/table/{table_id}/order'
+    base_url = get_public_url_root()
+    url = base_url + f'/table/{table_id}/order'
     qr = qrcode.QRCode(box_size=8, border=2)
     qr.add_data(url)
     qr.make(fit=True)
@@ -3994,6 +3998,19 @@ def get_users():
         return jsonify({'error': 'unauthorized'}), 403
 
     users = apply_tenant_scope(apply_branch_scope(User.query, User.branch_id), User).filter(User.id != session['user_id']).all()
+    user_ids = [u.id for u in users]
+    stats_map = {}
+    if user_ids:
+        order_stats = db.session.query(
+            Order.user_id,
+            func.count(Order.id).label('total_orders'),
+            func.sum(Order.total).label('total_sales')
+        ).filter(
+            Order.user_id.in_(user_ids),
+            Order.status == 'paid'
+        ).group_by(Order.user_id).all()
+        stats_map = {row.user_id: {'total_orders': row.total_orders, 'total_sales': float(row.total_sales or 0)} for row in order_stats}
+
     return jsonify([{
         'id': u.id,
         'name': u.name,
@@ -4005,6 +4022,8 @@ def get_users():
         'branch_id': u.branch_id,
         'branch_name': u.branch.name if u.branch else '',
         'is_superadmin': bool(u.is_superadmin),
+        'total_orders': stats_map.get(u.id, {}).get('total_orders', 0),
+        'total_sales': stats_map.get(u.id, {}).get('total_sales', 0.0),
     } for u in users])
 
 @app.route('/api/users', methods=['POST'])
@@ -4192,7 +4211,6 @@ def manage_inventory_item(iid):
         
         if request.method == 'DELETE':
             # Check for existing recipe logs or dependencies if necessary
-            ProductRecipe.query.filter_by(inventory_item_id=iid).delete()
             db.session.delete(item)
             db.session.commit()
             return jsonify({'ok': True})
@@ -4221,41 +4239,6 @@ def manage_inventory_item(iid):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/recipes', methods=['GET'])
-@admin_required
-def get_all_recipes():
-    tid = get_current_tenant_id()
-    recipes = ProductRecipe.query.filter_by(tenant_id=tid).all()
-    return jsonify([{
-        'id': r.id,
-        'product_id': r.product_id,
-        'inventory_item_id': r.inventory_item_id,
-        'quantity': r.quantity
-    } for r in recipes])
-
-@app.route('/api/recipes', methods=['POST'])
-@admin_required
-def save_product_recipe():
-    tid = get_current_tenant_id()
-    d = request.json or {}
-    pid = d.get('product_id')
-    items = d.get('items', []) # List of {inventory_item_id, quantity}
-    
-    # Delete existing recipe for this product
-    ProductRecipe.query.filter_by(product_id=pid, tenant_id=tid).delete()
-    
-    for it in items:
-        r = ProductRecipe(
-            product_id=pid,
-            inventory_item_id=it['inventory_item_id'],
-            quantity=float(it['quantity']),
-            tenant_id=tid
-        )
-        db.session.add(r)
-    
-    db.session.commit()
-    return jsonify({'ok': True})
-
 # ─── API: Cafe Settings ─────────────────────────────────
 @app.route('/api/cafe-settings', methods=['GET'])
 def get_cafe_settings():
@@ -4267,7 +4250,7 @@ def get_cafe_settings():
             
         settings = CafeSettings.query.filter_by(tenant_id=tid).first()
         if not settings:
-            settings = CafeSettings(tenant_id=tid, name='POS Cafe')
+            settings = CafeSettings(tenant_id=tid, name='POS Cafè')
             db.session.add(settings)
             db.session.commit()
         
@@ -4299,7 +4282,7 @@ def get_cafe_settings():
         })
     except Exception as e:
         app.logger.error(f"Error in get_cafe_settings: {e}")
-        return jsonify({'name': 'POS Cafe', 'logo_b64': ''})
+        return jsonify({'name': 'POS Cafè', 'logo_b64': ''})
 
 @app.route('/api/cafe-settings', methods=['POST'])
 @admin_required
@@ -4453,7 +4436,7 @@ def get_receipt_data(order_id):
         return access_error
     settings = CafeSettings.query.filter_by(tenant_id=o.tenant_id).first()
     cafe = {
-        'name': settings.name if settings else 'POS Cafe',
+        'name': settings.name if settings else 'POS Cafè',
         'address': (settings.address or '') if settings else '',
         'phone': (settings.phone or '') if settings else '',
         'email': (settings.email or '') if settings else '',
@@ -5355,49 +5338,22 @@ def ensure_sample_data():
         db.session.commit()
     
     # Create sample recipes for products
-    if ProductRecipe.query.filter_by(tenant_id=default_tenant.id).count() < 3:
-        # Recipe for Pizza
-        pizza = Product.query.filter_by(name='Margherita Pizza', tenant_id=default_tenant.id).first()
-        tomato_sauce = InventoryItem.query.filter_by(name='Tomato Sauce', tenant_id=default_tenant.id).first()
-        cheese = InventoryItem.query.filter_by(name='Mozzarella Cheese', tenant_id=default_tenant.id).first()
-        
-        if pizza and tomato_sauce and cheese:
-            existing = ProductRecipe.query.filter_by(product_id=pizza.id).first()
-            if not existing:
-                # Pizza recipe: 0.2L tomato sauce
-                recipe1 = ProductRecipe(
-                    product_id=pizza.id,
-                    inventory_item_id=tomato_sauce.id,
-                    quantity=0.2,
-                    tenant_id=default_tenant.id
-                )
-                db.session.add(recipe1)
-                # Pizza recipe: 0.15kg cheese
-                recipe2 = ProductRecipe(
-                    product_id=pizza.id,
-                    inventory_item_id=cheese.id,
-                    quantity=0.15,
-                    tenant_id=default_tenant.id
-                )
-                db.session.add(recipe2)
-        db.session.commit()
-
-with app.app_context():
-    db.create_all()
-    ensure_tenant_schema()
-    seed_data()
-    ensure_payment_method_schema()
-    ensure_cafe_settings_schema()
-    ensure_payment_methods()
-    ensure_order_table_schema()
-    ensure_branch_schema()
-    ensure_default_accounts()
-    ensure_demo_catalog()
-    ensure_demo_floors_and_tables()
-    ensure_sample_data()
-    # ensure_demo_paid_orders_and_reviews() - Commented out: depends on request context, call from endpoint instead
 
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
+        ensure_tenant_schema()
+        seed_data()
+        ensure_payment_method_schema()
+        ensure_cafe_settings_schema()
+        ensure_payment_methods()
+        ensure_order_table_schema()
+        ensure_branch_schema()
+        ensure_default_accounts()
+        ensure_demo_catalog()
+        ensure_demo_floors_and_tables()
+        ensure_sample_data()
+
     import os
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_ENV') != 'production'

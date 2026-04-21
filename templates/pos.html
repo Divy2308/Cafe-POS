@@ -3,7 +3,8 @@
 {% block extra_head %}
 <style>
   /* Ensure fixed positioning works correctly for mobile nav */
-  html, body {
+  html,
+  body {
     position: relative;
     width: 100%;
     height: 100%;
@@ -124,7 +125,7 @@
 
   .table-card.merged-child {
     opacity: 0.65;
-    background:Repeating-linear-gradient(45deg, rgba(249,115,22,0.05), rgba(249,115,22,0.05) 10px, rgba(249,115,22,0.1) 10px, rgba(249,115,22,0.1) 20px);
+    background: Repeating-linear-gradient(45deg, rgba(249, 115, 22, 0.05), rgba(249, 115, 22, 0.05) 10px, rgba(249, 115, 22, 0.1) 10px, rgba(249, 115, 22, 0.1) 20px);
   }
 
   #mobile-floor-select {
@@ -309,6 +310,7 @@
     min-width: 260px;
     position: relative;
     z-index: 40;
+    background: var(--card);
   }
 
   /* Cart Panel - Desktop version */
@@ -351,7 +353,12 @@
     }
 
     /* Add padding-bottom to all view sections to avoid nav overlap */
-    #view-floor, #view-order, #view-bills, #view-reservations, #view-history, #view-payment {
+    #view-floor,
+    #view-order,
+    #view-bills,
+    #view-reservations,
+    #view-history,
+    #view-payment {
       padding-bottom: 90px !important;
     }
 
@@ -361,7 +368,7 @@
       width: 100%;
       margin-bottom: 12px;
     }
-    
+
     #floor-tabs {
       display: none !important;
     }
@@ -393,7 +400,7 @@
     .mobile-cart-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.7);
+      background: rgba(0, 0, 0, 0.7);
       backdrop-filter: blur(4px);
       z-index: 101;
       opacity: 0;
@@ -423,7 +430,7 @@
       font-weight: 700;
       box-shadow: 0 8px 24px rgba(249, 115, 22, 0.4);
       z-index: 90;
-      border: 1px solid rgba(255,255,255,0.1);
+      border: 1px solid rgba(255, 255, 255, 0.1);
       font-size: 15px;
       transition: all .2s;
     }
@@ -439,7 +446,8 @@
   }
 
   /* Desktop defaults for mobile elements */
-  #mobile-floor-select-wrap, .mobile-cart-bar {
+  #mobile-floor-select-wrap,
+  .mobile-cart-bar {
     display: none;
   }
 
@@ -657,7 +665,7 @@
     }
 
     /* Cart panel shows as drawer on mobile - not hidden */
-    #view-order > .cart-panel-standard {
+    #view-order>.cart-panel-standard {
       display: flex !important;
     }
   }
@@ -670,7 +678,10 @@
     padding-bottom: 4px;
     scrollbar-width: none;
   }
-  #cat-pills-wrap::-webkit-scrollbar { display: none; }
+
+  #cat-pills-wrap::-webkit-scrollbar {
+    display: none;
+  }
 
   #cat-pills {
     display: flex !important;
@@ -687,10 +698,18 @@
   }
 
   @keyframes slide-up {
-    from { transform: translateY(100%); }
-    to { transform: translateY(0); }
+    from {
+      transform: translateY(100%);
+    }
+
+    to {
+      transform: translateY(0);
+    }
   }
-  .animate-slide-up { animation: slide-up 0.3s ease-out forwards; }
+
+  .animate-slide-up {
+    animation: slide-up 0.3s ease-out forwards;
+  }
 
   /* Responsive payment view */
   @media (max-width: 768px) {
@@ -964,7 +983,7 @@
     background: var(--card);
     border: 2px solid #f97316;
     color: var(--text);
-    box-shadow: 0 12px 40px rgba(249,115,22,0.35);
+    box-shadow: 0 12px 40px rgba(249, 115, 22, 0.35);
     display: flex;
     align-items: center;
     gap: 12px;
@@ -1032,11 +1051,11 @@
 
   body[data-theme="light"] .bg-white\/5,
   body[data-theme="light"] .bg-black\/40 {
-    background: rgba(15,23,42,0.04) !important;
+    background: rgba(15, 23, 42, 0.04) !important;
   }
 
   body[data-theme="light"] .hover\:bg-white\/5:hover {
-    background: rgba(15,23,42,0.06) !important;
+    background: rgba(15, 23, 42, 0.06) !important;
   }
 
   #more-actions-modal .modal-content {
@@ -1075,7 +1094,7 @@
   </button>
 
   <!-- Sidebar -->
-  <div class="sidebar bg-card border-r border-border flex flex-col" id="sidebar" style="background:#111">
+  <div class="sidebar bg-card border-r border-border flex flex-col" id="sidebar">
     <div class="p-5 border-b border-border">
       <div class="flex items-center gap-3">
         <div class="w-9 h-9 brand-gradient rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden"
@@ -1083,17 +1102,17 @@
           <img src="/static/img/logo_icon.svg" alt="POS Cafè Icon" class="w-6 h-6 object-contain">
         </div>
         <div>
-          <div class="font-display font-700 text-sm text-white" id="pos-cafe-name">POS Cafe</div>
+          <div class="font-display font-700 text-sm text-heading" id="pos-cafe-name">POS Cafè</div>
           <div class="text-xs text-gray-500">{{ user_name }}</div>
         </div>
       </div>
 
-      <div class="mt-4 card p-3" style="border-radius:14px; background:#0c0c0f;">
+      <div class="mt-4 card p-3" style="border-radius:14px; background:var(--card-2);">
         <div class="text-[10px] text-gray-500 uppercase tracking-wider font-bold">My Today</div>
         <div class="grid grid-cols-3 gap-2 mt-2">
           <div class="p-2 rounded-lg border border-white/5 bg-white/5">
             <div class="text-[10px] text-gray-500">Orders</div>
-            <div class="text-sm font-800 text-white" id="today-total-orders">—</div>
+            <div class="text-sm font-800 text-heading" id="today-total-orders">—</div>
           </div>
           <div class="p-2 rounded-lg border border-white/5 bg-white/5">
             <div class="text-[10px] text-gray-500">Paid</div>
@@ -1170,9 +1189,19 @@
 
     </nav>
     <div class="p-3 border-t border-border space-y-2">
-      <div id="session-status" class="text-xs text-gray-600 text-center"></div>
-      <button onclick="closeSession()" class="btn-ghost w-full py-2 rounded-lg text-sm text-red-400">Close
-        Register</button>
+      <div id="session-status" class="text-xs text-gray-600 text-center mb-2"></div>
+
+      <button id="attendance-btn-pc" onclick="handleAttendance()"
+        class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-brand-500/10 text-brand-500 text-[11px] font-900 border border-brand-500/20 hover:bg-brand-500/20 transition mb-2 uppercase tracking-tight">
+        📅 <span id="attendance-label-pc">Clock In</span>
+      </button>
+
+
+
+      <button onclick="logout()"
+        class="btn-ghost w-full py-1.5 rounded-lg text-[11px] text-gray-500 hover:text-gray-300">
+        ↩ Logout Account
+      </button>
     </div>
   </div>
 
@@ -1180,10 +1209,12 @@
   <div class="flex-1 flex flex-col overflow-hidden" id="main-content">
 
     <!-- Top Bar -->
-    <div class="border-b border-border px-6 py-3 flex items-center justify-between" style="background:#111">
+    <div class="border-b border-border px-6 py-3 flex items-center justify-between" style="background:var(--bg)">
       <div class="flex items-center gap-3 flex-wrap">
         <div id="breadcrumb" class="text-sm text-gray-500">Floor View</div>
-        <div id="printer-status-pill" class="flex items-center gap-1.5 text-[10px] text-gray-500 px-2 py-1 rounded-lg bg-white/5 border border-white/10" title="Printer status">
+        <div id="printer-status-pill"
+          class="flex items-center gap-1.5 text-[10px] text-gray-500 px-2 py-1 rounded-lg bg-white/5 border border-white/10"
+          title="Printer status">
           <span id="printer-status-dot" class="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
           <span id="printer-status-label">Print: browser</span>
         </div>
@@ -1208,14 +1239,16 @@
         <div class="flex items-center justify-between">
           <h2 class="font-display text-xl font-700">Floor Plan</h2>
           <div class="flex gap-2">
-            <button id="merge-mode-btn" onclick="toggleMergeMode()" class="btn-ghost px-3 py-1.5 rounded-lg text-xs border border-border flex items-center gap-2">
-               🔗 Merge Tables
+            <button id="merge-mode-btn" onclick="toggleMergeMode()"
+              class="btn-ghost px-3 py-1.5 rounded-lg text-xs border border-border flex items-center gap-2">
+              🔗 Merge Tables
             </button>
           </div>
         </div>
         <!-- Mobile Floor Selector -->
         <div id="mobile-floor-select-wrap">
-          <select id="mobile-floor-select" onchange="renderTables(this.value)" class="w-full bg-card border border-border rounded-xl px-4 py-3 font-semibold text-sm">
+          <select id="mobile-floor-select" onchange="renderTables(this.value)"
+            class="w-full bg-card border border-border rounded-xl px-4 py-3 font-semibold text-sm">
           </select>
         </div>
         <div id="floor-tabs" class="flex gap-2"></div>
@@ -1244,16 +1277,18 @@
           <div class="flex gap-2">
             <button onclick="clearOrder()" class="btn-ghost p-2 rounded-lg text-red-400" title="Clear Order">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
             </button>
           </div>
         </div>
-        
+
         <div class="px-4 pt-4 pb-2 border-b border-border flex flex-col gap-3" style="background:#0a0a0a">
           <div class="flex gap-2">
-            <input type="text" id="product-search" placeholder="🔍 Search products..." oninput="filterProducts()" 
-              class="flex-1 bg-card-2 border border-border rounded-xl px-4 py-3 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition font-500" style="background:#1a1a1a;border:1px solid #2a2a2a;">
+            <input type="text" id="product-search" placeholder="🔍 Search products..." oninput="filterProducts()"
+              class="flex-1 bg-card-2 border border-border rounded-xl px-4 py-3 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition font-500"
+              style="background:#1a1a1a;border:1px solid #2a2a2a;">
           </div>
           <div id="cat-pills-wrap" class="flex overflow-x-auto no-scrollbar pb-1">
             <div id="cat-pills" class="flex gap-2"></div>
@@ -1266,40 +1301,45 @@
 
         <!-- Floating Mobile Cart Bar -->
         <button class="mobile-cart-bar" onclick="toggleCartDrawer('open')">
-           <div class="flex items-center gap-3">
-             <span class="bg-white/20 px-2 py-0.5 rounded-lg text-xs" id="mobile-cart-count">0</span>
-             <span>View Order</span>
-           </div>
-           <span id="mobile-cart-total">₹0</span>
+          <div class="flex items-center gap-3">
+            <span class="bg-white/20 px-2 py-0.5 rounded-lg text-xs" id="mobile-cart-count">0</span>
+            <span>View Order</span>
+          </div>
+          <span id="mobile-cart-total">₹0</span>
         </button>
       </div>
 
       <!-- Cart Panel Overlay (Mobile) -->
       <div class="mobile-cart-backdrop" id="cart-backdrop" onclick="toggleCartDrawer('close')"></div>
       <div id="cart-panel-overlay" class="bg-card">
-         <div class="p-4 border-b border-border flex items-center justify-between">
-            <h3 class="font-700">Order Summary</h3>
-            <button onclick="toggleCartDrawer('close')" class="p-2 text-gray-500">
-               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l18 18" /></svg>
-            </button>
-         </div>
-         <div id="mobile-cart-content" class="flex-1 overflow-auto">
-            <!-- Content will be cloned from standard cart or rendered here -->
-         </div>
+        <div class="p-4 border-b border-border flex items-center justify-between">
+          <h3 class="font-700">Order Summary</h3>
+          <button onclick="toggleCartDrawer('close')" class="p-2 text-gray-500">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l18 18" />
+            </svg>
+          </button>
+        </div>
+        <div id="mobile-cart-content" class="flex-1 overflow-auto">
+          <!-- Content will be cloned from standard cart or rendered here -->
+        </div>
       </div>
 
       <!-- Cart Panel (Desktop & Mobile) -->
-      <div class="flex flex-col cart-panel-standard" style="width:300px;min-width:300px;background:#111">
+      <div class="flex flex-col cart-panel-standard" style="width:300px;min-width:300px;background:var(--card-2)">
         <div class="p-4 border-b border-border flex items-center justify-between">
           <div>
             <h3 class="font-display font-700 text-base">Order <span id="cart-order-num"
                 class="text-gray-500 font-400 text-sm"></span></h3>
           </div>
-          <button onclick="toggleCartDrawer('close')" class="p-2 text-gray-500 lg:hidden" title="Back to menu" aria-label="Back to menu">
-             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+          <button onclick="toggleCartDrawer('close')" class="p-2 text-gray-500 lg:hidden" title="Back to menu"
+            aria-label="Back to menu">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
-        
+
         <div class="p-4 border-b border-border space-y-3">
           <div id="order-type-toggle">
             <button id="btn-take" class="order-type-btn w-full" onclick="setOrderType()">🛵 Takeaway</button>
@@ -1333,10 +1373,7 @@
           <button onclick="sendToKitchen()" class="btn-ghost w-full py-2.5 rounded-xl text-sm text-orange-400">
             Send to Kitchen
           </button>
-          <button id="pay-now-btn" onclick="goToPayment()"
-            class="btn-primary hidden w-full py-2.5 rounded-xl text-white text-sm font-medium">
-            Checkout Sent Order →
-          </button>
+
           <button onclick="clearOrder()"
             class="btn-ghost w-full py-2 rounded-xl text-xs text-red-400 border border-red-400/30">
             Clear Order
@@ -1384,16 +1421,12 @@
       </div>
       <!-- Filter pills -->
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
-        <button class="pos-res-filter active" data-f="all" onclick="filterPosRes('all',this)"
-          >All</button>
-        <button class="pos-res-filter" data-f="pending" onclick="filterPosRes('pending',this)"
-          >🟡
+        <button class="pos-res-filter active" data-f="all" onclick="filterPosRes('all',this)">All</button>
+        <button class="pos-res-filter" data-f="pending" onclick="filterPosRes('pending',this)">🟡
           Pending</button>
-        <button class="pos-res-filter" data-f="confirmed" onclick="filterPosRes('confirmed',this)"
-          >🟢
+        <button class="pos-res-filter" data-f="confirmed" onclick="filterPosRes('confirmed',this)">🟢
           Confirmed</button>
-        <button class="pos-res-filter" data-f="seated" onclick="filterPosRes('seated',this)"
-          >🟣
+        <button class="pos-res-filter" data-f="seated" onclick="filterPosRes('seated',this)">🟣
           Seated</button>
       </div>
       <div id="pos-res-grid" class="grid gap-4"
@@ -1423,7 +1456,7 @@
     <!-- ═══ PAYMENT VIEW ═══ -->
     <div id="view-payment" class="hidden flex-1 flex items-center justify-center p-4 sm:p-8">
       <div class="w-full max-w-sm sm:max-w-md">
-        
+
         <div class="card p-5 sm:p-6" style="border-radius:20px; max-height:calc(100vh - 7rem); overflow-y:auto;">
           <h2 class="font-display text-xl sm:text-2xl font-700 mb-2">Payment</h2>
           <div class="text-xs text-gray-500 uppercase tracking-wider mb-4">Bill <span id="pay-order-num"
@@ -1517,7 +1550,8 @@
 </div>
 
 <!-- Addon Selection Modal -->
-<div id="addon-modal" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-[60]" onclick="if(event.target===this)closeAddonModal()">
+<div id="addon-modal" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-[60]"
+  onclick="if(event.target===this)closeAddonModal()">
   <div class="card p-6 w-full max-w-sm m-4 overflow-hidden flex flex-col" style="border-radius:24px; max-height: 85vh;">
     <div class="flex justify-between items-start mb-4">
       <div>
@@ -1526,7 +1560,7 @@
       </div>
       <button onclick="closeAddonModal()" class="text-gray-500 p-1">✕</button>
     </div>
-    
+
     <div id="addon-list" class="flex-1 overflow-y-auto space-y-3 py-2 pr-1">
       <!-- Addons will be injected here -->
     </div>
@@ -1536,7 +1570,8 @@
         <span class="text-sm text-gray-400">Total Price</span>
         <span id="addon-total-display" class="text-xl font-800 text-white">₹0</span>
       </div>
-      <button id="addon-confirm-btn" class="btn-primary w-full py-3.5 rounded-xl font-bold transition-all active:scale-95 shadow-lg shadow-brand-500/20">
+      <button id="addon-confirm-btn"
+        class="btn-primary w-full py-3.5 rounded-xl font-bold transition-all active:scale-95 shadow-lg shadow-brand-500/20">
         Add to Ticket
       </button>
     </div>
@@ -1592,7 +1627,7 @@
   let lastPaidOrder = null, lastPaidMethod = 'cash', confirmReviewRating = 0, confirmReviewSubmitted = false;
   let isTakeaway = false;
   let lookupTimeout = null;
-  const POS_USER_NAME = {{ user_name|tojson }};
+  const POS_USER_NAME = {{ user_name| tojson }};
   let attendanceState = { clocked_in: false, current_shift_started_at: null };
   const NOTE_PRESETS = ['No ice', 'Parcel', 'Urgent', 'Birthday', 'VIP'];
 
@@ -1688,21 +1723,28 @@
   async function reloadData() {
     const [fl, pr, bl] = await Promise.all([api('/api/floors'), api('/api/products'), api('/api/bills')]);
     floors = fl; products = pr; bills = bl;
-    if (currentTable) {
-      const tableBill = bills.find(b => b.table_id === currentTable.id && b.status === 'sent');
-      currentBill = tableBill || (currentBill && currentBill.table_id === currentTable.id ? currentBill : null);
+
+    // Update or clear currentBill based on latest bills list
+    if (currentBill) {
+      const active = bills.find(b => b.id === currentBill.id);
+      currentBill = active || null;
+    } else if (currentTable) {
+      currentBill = bills.find(b => b.table_id === currentTable.id && b.status === 'sent') || null;
     }
+
     renderFloors(); renderProducts();
     renderBills();
     loadMyTodayStats();
-    try { if (typeof refreshPrinterStatus === 'function') refreshPrinterStatus(); } catch (e) {}
+    try { if (typeof refreshPrinterStatus === 'function') refreshPrinterStatus(); } catch (e) { }
   }
 
   async function refreshBills() {
     bills = await api('/api/bills');
-    if (currentTable) {
-      const tableBill = bills.find(b => b.table_id === currentTable.id && b.status === 'sent');
-      currentBill = tableBill || (currentBill && currentBill.table_id === currentTable.id ? currentBill : null);
+    if (currentBill) {
+      const active = bills.find(b => b.id === currentBill.id);
+      currentBill = active || null;
+    } else if (currentTable) {
+      currentBill = bills.find(b => b.table_id === currentTable.id && b.status === 'sent') || null;
     }
     renderBills();
   }
@@ -1717,10 +1759,10 @@
     const tabs = document.getElementById('floor-tabs');
     const select = document.getElementById('mobile-floor-select');
     if (!activeFloorId && floors.length) activeFloorId = floors[0].id;
-    
+
     // Desktop Tabs
     tabs.innerHTML = floors.map(f => `<button onclick="renderTables(${f.id})" class="cat-pill px-4 py-1.5 rounded-full text-sm border border-border ${f.id === activeFloorId ? 'active' : ''}">${escapeHTML(f.name)}</button>`).join('');
-    
+
     // Mobile Select
     if (select) {
       select.innerHTML = floors.map(f => `<option value="${f.id}" ${f.id === activeFloorId ? 'selected' : ''}>${f.name}</option>`).join('');
@@ -1807,12 +1849,12 @@
     const floor = floors.find(f => f.id === floorId);
     if (!floor) return;
     activeFloorId = floorId;
-    
+
     // Sync UI
     document.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
     const activeTab = Array.from(document.querySelectorAll('#floor-tabs .cat-pill')).find(btn => btn.textContent === floor.name);
     if (activeTab) activeTab.classList.add('active');
-    
+
     const select = document.getElementById('mobile-floor-select');
     if (select) select.value = floorId;
 
@@ -1840,10 +1882,10 @@
         <div class="table-footer">
           <div class="table-status">
             <span class="tag ${t.status === 'occupied' ? 'occupied' : 'free'}">${t.status === 'occupied' ? 'Occupied' : 'Free'}</span>
-            ${t.status === 'occupied' ? 
-              `<button class="table-free-btn" style="display:block;" onclick="event.stopPropagation(); freeTable(${t.id}, '${String(t.number).replace(/'/g, "\\'")}')">Free</button>` : 
-              `<button class="table-free-btn" style="background:rgba(34,197,150,0.1);color:#22c59e;border-color:rgba(34,197,150,0.2);display:block;" onclick="event.stopPropagation(); toggleTableStatus(event, ${t.id}, 'free')">Occupy</button>`
-            }
+            ${t.status === 'occupied' ?
+          `<button class="table-free-btn" style="display:block;" onclick="event.stopPropagation(); freeTable(${t.id}, '${String(t.number).replace(/'/g, "\\'")}')">Free</button>` :
+          `<button class="table-free-btn" style="background:rgba(34,197,150,0.1);color:#22c59e;border-color:rgba(34,197,150,0.2);display:block;" onclick="event.stopPropagation(); toggleTableStatus(event, ${t.id}, 'free')">Occupy</button>`
+        }
           </div>
           <div class="table-hint">Right-click for options</div>
           ${t.merged_to_id ? `<button onclick="event.stopPropagation(); unmergeTable(${t.id})" class="text-[10px] mt-2 text-red-500 font-bold underline">Unmerge Table</button>` : ''}
@@ -1964,9 +2006,27 @@
     let html = '';
     cats.forEach(c => {
       c.products.forEach(p => {
-        const imgHtml = p.image_b64
-          ? `<img src="${p.image_b64}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`
-          : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px;opacity:0.6;">${getCatEmoji(c.name)}</div>`;
+        const catName = (c.name || '').toLowerCase();
+        
+        let imgPath = '';
+        if (catName.includes('pizza')) imgPath = '/static/img/categories/pizza.png';
+        else if (catName.includes('burger')) imgPath = '/static/img/categories/burger.png';
+        else if (catName.includes('pasta')) imgPath = '/static/img/categories/pasta.png';
+        else if (catName.includes('salad')) imgPath = '/static/img/categories/salads.png';
+        else if (catName.includes('dessert')) imgPath = '/static/img/categories/Desserts.png';
+        else if (catName.includes('mains')) imgPath = '/static/img/categories/mains.png';
+        else if (catName.includes('drink') || catName.includes('water') || catName.includes('beverage') || catName.includes('juice') || catName.includes('coffee') || catName.includes('tea')) {
+            imgPath = '/static/img/categories/Beverages.png';
+        }
+
+        let imgHtml = '';
+        if (imgPath) {
+          imgHtml = `<img src="${imgPath}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`;
+        } else if (p.image_b64) {
+          imgHtml = `<img src="${p.image_b64}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`;
+        } else {
+          imgHtml = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px;opacity:0.6;">${getCatEmoji(c.name)}</div>`;
+        }
         html += `<div class="product-btn" role="button" tabindex="0" onclick="addToCart(${p.id},'${p.name.replace(/'/g, "\\'")}',${p.price})" onkeydown="handleProductCardKeydown(event, ${p.id}, '${p.name.replace(/'/g, "\\'")}', ${p.price})">
         <div class="product-image">${imgHtml}</div>
         <div class="product-name">${escapeHTML(p.name)}</div>
@@ -2004,22 +2064,22 @@
 
     const itemPrice = price + selectedAddons.reduce((s, a) => s + a.price, 0);
     const itemKey = id + '_' + JSON.stringify(selectedAddons.map(a => a.id).sort());
-    
+
     // Check for existing item with same addons
     const ex = cart.find(i => i.itemKey === itemKey);
-    if (ex) { 
-      ex.qty++; 
-    } else { 
-      cart.push({ 
+    if (ex) {
+      ex.qty++;
+    } else {
+      cart.push({
         itemKey,
-        product_id: id, 
-        name, 
+        product_id: id,
+        name,
         basePrice: price,
-        price: itemPrice, 
-        qty: 1, 
+        price: itemPrice,
+        qty: 1,
         notes: '',
         addons: selectedAddons
-      }); 
+      });
     }
     renderCart();
   }
@@ -2046,7 +2106,7 @@
         <span class="text-xs font-bold text-brand-500">+₹${a.price}</span>
       </label>
     `).join('');
-    
+
     document.getElementById('addon-confirm-btn').onclick = () => {
       const selected = [];
       document.querySelectorAll('.addon-checkbox:checked').forEach(cb => {
@@ -2059,7 +2119,7 @@
       addToCart(p.id, p.name, p.price, selected);
       closeAddonModal();
     };
-    
+
     updateAddonTotal(p.price);
     document.getElementById('addon-modal').classList.remove('hidden');
   }
@@ -2085,10 +2145,10 @@
   function renderCart() {
     const el = document.getElementById('cart-items');
     const mobileContent = document.getElementById('mobile-cart-content');
-    
+
     let cartHtml = '';
-    if (!cart.length) { 
-      cartHtml = '<div class="text-gray-600 text-sm text-center mt-8 px-4">🛒 No items yet</div>'; 
+    if (!cart.length) {
+      cartHtml = '<div class="text-gray-600 text-sm text-center mt-8 px-4">🛒 No items yet</div>';
     } else {
       cartHtml = cart.map((i, idx) => `
       <div class="cart-item">
@@ -2114,14 +2174,14 @@
         </div>
       </div>`).join('');
     }
-    
+
     if (el) el.innerHTML = cartHtml;
-    
+
     // Sync to mobile overlay content as well
     if (mobileContent) {
-       const payableOrder = currentBill || currentOrder;
-       const canPay = Boolean(payableOrder && (payableOrder.sent_to_kitchen_at || payableOrder.status === 'sent'));
-       mobileContent.innerHTML = `
+      const payableOrder = currentBill || currentOrder;
+      const canPay = Boolean(payableOrder && (payableOrder.sent_to_kitchen_at || payableOrder.status === 'sent'));
+      mobileContent.innerHTML = `
          <div class="flex flex-col h-full" style="max-height: 100%;">
            <div class="flex-1 overflow-auto px-4 py-2">${cartHtml}</div>
            ${cart.length ? `
@@ -2139,62 +2199,62 @@
 
     const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
     const count = cart.reduce((s, i) => s + i.qty, 0);
-    
+
     // Update all total labels
     ['cart-subtotal', 'cart-total', 'mobile-cart-total', 'mobile-drawer-subtotal', 'mobile-drawer-total'].forEach(id => {
       const label = document.getElementById(id);
       if (label) label.textContent = '₹' + total.toFixed(0);
     });
-    
+
     const countLabel = document.getElementById('mobile-cart-count');
     if (countLabel) countLabel.textContent = count;
 
     updatePayButtonState();
-    
+
     // If cart becomes empty, close drawer
     if (cart.length === 0 && document.querySelector('.cart-panel-standard')?.classList.contains('mobile-open')) {
-       setCartDrawerOpen(false);
+      setCartDrawerOpen(false);
     }
   }
 
   function setCartDrawerOpen(open) {
-     const cartPanel = document.querySelector('#view-order .cart-panel-standard');
-     const backdrop = document.querySelector('#view-order .mobile-cart-backdrop');
-     if (!cartPanel) return;
-     cartPanel.classList.toggle('mobile-open', open);
-     backdrop?.classList.toggle('active', open);
+    const cartPanel = document.querySelector('#view-order .cart-panel-standard');
+    const backdrop = document.querySelector('#view-order .mobile-cart-backdrop');
+    if (!cartPanel) return;
+    cartPanel.classList.toggle('mobile-open', open);
+    backdrop?.classList.toggle('active', open);
   }
 
   function toggleCartDrawer(action = 'toggle') {
-     const cartPanel = document.querySelector('#view-order .cart-panel-standard');
+    const cartPanel = document.querySelector('#view-order .cart-panel-standard');
 
-     // If we're not in the order view, navigate there first (desktop behavior)
-     const orderView = document.getElementById('view-order');
-     if (!orderView || orderView.classList.contains('hidden')) {
-        showView('order');
-        return;
-     }
+    // If we're not in the order view, navigate there first (desktop behavior)
+    const orderView = document.getElementById('view-order');
+    if (!orderView || orderView.classList.contains('hidden')) {
+      showView('order');
+      return;
+    }
 
-     if (!cartPanel) return;
+    if (!cartPanel) return;
 
-     const isOpen = cartPanel.classList.contains('mobile-open');
-     const shouldOpen = action === 'open' ? true : action === 'close' ? false : !isOpen;
+    const isOpen = cartPanel.classList.contains('mobile-open');
+    const shouldOpen = action === 'open' ? true : action === 'close' ? false : !isOpen;
 
-     if (!shouldOpen) {
-        setCartDrawerOpen(false);
-        return;
-     }
+    if (!shouldOpen) {
+      setCartDrawerOpen(false);
+      return;
+    }
 
-     // Check cart is not empty only when opening on mobile
-     const isMobile = window.innerWidth <= 1024;
-     if (isMobile && !cart.length) {
-        toast('Cart is empty', 'info');
-        return;
-     }
+    // Check cart is not empty only when opening on mobile
+    const isMobile = window.innerWidth <= 1024;
+    if (isMobile && !cart.length) {
+      toast('Cart is empty', 'info');
+      return;
+    }
 
-     if (isMobile) {
-        setCartDrawerOpen(true);
-     }
+    if (isMobile) {
+      setCartDrawerOpen(true);
+    }
   }
 
   async function logout() {
@@ -2240,11 +2300,11 @@
     if (!cart.length) { toast('Add items first', 'error'); return null; }
     const customerName = (document.getElementById('customer-name')?.value || '').trim();
     const customerPhone = (document.getElementById('customer-phone')?.value || '').trim();
-    const items = cart.map(i => ({ 
-      product_id: i.product_id, 
-      name: i.name, 
-      price: i.price, 
-      qty: i.qty, 
+    const items = cart.map(i => ({
+      product_id: i.product_id,
+      name: i.name,
+      price: i.price,
+      qty: i.qty,
       notes: i.notes || '',
       addons_json: JSON.stringify(i.addons || [])
     }));
@@ -2554,7 +2614,7 @@
       key: gateway.key_id,
       amount: gateway.amount,
       currency: gateway.currency,
-      name: gateway.merchant_name || 'POS Cafe',
+      name: gateway.merchant_name || 'POS Cafè',
       description: `Order ${gateway.order_number}`,
       order_id: gateway.razorpay_order_id,
       prefill: {
@@ -2636,7 +2696,7 @@
       lastPaidMethod = method || 'cash';
       confirmReviewRating = 0;
       confirmReviewSubmitted = false;
-      cart = []; currentOrder = null; currentTable = null; currentTip = 0;
+      cart = []; currentOrder = null; currentTable = null; currentBill = null; currentTip = 0;
       selectedMethod = null;
       showView('confirm');
       renderConfirmReview();
@@ -2777,10 +2837,10 @@
           <span>${i.name}</span>
           <span>×${i.qty}</span>
         </div>`).join('');
-      
+
       const statusClass = sentToKitchen ? 'bg-orange-500/10 text-orange-500' : 'bg-gray-500/10 text-gray-500';
-      const waMsg = encodeURIComponent(`\uD83E\uDDFE POS Cafe \u2014 Bill\nOrder: ${b.order_number} | Table ${b.table}\nTotal: \u20b9${b.total.toFixed(0)}`);
-      
+      const waMsg = encodeURIComponent(`\uD83E\uDDFE POS Cafè \u2014 Bill\nOrder: ${b.order_number} | Table ${b.table}\nTotal: \u20b9${b.total.toFixed(0)}`);
+
       return `
       <div class="card p-5 rounded-3xl border border-white/5 transition-all hover:scale-[1.01] ${isCurrent ? 'ring-2 ring-brand-500 bg-brand-500/5' : 'bg-card-2'}">
         <div class="flex justify-between items-start mb-4">
@@ -2803,9 +2863,9 @@
           <button class="btn-ghost flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-700 bg-white/5" onclick="openBillForPayment(${b.id})">
             📄 Open
           </button>
-          ${sentToKitchen 
-            ? `<button class="btn-primary flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-800 shadow-lg shadow-brand-500/20" onclick="payBill(${b.id})">💰 Pay Now</button>` 
-            : `<button class="bg-gray-800 text-gray-500 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-700 cursor-not-allowed" disabled>Draft</button>`}
+          ${sentToKitchen
+          ? `<button class="btn-primary flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-800 shadow-lg shadow-brand-500/20" onclick="payBill(${b.id})">💰 Pay Now</button>`
+          : `<button class="bg-gray-800 text-gray-500 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-700 cursor-not-allowed" disabled>Draft</button>`}
         </div>
         
         <div class="flex gap-2 flex-wrap">
@@ -2880,13 +2940,13 @@
   }
   document.addEventListener('click', () => {
     const ctx = getPosAudioCtx();
-    if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+    if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => { });
   }, { once: true, capture: true });
 
   function playWaiterBellPos() {
     const ctx = getPosAudioCtx();
     if (!ctx) return;
-    if (ctx.state === 'suspended') { ctx.resume().catch(() => {}); if (ctx.state !== 'running') return; }
+    if (ctx.state === 'suspended') { ctx.resume().catch(() => { }); if (ctx.state !== 'running') return; }
     const now = ctx.currentTime;
     const mg = ctx.createGain();
     mg.gain.setValueAtTime(0.18, now);
@@ -2979,7 +3039,7 @@
       const dt = new Date(r.reserved_at);
       const timeStr = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       const dateStr = dt.toLocaleDateString([], { month: 'short', day: 'numeric' });
-      
+
       const preHtml = r.items && r.items.length
         ? `<div class="mt-3 p-3 bg-black/40 rounded-xl border border-white/5 space-y-2">
             <div class="text-[10px] font-800 text-brand-500 uppercase tracking-widest">\uD83D\uDED2 Pre-Order Items</div>
@@ -2987,7 +3047,7 @@
               ${r.items.map(i => `<div class="flex justify-between text-[11px] text-gray-400"><span>${i.product_name}</span><span>×${i.qty}</span></div>`).join('')}
             </div>
           </div>` : '';
-          
+
       return `
       <div class="card p-5 rounded-3xl bg-card-2 border border-white/5 transition-all hover:border-brand-500/30">
         <div class="flex justify-between items-start mb-4">
@@ -3076,7 +3136,7 @@
       const itemsSummary = o.items.map(i => `${i.name} x${i.qty}`).join(', ');
       const methodIcon = o.payment_method === 'cash' ? '💵' : o.payment_method === 'upi' ? '📱' : '💳';
       const tableLabel = o.table === 'Takeaway' ? '🛵 Takeaway' : '🪑 Table ' + o.table;
-      
+
       return `
       <button type="button" class="card w-full p-4 rounded-2xl bg-card-2 border border-white/5 transition-all active:scale-[0.98] text-left cursor-pointer" onclick="openHistoryOrder(${o.id})">
         <div class="flex items-center justify-between mb-2">
@@ -3135,27 +3195,35 @@
   function updateAttendanceLabel() {
     const isClockedIn = Boolean(attendanceState.clocked_in);
     const label = document.getElementById('attendance-label');
+    const labelPc = document.getElementById('attendance-label-pc');
     const meta = document.getElementById('attendance-meta');
     const btn = document.getElementById('attendance-btn');
-    if (label) label.textContent = isClockedIn ? 'Clock Out' : 'Clock In';
+    const btnPc = document.getElementById('attendance-btn-pc');
+
+    const txt = isClockedIn ? 'Clock Out' : 'Clock In';
+    if (label) label.textContent = txt;
+    if (labelPc) labelPc.textContent = txt;
+
     if (meta) {
       meta.textContent = isClockedIn && attendanceState.current_shift_started_at
         ? `Started at ${formatAttendanceTime(attendanceState.current_shift_started_at)}`
         : 'Tap to start staff duty';
     }
-    if (btn) {
+
+    [btn, btnPc].forEach(b => {
+      if (!b) return;
       if (isClockedIn) {
-        btn.style.background = 'rgba(239,68,68,0.15)';
-        btn.style.borderColor = 'rgba(239,68,68,0.4)';
-        btn.style.color = '#ef4444';
-        btn.classList.add('font-bold');
+        b.style.background = 'rgba(239,68,68,0.15)';
+        b.style.borderColor = 'rgba(239,68,68,0.4)';
+        b.style.color = '#ef4444';
+        b.classList.add('font-bold');
       } else {
-        btn.style.background = 'transparent';
-        btn.style.borderColor = '';
-        btn.style.color = '';
-        btn.classList.remove('font-bold');
+        b.style.background = 'transparent';
+        b.style.borderColor = '';
+        b.style.color = '';
+        b.classList.remove('font-bold');
       }
-    }
+    });
   }
 
   async function handleAttendance() {
@@ -3163,21 +3231,21 @@
     const action = isClockedIn ? 'out' : 'in';
     const r = await api('/api/attendance/clock', 'POST', { action });
     if (r.ok || r.message) {
-        attendanceState = {
-          clocked_in: Boolean(r.clocked_in),
-          current_shift_started_at: action === 'in' ? r.timestamp : null
-        };
-        const when = formatAttendanceTime(r.timestamp);
-        toast(
-          action === 'in'
-            ? `${POS_USER_NAME} started duty${when ? ' at ' + when : ''}`
-            : `${POS_USER_NAME} ended duty${when ? ' at ' + when : ''}`,
-          'success'
-        );
-        updateAttendanceLabel();
-        closeMoreActions();
+      attendanceState = {
+        clocked_in: Boolean(r.clocked_in),
+        current_shift_started_at: action === 'in' ? r.timestamp : null
+      };
+      const when = formatAttendanceTime(r.timestamp);
+      toast(
+        action === 'in'
+          ? `${POS_USER_NAME} started duty${when ? ' at ' + when : ''}`
+          : `${POS_USER_NAME} ended duty${when ? ' at ' + when : ''}`,
+        'success'
+      );
+      updateAttendanceLabel();
+      closeMoreActions();
     } else {
-        toast(r.error || 'Attendance error', 'error');
+      toast(r.error || 'Attendance error', 'error');
     }
   }
 
@@ -3202,22 +3270,25 @@
 </script>
 
 <!-- ═══ MORE ACTIONS MODAL ═══ -->
-<div id="more-actions-modal" class="hidden fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-4 modal-bg">
+<div id="more-actions-modal"
+  class="hidden fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-4 modal-bg">
   <div class="modal-content w-full max-w-sm bg-card border border-border rounded-2xl shadow-2xl overflow-hidden">
     <div class="p-4 border-b border-border flex items-center justify-between">
       <h3 class="font-700">More Actions</h3>
       <button onclick="closeMoreActions()" class="p-2 text-gray-500">&times;</button>
     </div>
     <div class="p-4 space-y-3">
-      <button id="attendance-btn" onclick="handleAttendance()" class="w-full flex items-center gap-3 p-4 rounded-xl border border-border hover:bg-white/5 transition">
+      <button id="attendance-btn" onclick="handleAttendance()"
+        class="w-full flex items-center gap-3 p-4 rounded-xl border border-border hover:bg-white/5 transition">
         <span class="text-xl">📅</span>
         <div class="text-left">
           <div id="attendance-label" class="font-700 text-sm">Clock In</div>
           <div id="attendance-meta" class="text-[10px] text-gray-500 uppercase">Tap to start staff duty</div>
         </div>
       </button>
-      
-      <a href="/backend" class="w-full flex items-center gap-3 p-4 rounded-xl border border-border hover:bg-white/5 transition">
+
+      <a href="/backend"
+        class="w-full flex items-center gap-3 p-4 rounded-xl border border-border hover:bg-white/5 transition">
         <span class="text-xl">🟧</span>
         <div class="text-left">
           <div class="font-700 text-sm">Open Backend</div>
@@ -3225,7 +3296,8 @@
         </div>
       </a>
 
-      <button onclick="closeSession()" class="w-full flex items-center gap-3 p-4 rounded-xl border border-border hover:bg-white/5 transition">
+      <button onclick="closeSession()"
+        class="w-full flex items-center gap-3 p-4 rounded-xl border border-border hover:bg-white/5 transition">
         <span class="text-xl">💰</span>
         <div class="text-left">
           <div class="font-700 text-sm">Close Register</div>
@@ -3234,7 +3306,8 @@
       </button>
 
       <div class="pt-4 border-t border-border">
-        <button onclick="logout()" class="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-red-500/10 text-red-500 font-700 text-sm border border-red-500/20 hover:bg-red-500/20 transition">
+        <button onclick="logout()"
+          class="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-red-500/10 text-red-500 font-700 text-sm border border-red-500/20 hover:bg-red-500/20 transition">
           ↩ Logout Account
         </button>
       </div>

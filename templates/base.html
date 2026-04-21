@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, maximum-scale=1">
 <meta name="apple-mobile-web-app-capable" content="true">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="POS Cafe">
+<meta name="apple-mobile-web-app-title" content="POS Cafè">
 <meta name="theme-color" content="#1a1a1a">
 <meta name="csrf-token" content="{{ csrf_token() }}">
-<title>{% block title %}POS Cafe{% endblock %}</title>
+<title>{% block title %}POS Cafè{% endblock %}</title>
 <!-- Compiled Tailwind CSS for production -->
 <link rel="stylesheet" href="{{ url_for('static', filename='output.css') }}">
 <!-- Socket.io for real-time updates -->
@@ -44,6 +44,7 @@
     --toast-bg: #ffffff;
   }
   body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; transition:background .2s ease,color .2s ease; }
+  .text-heading { color:var(--text); }
   .brand-gradient { background: linear-gradient(135deg, #f97316, #ea580c); }
   .glass { background:rgba(255,255,255,0.04); backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.08); }
   .nav-link { transition:all .2s; min-height:44px; display:flex; align-items:center; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
@@ -244,6 +245,7 @@ async function api(url, method='GET', data=null) {
   } catch (e) {
     console.error('Network Error:', e);
     toast('Network error. Check connection.', 'error');
+    return { error: 'network_error' };
   }
 }
 

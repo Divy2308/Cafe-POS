@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Customer Portal — POS Cafe{% endblock %}
+{% block title %}Customer Portal — POS Cafè{% endblock %}
 {% block extra_head %}
 <style>
   body { background:#050505; }
@@ -101,7 +101,7 @@
   <!-- Header -->
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
     <div>
-      <h1 style="font-size:24px; font-weight:800; margin:0;">🍽️ POS Cafe</h1>
+      <h1 style="font-size:24px; font-weight:800; margin:0;">🍽️ POS Cafè</h1>
       <div style="font-size:13px; color:#888; margin-top:4px;">
         <span class="live-dot"></span>
         <span id="user-greeting" style="margin-left:6px;">Welcome</span>
@@ -706,7 +706,7 @@ async function registerPush() {
 function showInPageAlert(msg) {
   // Show browser notification if permission granted
   if (window._pushEnabled || Notification.permission === 'granted') {
-    try { new Notification('POS Cafe', { body: msg, icon: '/favicon.ico' }); } catch(e) {}
+    try { new Notification('POS Cafè', { body: msg, icon: '/favicon.ico' }); } catch(e) {}
   }
   // Also show in-page toast
   toast(msg, 'success');
