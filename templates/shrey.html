@@ -602,14 +602,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
 <script>
 const PASS = 'admin';
-let restaurants = [
-  {id:1,name:'Spice Garden',owner:'Amit Shah',email:'amit@spicegarden.com',city:'Ahmedabad',phone:'9876543210',plan:'pro',tables:12,ordersDay:87,status:'active',applied:'2025-03-10',type:'Dine-in',gst:'24AABCU9603R1ZX'},
-  {id:2,name:'The Brew House',owner:'Priya Mehta',email:'priya@brewhouse.com',city:'Surat',phone:'9123456780',plan:'starter',tables:8,ordersDay:43,status:'active',applied:'2025-02-20',type:'Cafe',gst:'24AABCU9603R1ZY'},
-  {id:3,name:'Biryani Express',owner:'Rahul Patel',email:'rahul@biryani.com',city:'Vadodara',phone:'9988776655',plan:'enterprise',tables:20,ordersDay:210,status:'active',applied:'2024-12-01',type:'QSR',gst:'24AABCU9603R1ZZ'},
-  {id:4,name:'Cafe Monsoon',owner:'Sneha Joshi',email:'sneha@monsoon.com',city:'Rajkot',phone:'9665544332',plan:'pro',tables:10,ordersDay:56,status:'suspended',applied:'2025-01-15',type:'Cafe',gst:''},
-  {id:5,name:'The Pizza Factory',owner:'Karan Desai',email:'karan@pizza.com',city:'Ahmedabad',phone:'9554433221',plan:'starter',tables:6,ordersDay:34,status:'active',applied:'2025-04-02',type:'QSR',gst:''},
-  {id:6,name:'Royal Thali',owner:'Meera Sharma',email:'meera@royalthali.com',city:'Gandhinagar',phone:'9443322110',plan:'pro',tables:15,ordersDay:95,status:'active',applied:'2025-03-28',type:'Dine-in',gst:'24AABCU9603R1ZW'},
-];
+let restaurants = [];
 let requests = [];
 let logs = [];
 let bcHistory = [];
@@ -618,6 +611,34 @@ let reqSearch = '';
 let restSearch = '';
 let currentAction = null;
 let appInitialized = false;
+const FEATURE_DEFINITIONS = {
+  dashboard: {
+    label: 'Dashboard',
+    description: 'Sales and analytics dashboard access',
+  },
+  kitchen: {
+    label: 'Kitchen Display',
+    description: 'Kitchen screen, ticket flow, and ready alerts',
+  },
+  self_order: {
+    label: 'QR Self-Order',
+    description: 'Guest QR menu and self-ordering for tables',
+  },
+};
+
+function getRestaurantRows() {
+  return [
+    ...restaurants,
+    ...requests.filter(r => ['approved', 'suspended'].includes(r.status)),
+  ];
+}
+
+function updateRequestRecord(nextRecord) {
+  if (!nextRecord) return;
+  const idx = requests.findIndex(r => r.id === nextRecord.id);
+  if (idx >= 0) requests[idx] = nextRecord;
+  else requests.unshift(nextRecord);
+}
 
 function tryUnlock(){
   const v=document.getElementById('lock-pass').value;
@@ -671,6 +692,7 @@ async function loadRealRequests(){
       renderOverviewRequests();
       renderRequests();
       renderRestaurants();
+      renderBilling();
     }
   } catch (e) {
     console.error('Failed to load real requests', e);
@@ -724,7 +746,6 @@ function renderRequests(){
       <td><div class="action-btns">
         <button class="act-btn view" onclick="viewRequest(${r.id})">View</button>
         ${r.status==='pending'?`<button class="act-btn approve" onclick="quickApprove(${r.id})">Approve</button><button class="act-btn reject" onclick="quickReject(${r.id})">Reject</button>`:''}
-        ${r.status==='approved'?`<button class="act-btn suspend" onclick="suspendReq(${r.id})">Suspend</button>`:''}
       </div></td>
     </tr>`).join('');
   document.getElementById('req-badge').textContent=requests.filter(r=>r.status==='pending').length;
@@ -748,11 +769,12 @@ async function quickApprove(id){
     const res = await fetch('/api/shrey/requests/'+id+'/approve', { method:'POST', headers:{'Content-Type':'application/json'} });
     const data = await res.json().catch(()=>({}));
     if (!res.ok) { showToast(data.error||'Approval failed','red'); return; }
+    updateRequestRecord(data.request);
   }
   if(r.status!==undefined) r.status='approved';
   addLog(r.name,'was approved','green');
   updateStats();
-  renderRequests(); renderOverviewRequests(); renderRestaurants();
+  renderRequests(); renderOverviewRequests(); renderRestaurants(); renderBilling();
   showToast(r.name+' approved!','green');
 }
 async function quickReject(id){
@@ -761,10 +783,11 @@ async function quickReject(id){
   const res = await fetch('/api/shrey/requests/'+id+'/reject', { method:'POST', headers:{'Content-Type':'application/json'} });
   const data = await res.json().catch(()=>({}));
   if (!res.ok) { showToast(data.error||'Rejection failed','red'); return; }
+  updateRequestRecord(data.request);
   r.status='rejected';
   addLog(r.name,'was rejected','red');
   updateStats();
-  renderRequests(); renderOverviewRequests();
+  renderRequests(); renderOverviewRequests(); renderRestaurants(); renderBilling();
   showToast(r.name+' rejected','red');
 }
 function suspendReq(id){
@@ -814,27 +837,44 @@ function viewRequest(id){
 
 function renderRestaurants(){
   const el=document.getElementById('rest-tbody');
-  let data=[...restaurants,...requests.filter(r=>r.status==='approved').map(r=>({...r,tables:Math.floor(4+Math.random()*12),ordersDay:Math.floor(20+Math.random()*80)}))];
+  let data=getRestaurantRows();
   if(restSearch) data=data.filter(r=>r.name.toLowerCase().includes(restSearch)||r.owner.toLowerCase().includes(restSearch));
+  if(!data.length){ el.innerHTML='<tr><td colspan="7"><div class="empty-state">No approved restaurants yet</div></td></tr>'; return; }
   el.innerHTML=data.map(r=>`
     <tr>
       <td><div class="rest-name">${r.name}</div><div class="rest-meta">${r.email}</div></td>
       <td>${r.owner}<div class="rest-meta">${r.city}</div></td>
       <td><span class="badge badge-${r.plan==='enterprise'?'active':r.plan==='pro'?'trial':'pending'}">${r.plan}</span></td>
-      <td style="font-family:'JetBrains Mono',monospace">${r.tables||'—'}</td>
-      <td style="font-family:'JetBrains Mono',monospace">${r.ordersDay||'—'}</td>
-      <td><span class="badge badge-${r.status||'active'}">${r.status||'active'}</span></td>
+      <td style="font-family:'JetBrains Mono',monospace">${r.tables ?? '—'}</td>
+      <td style="font-family:'JetBrains Mono',monospace">${r.ordersDay ?? '—'}</td>
+      <td><span class="badge badge-${r.status||'approved'}">${r.status||'approved'}</span></td>
       <td><div class="action-btns">
         <button class="act-btn view" onclick="viewRestaurant(${r.id})">Details</button>
-        <button class="act-btn suspend" onclick="suspendRest(${r.id})">Suspend</button>
       </div></td>
     </tr>`).join('');
 }
 function searchRests(v){ restSearch=v.toLowerCase(); renderRestaurants(); }
 
 function viewRestaurant(id){
-  const r=restaurants.find(x=>x.id===id);
+  const r=getRestaurantRows().find(x=>x.id===id) || requests.find(x=>x.id===id);
   if(!r) return;
+  const isLiveTenant = requests.some(x => x.id === id);
+  const featureRows = isLiveTenant
+    ? Object.entries(FEATURE_DEFINITIONS).map(([key, meta]) => {
+        const enabled = (r.feature_flags || {})[key] !== false;
+        return `
+          <div class="info-row" style="align-items:center;gap:16px">
+            <div style="flex:1">
+              <div class="info-val">${meta.label}</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:4px;font-family:'JetBrains Mono',monospace">${meta.description}</div>
+            </div>
+            <button class="act-btn ${enabled ? 'reject' : 'approve'}" onclick="toggleRestaurantFeature(${r.id}, '${key}', ${enabled ? 'false' : 'true'})">
+              ${enabled ? 'Disable' : 'Enable'}
+            </button>
+          </div>
+        `;
+      }).join('')
+    : `<div style="font-size:11px;color:var(--muted2);font-family:'JetBrains Mono',monospace">Feature toggles are available for live tenant accounts only.</div>`;
   document.getElementById('modal-title').textContent=r.name;
   document.getElementById('modal-body').innerHTML=`
     <div class="field-row" style="margin-bottom:12px">
@@ -857,20 +897,38 @@ function viewRestaurant(id){
       <div class="field-group"><label class="field-label">Type</label><div class="field-val">${r.type}</div></div>
       <div class="field-group"><label class="field-label">GST Number</label><div class="field-val">${r.gst||'Not provided'}</div></div>
     </div>
-    <div class="field-group"><label class="field-label">Change Plan</label>
-      <select class="field-select" id="change-plan">
-        <option ${r.plan==='starter'?'selected':''}>starter</option>
-        <option ${r.plan==='pro'?'selected':''}>pro</option>
-        <option ${r.plan==='enterprise'?'selected':''}>enterprise</option>
-      </select>
+    <div class="field-group">
+      <label class="field-label">Feature Access</label>
+      <div class="table-card" style="padding:0 16px">${featureRows}</div>
     </div>
   `;
   document.getElementById('modal-foot').innerHTML=`
     <button class="btn-cancel" onclick="closeModal()">Close</button>
-    <button class="btn-confirm red" onclick="suspendRest(${r.id});closeModal()">Suspend</button>
-    <button class="btn-confirm cyan" onclick="savePlan(${r.id})">Save Changes</button>
   `;
   document.getElementById('modal-detail').classList.add('open');
+}
+
+async function toggleRestaurantFeature(tenantId, featureKey, enabled){
+  const meta = FEATURE_DEFINITIONS[featureKey];
+  if (!meta) return;
+  const res = await fetch(`/api/shrey/tenants/${tenantId}/features/${featureKey}`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ enabled })
+  });
+  const data = await res.json().catch(()=>({}));
+  if (!res.ok) {
+    showToast(data.error || 'Feature update failed', 'red');
+    return;
+  }
+  updateRequestRecord(data.request);
+  renderRequests();
+  renderRestaurants();
+  renderBilling();
+  updateStats();
+  addLog(data.request?.name || 'Restaurant', `${meta.label} ${enabled ? 'enabled' : 'disabled'}`, enabled ? 'green' : 'amber');
+  showToast(`${meta.label} ${enabled ? 'enabled' : 'disabled'} for ${data.request?.name || 'restaurant'}`, enabled ? 'green' : 'amber');
+  viewRestaurant(tenantId);
 }
 function savePlan(id){
   const r=restaurants.find(x=>x.id===id);
@@ -921,7 +979,9 @@ function renderBilling(){
   const el=document.getElementById('billing-tbody');
   const prices={starter:999,pro:2499,enterprise:5999};
   const statuses=['paid','paid','due','paid','overdue','paid'];
-  el.innerHTML=restaurants.map((r,i)=>`
+  const rows=getRestaurantRows();
+  if(!rows.length){ el.innerHTML='<tr><td colspan="6"><div class="empty-state">No approved restaurants to bill yet</div></td></tr>'; return; }
+  el.innerHTML=rows.map((r,i)=>`
     <tr>
       <td><div class="rest-name">${r.name}</div></td>
       <td><span class="badge badge-${r.plan==='enterprise'?'active':r.plan==='pro'?'trial':'pending'}">${r.plan}</span></td>
@@ -986,9 +1046,10 @@ function changePassword(){
 }
 
 function updateStats(){
-  const active=restaurants.filter(r=>r.status==='active').length;
+  const restaurantRows=getRestaurantRows();
+  const active=restaurantRows.filter(r=>r.status==='approved').length;
   const pending=requests.filter(r=>r.status==='pending').length;
-  const total=restaurants.length+requests.filter(r=>r.status==='approved').length;
+  const total=requests.length;
   ['ts-total','ov-total'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=total;});
   ['ts-active','ov-active'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=active;});
   ['ts-pending','ov-pending'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=pending;});
@@ -996,7 +1057,8 @@ function updateStats(){
 }
 
 function exportData(){
-  const rows=[['Name','Owner','City','Plan','Status','Email'],...restaurants.map(r=>[r.name,r.owner,r.city,r.plan,r.status,r.email])];
+  const restaurantRows=getRestaurantRows();
+  const rows=[['Name','Owner','City','Plan','Status','Email'],...restaurantRows.map(r=>[r.name,r.owner,r.city,r.plan,r.status,r.email])];
   const csv=rows.map(r=>r.join(',')).join('\n');
   const a=document.createElement('a');
   a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);

@@ -180,6 +180,26 @@ def _safe_json_loads(value, default):
     except Exception:
         return default
 
+
+TENANT_FEATURE_DEFINITIONS = {
+    'dashboard': {
+        'label': 'Dashboard',
+        'description': 'Sales, analytics, and reporting dashboard',
+    },
+    'kitchen': {
+        'label': 'Kitchen Display',
+        'description': 'Kitchen screen, ticket flow, and ready updates',
+    },
+    'self_order': {
+        'label': 'QR Self-Order',
+        'description': 'Guest QR menu, ordering, and table self-order flow',
+    },
+}
+
+
+def get_default_tenant_feature_flags():
+    return {key: True for key in TENANT_FEATURE_DEFINITIONS}
+
 @app.template_filter('from_json')
 def from_json_filter(s):
     try:
@@ -212,6 +232,7 @@ class Tenant(db.Model):
     plan = db.Column(db.String(20), default='free')
     is_active = db.Column(db.Boolean, default=True)
     approval_status = db.Column(db.String(20), default='approved')
+    features_json = db.Column(db.Text, default='{}')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     owner_id = db.Column(db.Integer, nullable=True)
 
@@ -648,6 +669,82 @@ def get_current_tenant():
     if tid:
         return Tenant.query.get(tid)
     return None
+
+
+def get_tenant_feature_flags(tenant=None, tenant_id=None):
+    defaults = get_default_tenant_feature_flags()
+    if tenant is None and tenant_id is not None:
+        tenant = Tenant.query.get(tenant_id)
+    if tenant is None:
+        tenant = get_current_tenant()
+    if not tenant:
+        return defaults
+
+    raw_flags = _safe_json_loads(getattr(tenant, 'features_json', '{}'), {})
+    if not isinstance(raw_flags, dict):
+        raw_flags = {}
+
+    flags = defaults.copy()
+    for key in defaults:
+        if key in raw_flags:
+            flags[key] = bool(raw_flags[key])
+    return flags
+
+
+def tenant_feature_enabled(feature_key, tenant=None, tenant_id=None):
+    if feature_key not in TENANT_FEATURE_DEFINITIONS:
+        return True
+    user = get_current_user()
+    if user and getattr(user, 'is_platform_admin', False):
+        return True
+    return bool(get_tenant_feature_flags(tenant=tenant, tenant_id=tenant_id).get(feature_key, True))
+
+
+def set_tenant_feature_flag(tenant, feature_key, enabled):
+    if not tenant:
+        raise ValueError('tenant is required')
+    if feature_key not in TENANT_FEATURE_DEFINITIONS:
+        raise ValueError(f'Unknown feature: {feature_key}')
+    flags = _safe_json_loads(getattr(tenant, 'features_json', '{}'), {})
+    if not isinstance(flags, dict):
+        flags = {}
+    flags[feature_key] = bool(enabled)
+    tenant.features_json = json.dumps(flags, separators=(',', ':'))
+    return get_tenant_feature_flags(tenant=tenant)
+
+
+def _is_api_request():
+    return (
+        request.path.startswith('/api/') or
+        request.headers.get('X-Requested-With') == 'XMLHttpRequest' or
+        'application/json' in request.headers.get('Accept', '')
+    )
+
+
+def tenant_feature_block_response(feature_key, is_api=None):
+    label = TENANT_FEATURE_DEFINITIONS.get(feature_key, {}).get('label', 'This feature')
+    message = f'{label} is disabled for this restaurant.'
+    if is_api is None:
+        is_api = _is_api_request()
+    if is_api:
+        return jsonify({'error': message, 'feature': feature_key, 'disabled': True}), 403
+    return (
+        '<!doctype html><title>Feature Unavailable</title>'
+        f'<body style="font-family:sans-serif;background:#111;color:#f5f5f5;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0;">'
+        f'<div style="max-width:520px;padding:24px;text-align:center;"><h1 style="margin-bottom:8px;">Feature Unavailable</h1>'
+        f'<p style="color:#c7c7c7;line-height:1.5;">{message}</p></div></body>'
+    ), 403
+
+
+def tenant_feature_required(feature_key):
+    def decorator(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            if not tenant_feature_enabled(feature_key):
+                return tenant_feature_block_response(feature_key)
+            return f(*args, **kwargs)
+        return decorated
+    return decorator
 
 def utc_iso(dt):
     """Format a naive UTC datetime as an ISO string with Z suffix.
@@ -1254,6 +1351,7 @@ def admin_redirect():
 
 @app.route('/kitchen')
 @staff_page_required
+@tenant_feature_required('kitchen')
 def kitchen():
     return render_template('kitchen.html', user_role=session.get('user_role'))
 
@@ -1264,6 +1362,7 @@ def customer():
 
 @app.route('/dashboard')
 @page_login_required(allowed_roles=('restaurant',))
+@tenant_feature_required('dashboard')
 def dashboard():
     return render_template(
         'dashboard.html',
@@ -1279,6 +1378,12 @@ def _serialize_shrey_request(tenant):
     ).order_by(User.id.asc()).first()
     branch = Branch.query.filter_by(tenant_id=tenant.id).order_by(Branch.id.asc()).first()
     status = (tenant.approval_status or ('approved' if tenant.is_active else 'pending')).strip().lower()
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    table_count = Table.query.filter_by(tenant_id=tenant.id, active=True).count()
+    orders_day = Order.query.filter(
+        Order.tenant_id == tenant.id,
+        Order.created_at >= today_start,
+    ).count()
     return {
         'id': tenant.id,
         'name': tenant.name,
@@ -1291,6 +1396,9 @@ def _serialize_shrey_request(tenant):
         'status': status,
         'type': 'Restaurant',
         'note': '',
+        'tables': table_count,
+        'ordersDay': orders_day,
+        'feature_flags': get_tenant_feature_flags(tenant=tenant),
     }
 
 @app.route('/shrey')
@@ -1352,6 +1460,25 @@ def reject_shrey_request(tenant_id):
     tenant = Tenant.query.get_or_404(tenant_id)
     tenant.is_active = False
     tenant.approval_status = 'rejected'
+    db.session.commit()
+    return jsonify({'ok': True, 'request': _serialize_shrey_request(tenant)})
+
+
+@csrf.exempt
+@app.route('/api/shrey/tenants/<int:tenant_id>/features/<feature_key>', methods=['POST'])
+def update_shrey_tenant_feature(tenant_id, feature_key):
+    if not session.get('shrey_admin'):
+        return jsonify({'error': 'unauthorized'}), 401
+    if feature_key not in TENANT_FEATURE_DEFINITIONS:
+        return jsonify({'error': 'Unknown feature'}), 404
+
+    tenant = Tenant.query.get_or_404(tenant_id)
+    d = request.json or {}
+    enabled = d.get('enabled')
+    if enabled is None:
+        return jsonify({'error': 'enabled is required'}), 400
+
+    set_tenant_feature_flag(tenant, feature_key, bool(enabled))
     db.session.commit()
     return jsonify({'ok': True, 'request': _serialize_shrey_request(tenant)})
 
@@ -2726,6 +2853,7 @@ def get_avg_prep_minutes():
 
 @app.route('/api/kitchen/orders', methods=['GET'])
 @app.route('/api/kitchen/tickets', methods=['GET'])
+@tenant_feature_required('kitchen')
 def get_tickets():
     _repair_open_self_orders_for_tenant(get_current_tenant_id())
     tickets = (
@@ -2781,6 +2909,7 @@ def get_tickets():
 
 @app.route('/api/kitchen/tickets/<int:kid>/advance', methods=['POST'])
 @staff_required
+@tenant_feature_required('kitchen')
 def advance_ticket(kid):
     kt = KitchenTicket.query.filter_by(id=kid, tenant_id=get_current_tenant_id()).first_or_404()
     o = kt.order
@@ -2839,6 +2968,7 @@ def advance_ticket(kid):
 
 @app.route('/api/kitchen/items/<int:item_id>/complete', methods=['POST'])
 @staff_required
+@tenant_feature_required('kitchen')
 def mark_item_complete(item_id):
     item = OrderItem.query.join(Order).filter(
         OrderItem.id == item_id,
@@ -3278,6 +3408,8 @@ def self_order_page(table_id):
     """Table QR landing page – no login required for customers."""
     t = Table.query.get_or_404(table_id)
     tenant = Tenant.query.get(t.tenant_id)
+    if not tenant_feature_enabled('self_order', tenant=tenant):
+        return tenant_feature_block_response('self_order', is_api=False)
     cafe_name = tenant.name if tenant else 'POS Cafè'
     branch_id = _resolve_self_order_branch_id(t, tenant_id=t.tenant_id)
     return render_template('self_order.html',
@@ -3365,6 +3497,8 @@ def create_self_order():
 
     t   = Table.query.get_or_404(table_id)
     tid = t.tenant_id   # always from table, never Flask session
+    if not tenant_feature_enabled('self_order', tenant_id=tid):
+        return tenant_feature_block_response('self_order', is_api=True)
 
     # Find an open staff session for this tenant to attach the order to
     staff_session = (
@@ -3570,6 +3704,8 @@ def self_order_menu():
     tid = tbl.tenant_id
     if not tid:
         return jsonify({'error': 'Invalid table'}), 400
+    if not tenant_feature_enabled('self_order', tenant_id=tid):
+        return tenant_feature_block_response('self_order', is_api=True)
     bid = _resolve_self_order_branch_id(tbl, tenant_id=tid)
     q = Product.query.filter_by(tenant_id=tid, active=True)
     if bid is not None:
@@ -3658,6 +3794,9 @@ def push_subscribe_table():
     table_id = d.get('table_id')
     if not sub or not table_id:
         return jsonify({'error': 'Missing data'}), 400
+    table = Table.query.get_or_404(table_id)
+    if not tenant_feature_enabled('self_order', tenant_id=table.tenant_id):
+        return tenant_feature_block_response('self_order', is_api=True)
     sub_json = json.dumps(sub)
     existing = PushSubscription.query.filter_by(table_id=table_id, user_id=None).first()
     if existing:
@@ -3676,6 +3815,7 @@ def get_vapid_public_key():
 # ─── API: Dashboard ────────────────────────────────────────
 @app.route('/api/dashboard/stats', methods=['GET'])
 @staff_required
+@tenant_feature_required('dashboard')
 def dashboard_stats():
     period = request.args.get('period','today')
     now = datetime.utcnow()
@@ -4641,9 +4781,15 @@ def ensure_tenant_schema():
         columns = {row[1] for row in rows}
         if 'approval_status' not in columns:
             conn.exec_driver_sql('ALTER TABLE "tenant" ADD COLUMN approval_status VARCHAR(20) DEFAULT "approved"')
+        if 'features_json' not in columns:
+            conn.exec_driver_sql('ALTER TABLE "tenant" ADD COLUMN features_json TEXT DEFAULT "{}"')
         conn.exec_driver_sql(
             "UPDATE tenant SET approval_status = 'approved' "
             "WHERE approval_status IS NULL OR TRIM(approval_status) = ''"
+        )
+        conn.exec_driver_sql(
+            'UPDATE tenant SET features_json = "{}" '
+            'WHERE features_json IS NULL OR TRIM(features_json) = ""'
         )
         conn.commit()
 

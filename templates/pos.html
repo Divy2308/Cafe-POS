@@ -3017,30 +3017,89 @@
     });
   }
 
+  function playOrderReadyBellPos() {
+    const ctx = getPosAudioCtx();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') { ctx.resume().catch(() => { }); if (ctx.state !== 'running') return; }
+    const now = ctx.currentTime;
+    const mg = ctx.createGain();
+    mg.gain.setValueAtTime(0.16, now);
+    mg.connect(ctx.destination);
+    [
+      [783.99, 0, 0.22],
+      [987.77, 0.16, 0.24],
+      [1318.51, 0.34, 0.36],
+    ].forEach(([freq, off, dur]) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(freq, now + off);
+      g.gain.setValueAtTime(0.0001, now + off);
+      g.gain.linearRampToValueAtTime(0.28, now + off + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + off + dur);
+      o.connect(g);
+      g.connect(mg);
+      o.start(now + off);
+      o.stop(now + off + dur + 0.02);
+    });
+  }
+
+  function showPosLiveAlert({ emoji, title, message, tone = 'info', timeoutMs = 12000 }) {
+    const el = document.createElement('div');
+    const isMobile = window.innerWidth < 768;
+    el.className = `waiter-alert ${isMobile ? 'mobile' : 'desktop'}`;
+    el.innerHTML = `
+      <span style="font-size:24px;">${emoji}</span>
+      <div style="flex:1">
+        <div class="waiter-alert-title">${title}</div>
+        <div class="waiter-alert-message">${message}</div>
+      </div>
+      <button onclick="this.parentElement.remove()" class="waiter-alert-close">&times;</button>
+    `;
+    if (tone === 'success') {
+      el.style.borderColor = 'rgba(34,197,94,0.35)';
+      el.style.boxShadow = '0 20px 60px rgba(34,197,94,0.18)';
+    }
+    el.onclick = (e) => { if (!e.target.closest('button')) el.remove(); };
+    document.body.appendChild(el);
+    setTimeout(() => {
+      if (el.parentNode) {
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(20px)';
+        setTimeout(() => el.remove(), 300);
+      }
+    }, timeoutMs);
+  }
+
   // Socket
   const socket = io();
   socket.on('order_paid', d => { toast('\u2713 Order ' + d.order_number + ' paid!'); reloadData(); });
+  socket.on('order_update', d => {
+    if (!d || d.status !== 'completed') return;
+    playOrderReadyBellPos();
+    const orderLabel = d.order_number || 'Unknown';
+    const msg = `Order ${orderLabel} is ready to serve.`;
+    showPosLiveAlert({
+      emoji: '\u2705',
+      title: 'Order Ready',
+      message: msg,
+      tone: 'success',
+      timeoutMs: 15000,
+    });
+    toast(msg, 'success');
+    reloadData();
+  });
 
   // Call Waiter alert
   socket.on('call_waiter', d => {
     playWaiterBellPos();
     const msg = `\uD83D\uDD14 Table ${d.table_number || d.table_id} needs assistance!`;
-    // Show a persistent loud toast
-    const el = document.createElement('div');
-    const isMobile = window.innerWidth < 768;
-
-    el.className = `waiter-alert ${isMobile ? 'mobile' : 'desktop'}`;
-    el.innerHTML = `
-      <span style="font-size:24px;">\uD83D\uDD14</span>
-      <div style="flex:1">
-        <div class="waiter-alert-title">Waiter Requested</div>
-        <div class="waiter-alert-message">${msg}</div>
-      </div>
-      <button onclick="this.parentElement.remove()" class="waiter-alert-close">&times;</button>
-    `;
-    el.onclick = (e) => { if (!e.target.closest('button')) el.remove(); };
-    document.body.appendChild(el);
-    setTimeout(() => { if (el.parentNode) { el.style.opacity = '0'; el.style.transform = 'translateY(20px)'; setTimeout(() => el.remove(), 300); } }, 12000);
+    showPosLiveAlert({
+      emoji: '\uD83D\uDD14',
+      title: 'Waiter Requested',
+      message: msg,
+      tone: 'error',
+      timeoutMs: 12000,
+    });
     toast(msg, 'error');
   });
 
