@@ -5358,6 +5358,11 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_ENV') != 'production'
     use_reloader = debug and not IS_WINDOWS
+    print(
+        f"Starting POS Cafe on http://127.0.0.1:{port} "
+        f"(debug={'on' if debug else 'off'}, async_mode={socketio.async_mode})",
+        flush=True,
+    )
     socketio.run(
         app,
         host='0.0.0.0',
