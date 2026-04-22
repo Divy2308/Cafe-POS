@@ -1082,6 +1082,35 @@
       justify-content: center;
     }
   }
+
+  /* ── CHANGE 1: WhatsApp button styles ── */
+  .btn-whatsapp {
+    background: #25D366;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all .2s;
+    min-height: 44px;
+    width: 100%;
+  }
+
+  .btn-whatsapp:hover {
+    background: #128C7E;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(37, 211, 102, 0.3);
+  }
+
+  .btn-whatsapp:active {
+    transform: scale(.97);
+  }
 </style>
 {% endblock %}
 {% block body %}
@@ -1539,6 +1568,12 @@
         <p class="text-gray-500 mb-2" id="confirm-amount"></p>
         <button id="btn-print-bill" class="btn-primary mt-4 py-3 px-6 rounded-xl font-medium"
           style="background:#f97316;color:white;width:100%" onclick="printLastBill(event)">🖨 Print Bill</button>
+        <!-- ── CHANGE 2: WhatsApp button in confirm screen ── -->
+        <button id="btn-whatsapp-bill" class="btn-whatsapp mt-3"
+          onclick="event.stopPropagation(); shareOnWhatsApp(lastPaidOrder && lastPaidOrder.id)"
+          style="display:none;">
+          📱 Send Bill on WhatsApp
+        </button>
         <p class="text-xs text-gray-600 mt-4">Tap anywhere to continue</p>
         <div id="confirm-review-card" class="card mt-8 p-5 text-left hidden"
           style="border-radius:18px;max-width:420px;margin-left:auto;margin-right:auto"
@@ -2396,6 +2431,11 @@
     if (!cart.length && order) {
       cart = (order.items || []).map(i => ({ product_id: i.product_id, name: i.name, price: i.price, qty: i.qty }));
     }
+    // ── CHANGE 8: Phone reminder toast (non-blocking) ──
+    const phoneVal = (document.getElementById('customer-phone')?.value || '').trim();
+    if (cart.length && !phoneVal) {
+      toast('💡 Add customer phone to send WhatsApp bill', 'info');
+    }
     await populatePaymentView(order);
   }
 
@@ -2682,6 +2722,7 @@
 
   async function completePayment(method) {
     const paidOrder = currentOrder ? { id: currentOrder.id, order_number: currentOrder.order_number, table: currentTable ? currentTable.number : (currentOrder.table || 'Takeaway') } : null;
+    const customerPhone = (document.getElementById('customer-phone')?.value || '').trim();
     const r = await api('/api/orders/' + currentOrder.id + '/pay', 'POST', { method, tip: currentTip });
     if (r.ok) {
       const totalWithTip = getPaymentTotal();
@@ -2699,6 +2740,16 @@
       cart = []; currentOrder = null; currentTable = null; currentBill = null; currentTip = 0;
       selectedMethod = null;
       showView('confirm');
+      // ── CHANGE 4: Show WhatsApp button after payment ──
+      const waBtn = document.getElementById('btn-whatsapp-bill');
+      if (waBtn && lastPaidOrder) {
+        waBtn.style.display = 'flex';
+        const rawPhone = customerPhone.replace(/\D/g, '');
+        const hasPhone = rawPhone.length === 10 || rawPhone.length === 12 || rawPhone.length === 13;
+        waBtn.textContent = hasPhone
+          ? '📱 Send to ' + customerPhone + ' on WhatsApp'
+          : '📱 Share Bill on WhatsApp';
+      }
       renderConfirmReview();
       await reloadData();
       try {
@@ -2871,7 +2922,8 @@
         <div class="flex gap-2 flex-wrap">
            <button type="button" onclick="printBillFromPos(${b.id})" class="flex-1 py-2 text-center rounded-lg text-[10px] font-700 text-gray-300 hover:bg-white/5 transition border border-white/10">🖨 Print</button>
            <a href="/receipt/${b.id}" target="_blank" class="flex-1 py-2 text-center rounded-lg text-[10px] font-700 text-gray-400 hover:bg-white/5 transition">📄 Preview</a>
-           <a href="https://wa.me/?text=${waMsg}" target="_blank" class="flex-1 py-2 text-center rounded-lg text-[10px] font-700 text-gray-400 hover:bg-white/5 transition">📱 Share</a>
+           <!-- ── CHANGE 3: WhatsApp button in bills card (replaces basic share link) ── -->
+           <button type="button" onclick="shareOnWhatsApp(${b.id})" class="flex-1 py-2 text-center rounded-lg text-[10px] font-700 transition" style="background:rgba(37,211,102,0.12);color:#25D366;border:1px solid rgba(37,211,102,0.25);">📱 WhatsApp</button>
            <button class="flex-1 py-1 px-2 rounded-lg text-[10px] font-700 text-red-500/50 hover:bg-red-500/10 hover:text-red-500 transition" onclick="deleteBill(${b.id})">🗑 Delete</button>
         </div>
       </div>
@@ -3137,9 +3189,10 @@
       const methodIcon = o.payment_method === 'cash' ? '💵' : o.payment_method === 'upi' ? '📱' : '💳';
       const tableLabel = o.table === 'Takeaway' ? '🛵 Takeaway' : '🪑 Table ' + o.table;
 
+      // ── CHANGE 6: WhatsApp icon button in history row ──
       return `
-      <button type="button" class="card w-full p-4 rounded-2xl bg-card-2 border border-white/5 transition-all active:scale-[0.98] text-left cursor-pointer" onclick="openHistoryOrder(${o.id})">
-        <div class="flex items-center justify-between mb-2">
+      <div class="card w-full p-4 rounded-2xl bg-card-2 border border-white/5 transition-all hover:border-brand-500/20">
+        <div class="flex items-center justify-between mb-2" onclick="openHistoryOrder(${o.id})" style="cursor:pointer;">
           <div class="flex items-center gap-3">
              <div class="px-2 py-1 bg-white/5 rounded text-[10px] font-800 text-gray-500 uppercase tracking-tighter border border-white/5">${String(o.order_number).includes('-') ? o.order_number.split('-')[1] : o.order_number}</div>
              <span class="text-xs font-700 text-white">${dateStr} &middot; <span class="text-gray-500 font-500">${timeStr}</span></span>
@@ -3149,18 +3202,94 @@
             <div class="font-800 text-sm text-brand-500">₹${Number(o.total).toFixed(0)}</div>
           </div>
         </div>
-        <div class="flex items-center gap-2 text-[10px] font-600 mb-1">
+        <div class="flex items-center gap-2 text-[10px] font-600 mb-2" onclick="openHistoryOrder(${o.id})" style="cursor:pointer;">
           <span class="text-white">${tableLabel}</span>
           ${o.customer_name ? `<span class="text-gray-600">&middot;</span> <span class="text-gray-500">${o.customer_name}</span>` : ''}
         </div>
-        <div class="text-[11px] text-gray-600 truncate">${itemsSummary}</div>
-      </button>`;
+        <div class="text-[11px] text-gray-600 truncate mb-2" onclick="openHistoryOrder(${o.id})" style="cursor:pointer;">${itemsSummary}</div>
+        <div class="flex gap-2">
+          <button type="button" onclick="openHistoryOrder(${o.id})" class="flex-1 py-1.5 rounded-lg text-[10px] font-700 text-gray-400 hover:bg-white/5 transition border border-white/10">📄 View Receipt</button>
+          <button type="button" onclick="shareOnWhatsApp(${o.id})" class="py-1.5 px-3 rounded-lg text-[10px] font-700 transition" style="background:rgba(37,211,102,0.12);color:#25D366;border:1px solid rgba(37,211,102,0.25);">📱 WhatsApp</button>
+        </div>
+      </div>`;
     }).join('');
   }
 
   function openHistoryOrder(orderId) {
     if (!orderId) return;
     window.open(`/receipt/${orderId}`, '_blank');
+  }
+
+  // ── CHANGE 5: shareOnWhatsApp() core function ──
+  async function shareOnWhatsApp(orderId) {
+    if (!orderId) { toast('No order to share', 'error'); return; }
+    try {
+      const response = await fetch('/api/receipt-data/' + orderId, { credentials: 'same-origin' });
+      if (!response.ok) throw new Error('Failed to fetch receipt data');
+      const data = await response.json();
+      const order = data.order;
+      const cafe = data.cafe;
+
+      const itemsList = (order.items || []).map(i =>
+        `• ${i.name} × ${i.qty} = ₹${(i.price * i.qty).toFixed(0)}`
+      ).join('\n');
+
+      const taxLines = Object.entries(order.tax_breakdown || {})
+        .map(([label, amt]) =>
+          `${label}:${' '.repeat(Math.max(1, 16 - label.length))}₹${Number(amt).toFixed(2)}`
+        ).join('\n');
+
+      const now = new Date(order.created_at || Date.now());
+      const dateStr = now.toLocaleString('en-IN', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+
+      const lines = [
+        '━━━━━━━━━━━━━━━━━━━━━━━',
+        `*${cafe.name} - Payment Receipt*`,
+        '━━━━━━━━━━━━━━━━━━━━━━━',
+        '',
+        `Order No: ${order.order_number}`,
+        `Table: ${order.table || 'Takeaway'}`,
+        `Date: ${dateStr}`,
+        order.cashier_name ? `Cashier: ${order.cashier_name}` : null,
+        '',
+        '*Items Ordered:*',
+        itemsList,
+        '',
+        '━━━━━━━━━━━━━━━━━━━━━━━',
+        `Subtotal:        ₹${Number(order.subtotal || 0).toFixed(0)}`,
+        taxLines || null,
+        order.round_off ? `Round off:       ₹${Number(order.round_off).toFixed(2)}` : null,
+        order.tip && order.tip > 0 ? `Tip:             ₹${Number(order.tip).toFixed(0)}` : null,
+        `*TOTAL:          ₹${Number(order.grand_total || order.total || 0).toFixed(0)}*`,
+        '━━━━━━━━━━━━━━━━━━━━━━━',
+        `Payment Mode: ${order.payment_method || 'Cash'}`,
+        '',
+        cafe.footer_note || 'Thank you for visiting! 🙏',
+        '',
+        '_Powered by POS Cafè_',
+        '━━━━━━━━━━━━━━━━━━━━━━━',
+      ].filter(line => line !== null && line !== undefined).join('\n');
+
+      const rawPhone = (order.customer_phone || '').replace(/\D/g, '');
+      const phone = rawPhone.length === 10
+        ? '91' + rawPhone
+        : (rawPhone.length === 12 || rawPhone.length === 13)
+          ? rawPhone
+          : '';
+
+      const encodedMsg = encodeURIComponent(lines);
+      const url = phone
+        ? `https://wa.me/${phone}?text=${encodedMsg}`
+        : `https://wa.me/?text=${encodedMsg}`;
+
+      window.open(url, '_blank');
+    } catch (err) {
+      console.error('WhatsApp share error:', err);
+      toast('Failed to build WhatsApp message', 'error');
+    }
   }
 
   // ─── Attendance & More Actions ─────────────────────────
