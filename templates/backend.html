@@ -512,13 +512,59 @@
         <!-- SETTINGS TAB -->
         <div id="tab-settings" class="tab-content">
           <div class="mb-6">
-            <h2 class="font-display text-xl font-700 mb-1">Cafe Settings</h2>
-            <p class="text-gray-500 text-sm">Configure your store branding and billing details</p>
+          <div class="card p-6 max-w-2xl mb-6" style="border-radius:20px">
+            <h3 class="text-sm font-bold text-white mb-4 uppercase tracking-wider">Public Restaurant Profile</h3>
+            <p class="text-[10px] text-gray-500 mb-4">This information is shown to customers on the reservation portal.</p>
+            
+            <div class="space-y-4">
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Restaurant Name</label>
+                  <input id="pub-name" placeholder="Le Blanc">
+                </div>
+                <div>
+                  <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Tags (comma separated)</label>
+                  <input id="pub-tags" placeholder="Fine Dining, Italian, Rooftop">
+                </div>
+              </div>
+              
+              <div>
+                <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Short Bio / Description</label>
+                <textarea id="pub-bio" rows="3" placeholder="Tell customers about your restaurant..."></textarea>
+              </div>
+
+              <div class="grid grid-cols-2 gap-6">
+                <div>
+                  <label class="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Logo</label>
+                  <div class="flex items-center gap-3">
+                    <div id="pub-logo-preview" class="w-12 h-12 rounded-lg bg-gray-900 border border-white/10 flex items-center justify-center overflow-hidden">
+                      <span class="text-xs opacity-30">Logo</span>
+                    </div>
+                    <input type="file" id="pub-logo-file" accept="image/*" class="text-[10px] text-gray-500" onchange="previewImage('pub-logo-file', 'pub-logo-preview')">
+                  </div>
+                </div>
+                <div>
+                  <label class="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Cover Image</label>
+                  <div class="flex items-center gap-3">
+                    <div id="pub-cover-preview" class="w-20 h-12 rounded-lg bg-gray-900 border border-white/10 flex items-center justify-center overflow-hidden">
+                      <span class="text-xs opacity-30">Cover</span>
+                    </div>
+                    <input type="file" id="pub-cover-file" accept="image/*" class="text-[10px] text-gray-500" onchange="previewImage('pub-cover-file', 'pub-cover-preview')">
+                  </div>
+                </div>
+              </div>
+
+              <div class="pt-2">
+                <button onclick="savePublicProfile()" class="btn-ghost w-full py-2.5 rounded-xl text-brand-500 font-bold border border-brand-500/30 hover:bg-brand-500/10">Update Public Profile</button>
+              </div>
+            </div>
           </div>
+
           <div class="card p-6 max-w-2xl" style="border-radius:20px">
+            <h3 class="text-sm font-bold text-white mb-4 uppercase tracking-wider">Business & Billing Settings</h3>
             <div class="space-y-4">
               <div class="grid settings-grid gap-4" style="grid-template-columns:1fr 1fr">
-                <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Shop Name</label><input
+                <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Shop Name (on Bill)</label><input
                     id="s-name" placeholder="POS Cafè"></div>
                 <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Phone</label><input
                     id="s-phone" placeholder="823 823 7115"></div>
@@ -935,25 +981,7 @@
   let allInventory = [], allRecipes = [];
 
   async function loadRecipesSafe() {
-    try {
-      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
-      const r = await fetch('/api/recipes', {
-        headers: {
-          Accept: 'application/json',
-          'X-CSRFToken': csrfToken,
-        }
-      });
-      if (r.status === 401 && window.location.pathname !== '/auth') {
-        window.location.href = '/auth';
-        return [];
-      }
-      if (!r.ok) return [];
-      const rec = await r.json().catch(() => []);
-      return Array.isArray(rec) ? rec : [];
-    } catch (err) {
-      console.warn('Recipe API unavailable', err);
-      return [];
-    }
+    return [];
   }
 
   function switchTab(name, btn) {
@@ -967,6 +995,59 @@
   function escHtml(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
 
   function getCatName(catId) { const c = allCats.find(x => x.id === catId); return c ? c.name : '—'; }
+
+  async function loadCoupons() {
+    try {
+      const r = await api('/api/coupons');
+      if (!Array.isArray(r)) return;
+      allCoupons = r;
+      const tbody = document.getElementById('coupons-table-body');
+      if (!tbody) return;
+      tbody.innerHTML = r.map(c => `
+        <tr class="border-b border-border/30">
+          <td class="px-4 py-3 font-mono text-brand-500 font-700">${escHtml(c.code)}</td>
+          <td class="px-4 py-3 font-700">${c.value}${c.discount_type === 'percentage' ? '%' : '₹'}</td>
+          <td class="px-4 py-3 text-gray-400 uppercase text-[10px]">${escHtml(c.discount_type)}</td>
+          <td class="px-4 py-3"><span class="status-badge ${c.active ? 'active' : 'inactive'}">${c.active ? 'On' : 'Off'}</span></td>
+          <td class="px-4 py-3 text-center"><button onclick="deleteCoupon(${c.id})" class="text-red-500 hover:text-red-400 text-xs font-bold">Delete</button></td>
+        </tr>
+      `).join('') || '<tr><td colspan="5" class="text-center py-4 text-gray-500">No coupons yet.</td></tr>';
+    } catch (e) {
+      console.warn('Coupons unavailable', e);
+    }
+  }
+
+  function openCouponModal() { document.getElementById('coupon-modal').classList.remove('hidden'); }
+  function closeCouponModal() { document.getElementById('coupon-modal').classList.add('hidden'); }
+
+  async function saveCoupon() {
+    const d = {
+      code: document.getElementById('c-code').value.trim().toUpperCase(),
+      discount_type: document.getElementById('c-type').value,
+      value: parseFloat(document.getElementById('c-value').value),
+      active: true
+    };
+    if (!d.code || isNaN(d.value)) return toast('Code and value required', 'error');
+    const r = await api('/api/coupons', 'POST', d);
+    if (r.ok) {
+      toast('Coupon created!');
+      closeCouponModal();
+      loadCoupons();
+    } else {
+      toast(r.error || 'Failed', 'error');
+    }
+  }
+
+  async function deleteCoupon(id) {
+    if (!confirm('Delete this coupon?')) return;
+    const r = await api('/api/coupons/' + id, 'DELETE');
+    if (r.ok) {
+      toast('Coupon deleted');
+      loadCoupons();
+    } else {
+      toast(r.error || 'Failed', 'error');
+    }
+  }
 
   function renderProductsTable() {
     const tbody = document.getElementById('products-table');
@@ -1030,7 +1111,8 @@
   async function init() {
     const results = await Promise.allSettled([
       api('/api/products/all'), api('/api/floors'), api('/api/payment-methods'),
-      api('/api/reviews'), api('/api/cafe-settings'), api('/api/inventory'), loadRecipesSafe()
+      api('/api/reviews'), api('/api/cafe-settings'), api('/api/inventory'), 
+      loadRecipesSafe(), api('/api/tenant/settings')
     ]);
 
     const safeVal = (r, fallback) => (r.status === 'fulfilled' && r.value != null) ? r.value : fallback;
@@ -1042,6 +1124,9 @@
     const st  = safeVal(results[4], {});
     const inv = safeVal(results[5], []);
     const rec = safeVal(results[6], []);
+    const ts  = safeVal(results[7], {});
+    
+    loadCoupons();
 
     // Products
     if (!pd.error && pd.products) {
@@ -1079,6 +1164,7 @@
     try { renderReviews(); } catch(e) { console.error('renderReviews', e); }
     try { renderInventory(); } catch(e) { console.error('renderInventory', e); }
     if (!st.error) { try { fillSettings(st); } catch(e) { console.error('fillSettings', e); } }
+    if (!ts.error) { try { fillPublicProfile(ts); } catch(e) { console.error('fillPublicProfile', e); } }
     try { fillPrinterSettingsForm(); } catch(e) {}
     try { maybeShowPrinterSetup(); } catch(e) {}
 
@@ -1201,6 +1287,48 @@
       document.getElementById('p-image-preview').style.display = 'block';
     };
     reader.readAsDataURL(file);
+  }
+
+  function previewImage(fileId, previewId) {
+    const file = document.getElementById(fileId).files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      document.getElementById(previewId).innerHTML = `<img src="${e.target.result}" class="w-full h-full object-cover">`;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function fillPublicProfile(ts) {
+    if (!ts) return;
+    document.getElementById('pub-name').value = ts.name || '';
+    document.getElementById('pub-bio').value = ts.description || '';
+    document.getElementById('pub-tags').value = (ts.tags || []).join(', ');
+    
+    if (ts.logo_b64) {
+      document.getElementById('pub-logo-preview').innerHTML = `<img src="${ts.logo_b64}" class="w-full h-full object-cover">`;
+    }
+    if (ts.cover_image_b64) {
+      document.getElementById('pub-cover-preview').innerHTML = `<img src="${ts.cover_image_b64}" class="w-full h-full object-cover">`;
+    }
+  }
+
+  async function savePublicProfile() {
+    const d = {
+      name: document.getElementById('pub-name').value.trim(),
+      description: document.getElementById('pub-bio').value.trim(),
+      tags: document.getElementById('pub-tags').value.split(',').map(t => t.trim()).filter(t => t),
+    };
+
+    const logoImg = document.querySelector('#pub-logo-preview img');
+    if (logoImg) d.logo_b64 = logoImg.src;
+    
+    const coverImg = document.querySelector('#pub-cover-preview img');
+    if (coverImg) d.cover_image_b64 = coverImg.src;
+
+    const r = await api('/api/tenant/settings', 'POST', d);
+    if (r.ok) toast('Public profile updated!');
+    else toast(r.error || 'Failed to update profile', 'error');
   }
 
   function clearProductImage() {

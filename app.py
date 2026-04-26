@@ -233,6 +233,11 @@ class Tenant(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     approval_status = db.Column(db.String(20), default='approved')
     features_json = db.Column(db.Text, default='{}')
+    description = db.Column(db.Text, default='')
+    address = db.Column(db.Text, default='')
+    phone = db.Column(db.String(20), default='')
+    cover_image_b64 = db.Column(db.Text, default='')
+    tags_json = db.Column(db.Text, default='[]')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     owner_id = db.Column(db.Integer, nullable=True)
 
@@ -1096,8 +1101,7 @@ def restaurant_chooser():
 
 @app.route('/discover')
 def restaurant_discover_public():
-    """Public restaurant discovery page (no login required)."""
-    return render_template('restaurants.html')
+    return redirect(url_for('customer'))
 
 @app.route('/api/restaurants')
 def get_restaurants():
@@ -1109,8 +1113,42 @@ def get_restaurants():
             'name': t.name,
             'slug': t.slug,
             'logo_b64': t.logo_b64,
+            'cover_image_b64': t.cover_image_b64,
+            'description': t.description,
+            'address': t.address,
+            'phone': t.phone,
+            'tags': json.loads(t.tags_json or '[]'),
         })
     return jsonify(results)
+
+@app.route('/api/tenant/settings', methods=['GET', 'POST'])
+@page_login_required(allowed_roles=('restaurant',))
+def api_tenant_settings():
+    tid = get_current_tenant_id()
+    tenant = Tenant.query.get_or_404(tid)
+    
+    if request.method == 'POST':
+        d = request.json or {}
+        if 'name' in d: tenant.name = d['name'].strip()
+        if 'description' in d: tenant.description = d['description'].strip()
+        if 'address' in d: tenant.address = d['address'].strip()
+        if 'phone' in d: tenant.phone = d['phone'].strip()
+        if 'logo_b64' in d: tenant.logo_b64 = d['logo_b64']
+        if 'cover_image_b64' in d: tenant.cover_image_b64 = d['cover_image_b64']
+        if 'tags' in d: tenant.tags_json = json.dumps(d['tags'])
+        
+        db.session.commit()
+        return jsonify({'ok': True})
+    
+    return jsonify({
+        'name': tenant.name,
+        'description': tenant.description,
+        'address': tenant.address,
+        'phone': tenant.phone,
+        'logo_b64': tenant.logo_b64,
+        'cover_image_b64': tenant.cover_image_b64,
+        'tags': json.loads(tenant.tags_json or '[]')
+    })
 
 @app.route('/r/<slug>/reservations')
 def tenant_reservation_page(slug):
@@ -1356,9 +1394,11 @@ def kitchen():
     return render_template('kitchen.html', user_role=session.get('user_role'))
 
 @app.route('/customer')
-@page_login_required(allowed_roles=('customer',))
 def customer():
-    return render_template('customer.html', user_role=session.get('user_role'))
+    return render_template('customer.html', 
+        user_role=session.get('user_role'),
+        is_logged_in='user_id' in session
+    )
 
 @app.route('/dashboard')
 @page_login_required(allowed_roles=('restaurant',))
@@ -5496,9 +5536,9 @@ if __name__ == '__main__':
         ensure_order_table_schema()
         ensure_branch_schema()
         ensure_default_accounts()
-        ensure_demo_catalog()
-        ensure_demo_floors_and_tables()
-        ensure_sample_data()
+        # ensure_demo_catalog()
+        # ensure_demo_floors_and_tables()
+        # ensure_sample_data()
 
     import os
     port = int(os.environ.get('PORT', 5000))
