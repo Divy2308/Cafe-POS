@@ -1,52 +1,73 @@
-# Odoo POS Cafe — Hackathon Project
+# POS Cafè - Ultimate Multi-Branch Restaurant Management System
 
-A full-featured Restaurant POS system built with Flask + HTML/CSS/JS + Tailwind CSS.
+POS Cafè is a high-performance, full-featured restaurant Point of Sale (POS) system designed for modern cafes and restaurants. Built with a focus on speed, scalability, and premium user experience, it handles everything from floor management to real-time kitchen coordination.
 
-## Features
-- Login / Signup authentication
-- Floor Plan & Table Management
-- Product Management (CRUD + categories)
-- Order creation with cart
-- Real-time Kitchen Display (Socket.io)
-- Customer Display screen
-- Multiple Payment Methods: Cash, Card, UPI QR (auto-generated)
-- Reports Dashboard with Charts
-- Backend Configuration panel
+## 🌟 Premium Features
 
-## Setup
+- **Multi-Branch Architecture**: Manage multiple branches with scoped inventory, reports, and staff management from a single platform.
+- **Interactive Floor Plan**: Visual table management with real-time status updates (Occupied, Reserved, Available).
+- **Self-Order QR System**: Customers can scan table-specific QR codes to browse the menu and place orders directly from their mobile devices without logging in.
+- **Real-Time Kitchen Display (KDS)**: Instant order synchronization between the POS terminal and kitchen via Socket.io.
+- **WhatsApp Bill Sharing**: Send digital receipts directly to customers' WhatsApp numbers with one click.
+- **Automated Menu Management**: Intelligent category-based image mapping for products, reducing manual overhead.
+- **Comprehensive Analytics**: Dynamic dashboards with Chart.js showing sales trends, popular items, and branch performance.
+- **Multiple Payment Gateways**: Integrated support for Cash, Card, and dynamic UPI QR code generation.
+- **Guest Session Management**: Secure guest checkout for self-orders with privacy-focused bill viewing.
 
-```bash
-# 1. Create and activate a virtual environment
-python -m venv .venv
-.venv\Scripts\activate
+## 🛠️ Technology Stack
 
-# 2. Install dependencies
-pip install -r requirements.txt
+- **Backend**: Python 3.x, Flask, SQLAlchemy, Flask-SocketIO
+- **Database**: SQLite (Development), PostgreSQL (Production ready)
+- **Frontend**: HTML5, Tailwind CSS, Vanilla JavaScript, Socket.io-client
+- **Real-time**: WebSockets for instant updates across POS, Kitchen, and Customer displays.
+- **Branding**: Custom SVG icons, Syne & DM Sans typography for a sleek, modern look.
 
-# 3. Run the app
-python app.py
+## 🚀 Quick Start
 
-# 4. Open in browser
-http://localhost:5000
-```
+### Prerequisites
+- Python 3.8+
+- Node.js (for Tailwind/PostCSS processing if needed)
 
-## Demo Credentials
-Sign up with any email/password OR use the pre-seeded data.
+### Installation
 
-## Pages
-| URL | Description |
-|-----|-------------|
-| `/auth` | Login / Signup |
-| `/pos` | POS Terminal (floor + orders + payment) |
-| `/backend` | Config: products, floors, payment methods |
-| `/kitchen` | Kitchen Display (open on kitchen screen) |
-| `/customer` | Customer Display (face toward customer) |
-| `/dashboard` | Reports & Analytics |
+1. **Clone & Navigate**:
+   ```bash
+   git clone https://github.com/shreybhut21/pos-cafe.git
+   cd pos-cafe
+   ```
 
-## Tech Stack
-- **Backend**: Flask, Flask-SQLAlchemy, Flask-SocketIO
-- **Database**: SQLite (zero config)
-- **Frontend**: HTML, Tailwind CSS (CDN), Vanilla JS
-- **Real-time**: Socket.io
-- **Charts**: Chart.js
-- **Fonts**: Syne (display) + DM Sans (body)
+2. **Environment Setup**:
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
+
+3. **Database Initialization**:
+   The application automatically handles schema migrations and initial seeding on first run.
+
+4. **Launch**:
+   ```bash
+   python app.py
+   ```
+
+## 🗺️ System Modules
+
+| Route | Module | Description |
+| :--- | :--- | :--- |
+| `/auth` | **Authentication** | Secure Login/Signup with branch selection. |
+| `/pos` | **POS Terminal** | The main interface for taking orders and processing payments. |
+| `/backend` | **Admin Panel** | Configure products, floors, branches, and payment methods. |
+| `/kitchen` | **Kitchen Display** | Real-time order queue for chefs. |
+| `/customer` | **Customer Display** | Public-facing screen for order status and branding. |
+| `/dashboard`| **Analytics** | Deep dive into sales data and performance metrics. |
+| `/qr/<table_id>` | **Self-Order** | Guest interface for table-side ordering. |
+
+## 🎨 Design Philosophy
+POS Cafè follows a **Glassmorphism** design language with a focus on:
+- **Micro-animations**: Smooth transitions for cart additions and status changes.
+- **Responsive Layouts**: Optimized for both high-resolution desktops and tablet-based mobile POS.
+- **Harmonious Palettes**: Tailored color schemes for Light and Dark modes.
+
+---
+Built with excellence by **Shrey**
