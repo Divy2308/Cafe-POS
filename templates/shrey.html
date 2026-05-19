@@ -269,10 +269,10 @@ tr:hover td{background:rgba(255,255,255,.015)}
     <div class="brand-role">SUPER ADMIN</div>
   </div>
   <div class="topbar-stats">
-    <div class="tstat">Restaurants: <span class="tstat-val cyan" id="ts-total">24</span></div>
-    <div class="tstat">Active: <span class="tstat-val green" id="ts-active">18</span></div>
-    <div class="tstat">Pending: <span class="tstat-val amber" id="ts-pending">4</span></div>
-    <div class="tstat">Revenue: <span class="tstat-val">₹2.4L/mo</span></div>
+    <div class="tstat">Restaurants: <span class="tstat-val cyan" id="ts-total">0</span></div>
+    <div class="tstat">Active: <span class="tstat-val green" id="ts-active">0</span></div>
+    <div class="tstat">Pending: <span class="tstat-val amber" id="ts-pending">0</span></div>
+    <div class="tstat">Revenue: <span class="tstat-val">₹0</span></div>
   </div>
   <div class="topbar-right">
     <button class="tb-btn" onclick="openTab('broadcast')">
@@ -346,27 +346,27 @@ tr:hover td{background:rgba(255,255,255,.015)}
   </div>
 
   <div class="stat-grid">
-    <div class="stat-card"><div class="stat-label">Total Restaurants</div><div class="stat-val cyan" id="ov-total">24</div><div class="stat-delta up">+3 this month</div></div>
-    <div class="stat-card"><div class="stat-label">Active Today</div><div class="stat-val green" id="ov-active">18</div><div class="stat-delta up">75% uptime</div></div>
-    <div class="stat-card"><div class="stat-label">Pending Requests</div><div class="stat-val amber" id="ov-pending">4</div><div class="stat-delta">Needs review</div></div>
-    <div class="stat-card"><div class="stat-label">Monthly Revenue</div><div class="stat-val">2.4L</div><div class="stat-delta up">+18% vs last month</div></div>
+    <div class="stat-card"><div class="stat-label">Total Restaurants</div><div class="stat-val cyan" id="ov-total">0</div><div class="stat-delta">Platform total</div></div>
+    <div class="stat-card"><div class="stat-label">Active Today</div><div class="stat-val green" id="ov-active">0</div><div class="stat-delta">Live now</div></div>
+    <div class="stat-card"><div class="stat-label">Pending Requests</div><div class="stat-val amber" id="ov-pending">0</div><div class="stat-delta">Needs review</div></div>
+    <div class="stat-card"><div class="stat-label">Total Revenue</div><div class="stat-val">₹0</div><div class="stat-delta">Lifetime earnings</div></div>
   </div>
 
   <div class="metrics-row">
     <div class="metric-card">
       <div class="metric-header"><div class="metric-title">Orders Today</div></div>
       <div class="mini-chart" id="chart-orders"></div>
-      <div class="metric-vals"><div class="metric-main">1,247</div><div class="metric-change">+12%</div></div>
+      <div class="metric-vals"><div class="metric-main">0</div><div class="metric-change">0%</div></div>
     </div>
     <div class="metric-card">
       <div class="metric-header"><div class="metric-title">Avg Session Time</div></div>
       <div class="mini-chart" id="chart-session"></div>
-      <div class="metric-vals"><div class="metric-main">4.2h</div><div class="metric-change">+0.3h</div></div>
+      <div class="metric-vals"><div class="metric-main">0h</div><div class="metric-change">0h</div></div>
     </div>
     <div class="metric-card">
       <div class="metric-header"><div class="metric-title">Active Sessions</div></div>
       <div class="mini-chart" id="chart-sessions"></div>
-      <div class="metric-vals"><div class="metric-main" id="active-sessions">12</div><div class="metric-change">Live</div></div>
+      <div class="metric-vals"><div class="metric-main" id="active-sessions">0</div><div class="metric-change">Live</div></div>
     </div>
   </div>
 
@@ -451,19 +451,19 @@ tr:hover td{background:rgba(255,255,255,.015)}
     <div class="plan-card">
       <div class="plan-name">Starter</div>
       <div class="plan-price">₹999<span>/mo</span></div>
-      <div class="plan-count" id="pc-starter">8 restaurants</div>
+      <div class="plan-count" id="pc-starter">0 restaurants</div>
       <div class="plan-bar"><div class="plan-bar-fill" style="width:33%"></div></div>
     </div>
     <div class="plan-card featured">
       <div class="plan-name">Pro</div>
       <div class="plan-price">₹2,499<span>/mo</span></div>
-      <div class="plan-count" id="pc-pro">12 restaurants</div>
+      <div class="plan-count" id="pc-pro">0 restaurants</div>
       <div class="plan-bar"><div class="plan-bar-fill" style="width:50%"></div></div>
     </div>
     <div class="plan-card">
       <div class="plan-name">Enterprise</div>
       <div class="plan-price">₹5,999<span>/mo</span></div>
-      <div class="plan-count" id="pc-ent">4 restaurants</div>
+      <div class="plan-count" id="pc-ent">0 restaurants</div>
       <div class="plan-bar"><div class="plan-bar-fill" style="width:17%"></div></div>
     </div>
   </div>
@@ -677,7 +677,7 @@ function initApp(){
   renderActivityLog();
   renderBcHistory();
   setInterval(()=>{
-    document.getElementById('active-sessions').textContent=Math.floor(10+Math.random()*6);
+    document.getElementById('active-sessions').textContent=0;
   },5000);
   loadRealRequests();
 }
@@ -708,7 +708,7 @@ function startClock(){
 function renderMiniCharts(){
   ['chart-orders','chart-session','chart-sessions'].forEach(id=>{
     const el=document.getElementById(id);
-    const vals=[40,55,35,70,60,80,65,90,75,100].map(v=>v*Math.random()*0.4+v*0.6);
+    const vals=[0,0,0,0,0,0,0,0,0,0];
     const max=Math.max(...vals);
     el.innerHTML=vals.map((v,i)=>`<div class="bar ${i===vals.length-1?'active':''}" style="height:${(v/max*100).toFixed(0)}%"></div>`).join('');
   });

@@ -1439,14 +1439,24 @@
           <h2 class="font-display text-xl font-700">📅 Reservations</h2>
           <p class="text-sm text-gray-500">Manage booking requests &amp; seat parties</p>
         </div>
-        <button onclick="loadPosReservations()"
-          class="btn-ghost px-3 py-1.5 rounded-lg text-xs flex items-center gap-2">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          Refresh
-        </button>
+        <div class="flex items-center gap-2">
+          <button onclick="openQrScanner()"
+            class="btn-ghost px-3 py-1.5 rounded-lg text-xs flex items-center gap-2">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M6 6h4M6 6v4M18 6h-4M18 6v4M6 18h4M6 18v-4M18 18h-4M18 18v-4" />
+            </svg>
+            Scan QR
+          </button>
+          <button onclick="loadPosReservations()"
+            class="btn-ghost px-3 py-1.5 rounded-lg text-xs flex items-center gap-2">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh
+          </button>
+        </div>
       </div>
       <!-- Filter pills -->
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
@@ -1461,6 +1471,25 @@
       <div id="pos-res-grid" class="grid gap-4"
         style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr));align-content:start;"></div>
       <div id="pos-res-empty" class="hidden text-center py-20 text-gray-500">No reservations found.</div>
+    </div>
+
+    <div id="qr-scanner-modal" class="hidden fixed inset-0 z-[120] flex items-center justify-center p-4 modal-bg">
+      <div class="modal-content w-full max-w-2xl bg-card border border-border rounded-3xl shadow-2xl overflow-hidden">
+        <div class="p-4 border-b border-border flex items-center justify-between">
+          <div>
+            <h3 class="font-700 text-lg">Scan Reservation QR</h3>
+            <p class="text-xs text-gray-500">Point your camera at the customer&apos;s reservation QR code.</p>
+          </div>
+          <button onclick="closeQrScanner()" class="p-2 text-gray-500">&times;</button>
+        </div>
+        <div class="p-6 space-y-4">
+          <div id="qr-scanner" class="w-full rounded-3xl overflow-hidden bg-black/90" style="min-height:320px;"></div>
+          <div id="qr-scan-hint" class="text-sm text-gray-400 text-center">Allow camera access to scan the QR code.</div>
+          <div class="flex justify-end gap-2">
+            <button onclick="closeQrScanner()" class="btn-ghost px-4 py-2 rounded-xl text-xs">Cancel</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ═══ ORDER HISTORY VIEW ═══ -->
@@ -1496,6 +1525,16 @@
             <div id="pay-total" class="text-4xl sm:text-5xl font-display font-800 text-white">₹0</div>
           </div>
           <div id="bill-summary" class="mb-5 p-3 sm:p-4 rounded-xl border border-border bg-black/20 text-sm"></div>
+          <p class="text-xs text-gray-500 uppercase tracking-wider mb-3">Discount & Coupon</p>
+          <div class="grid grid-cols-2 gap-2 mb-3">
+             <input type="text" id="pay-coupon" placeholder="Coupon Code" class="text-sm px-3 py-2 bg-gray-800 rounded-lg border border-border text-white">
+             <button onclick="applyCoupon()" class="btn-ghost py-1.5 rounded-lg text-xs border border-border/50">Apply</button>
+          </div>
+          <div class="flex items-center gap-2 mb-4">
+            <input type="number" id="pay-discount" placeholder="Manual Discount (₹)" class="text-sm flex-1 px-3 py-2 bg-gray-800 rounded-lg border border-border text-white" oninput="recalcPayTotal()">
+            <button onclick="useLoyaltyPoints()" class="btn-ghost py-2 px-3 rounded-lg text-[10px] border border-border/50">Use Loyalty</button>
+          </div>
+
           <p class="text-xs text-gray-500 uppercase tracking-wider mb-3">Add a Tip</p>
           <div class="grid grid-cols-4 gap-2 mb-5">
             <button onclick="setTip(0)"
@@ -1662,6 +1701,7 @@
   let lastPaidOrder = null, lastPaidMethod = 'cash', confirmReviewRating = 0, confirmReviewSubmitted = false;
   let isTakeaway = false;
   let lookupTimeout = null;
+  let currentDiscountAmount = 0, currentLoyaltyPointsUsed = 0;
   const POS_USER_NAME = {{ user_name| tojson }};
   let attendanceState = { clocked_in: false, current_shift_started_at: null };
   const NOTE_PRESETS = ['No ice', 'Parcel', 'Urgent', 'Birthday', 'VIP'];
@@ -1806,52 +1846,63 @@
     if (floors.length) renderTables(activeFloorId || floors[0].id);
   }
 
-  let mergeState = { active: false, source: null };
+  let mergeState = { active: false, sources: [] };
 
   function toggleMergeMode() {
+    if (mergeState.active && mergeState.sources.length >= 2) {
+        confirmTableMerge();
+        return;
+    }
     mergeState.active = !mergeState.active;
-    mergeState.source = null;
+    mergeState.sources = [];
     const btn = document.getElementById('merge-mode-btn');
     if (mergeState.active) {
-      btn.textContent = '❌ Cancel Merge';
-      btn.classList.add('bg-red-500/10', 'text-red-500', 'border-red-500/20');
-      toast('Select first table to merge', 'info');
+      btn.textContent = '✅ Finish & Merge';
+      btn.style.background = '#f97316';
+      btn.style.color = 'white';
+      toast('Select tables to merge, then click Finish', 'info');
     } else {
       btn.textContent = '🔗 Merge Tables';
-      btn.classList.remove('bg-red-500/10', 'text-red-500', 'border-red-500/20');
+      btn.style.background = '';
+      btn.style.color = '';
     }
     renderTables(activeFloorId);
   }
 
   function handleTableSelection(id, number, status) {
     if (mergeState.active) {
-      if (!mergeState.source) {
-        mergeState.source = { id, number };
-        toast('Select second table to merge into', 'info');
-        renderTables(activeFloorId);
-      } else {
-        if (mergeState.source.id === id) {
-          mergeState.source = null;
-          renderTables(activeFloorId);
-          return;
-        }
-        confirmTableMerge(mergeState.source.id, id, mergeState.source.number, number);
-      }
+       const idx = mergeState.sources.findIndex(s => s.id === id);
+       if (idx > -1) mergeState.sources.splice(idx, 1);
+       else mergeState.sources.push({ id, number });
+       renderTables(activeFloorId);
     } else {
-      selectTable(id, number, status);
+       selectTable(id, number, status);
     }
   }
 
-  async function confirmTableMerge(sourceId, targetId, sourceNum, targetNum) {
-    if (!confirm(`Merge Table ${sourceNum} into Table ${targetNum}? Orders will be combined.`)) {
-      mergeState.source = null;
-      renderTables(activeFloorId);
+  async function confirmTableMerge() {
+    if (mergeState.sources.length < 2) {
+      toast('Select at least 2 tables', 'error');
       return;
     }
-    const r = await api('/api/tables/merge', 'POST', { source_table_id: sourceId, target_table_id: targetId });
+    const targetNum = prompt(`Enter the PRIMARY table number for this group:`, mergeState.sources[0].number);
+    if (!targetNum) return;
+
+    const target = mergeState.sources.find(s => s.number === targetNum);
+    if (!target) {
+      toast('Must be one of the selected tables', 'error');
+      return;
+    }
+
+    const sourceIds = mergeState.sources.filter(s => s.id !== target.id).map(s => s.id);
+    const r = await api('/api/tables/merge', 'POST', { source_table_ids: sourceIds, target_table_id: target.id });
     if (r.ok) {
-      toast('Tables merged successfully', 'success');
-      toggleMergeMode();
+      toast('Tables merged', 'success');
+      mergeState.active = false;
+      mergeState.sources = [];
+      const btn = document.getElementById('merge-mode-btn');
+      btn.textContent = '🔗 Merge Tables';
+      btn.style.background = ''; btn.style.color = '';
       await reloadData();
     } else {
       toast(r.error || 'Merge failed', 'error');
@@ -1897,7 +1948,7 @@
     grid.innerHTML = floor.tables.map(t => {
       let extraClass = '';
       if (mergeState.active) {
-        if (mergeState.source && mergeState.source.id === t.id) extraClass = 'merge-selected';
+        if (mergeState.sources.some(s => s.id === t.id)) extraClass = 'merge-selected';
         else extraClass = 'merge-selectable';
       } else if (t.merged_to_id) {
         extraClass = 'merged-child';
@@ -1947,6 +1998,10 @@
   }
 
   async function selectTable(id, number, status) {
+    if (status === 'occupied') {
+        const ok = confirm(`Table ${number} is currently occupied. Do you want to view/edit the order?`);
+        if (!ok) return;
+    }
     currentTable = { id, number };
     isTakeaway = false;
     document.getElementById('cart-table-name').textContent = 'Table ' + number;
@@ -1994,11 +2049,47 @@
       btn.textContent = '📱 Online Order';
     }
     setCartDrawerOpen(false);
-    renderCart();
     showView('order');
   }
 
   function backToFloor() { showView('floor'); reloadData(); }
+
+  async function applyCoupon() {
+    const code = document.getElementById('pay-coupon').value.trim().toUpperCase();
+    if (!code) return;
+    const r = await api('/api/coupons');
+    if (Array.isArray(r)) {
+        const coupon = r.find(c => c.code === code && c.active);
+        if (!coupon) {
+            toast('Invalid or inactive coupon', 'error');
+            return;
+        }
+        const subtotal = currentBill ? currentBill.total : 0;
+        let disc = 0;
+        if (coupon.discount_type === 'percentage') {
+            disc = subtotal * (coupon.value / 100);
+        } else {
+            disc = coupon.value;
+        }
+        document.getElementById('pay-discount').value = disc.toFixed(2);
+        currentDiscountAmount = disc;
+        currentLoyaltyPointsUsed = 0;
+        toast(`Coupon ${code} applied!`, 'success');
+        refreshPaymentTotals();
+    } else {
+        toast('Error loading coupons', 'error');
+    }
+  }
+
+  function useLoyaltyPoints() {
+    toast('Loyalty points integration coming soon!', 'info');
+  }
+
+  function recalcPayTotal() {
+    currentDiscountAmount = Math.max(0, parseFloat(document.getElementById('pay-discount')?.value || 0) || 0);
+    currentLoyaltyPointsUsed = 0;
+    refreshPaymentTotals();
+  }
 
   async function toggleTableStatus(e, tableId, currentStatus) {
     e.preventDefault();
@@ -2484,7 +2575,10 @@
 
   function getPaymentTotal() {
     const order = currentBill || currentOrder || { total: 0 };
-    return (order.total || 0) + currentTip;
+    const baseTotal = Number(order.total || 0);
+    const discount = Math.max(0, Number(currentDiscountAmount || 0));
+    const loyalty = Math.max(0, Number(currentLoyaltyPointsUsed || 0));
+    return Math.max(0, baseTotal - discount - loyalty + currentTip);
   }
 
   function formatCurrency(amount, decimals = 2) {
@@ -2492,11 +2586,9 @@
   }
 
   function refreshPaymentTotals() {
-    const order = currentBill || currentOrder || { total: 0, subtotal: 0 };
-    const baseTotal = order.total || 0;
-    const totalWithTip = baseTotal + currentTip;
+    const totalWithTip = getPaymentTotal();
 
-    document.getElementById('pay-total').textContent = formatCurrency(totalWithTip, 0); // Rounded Grand Total
+    document.getElementById('pay-total').textContent = formatCurrency(totalWithTip);
 
     // Update Tip in summary if it exists
     const tipShow = document.getElementById('pay-tip-show');
@@ -2548,6 +2640,8 @@
   async function populatePaymentView(order) {
     const bill = buildBillSummary(order);
     currentTip = order.tip || 0;
+    currentDiscountAmount = Math.max(0, Number(order.discount_amount || 0));
+    currentLoyaltyPointsUsed = Math.max(0, Number(order.loyalty_points_used || 0));
     selectedMethod = null;
     const isNotSentToKitchen = !order.sent_to_kitchen_at && order.status !== 'sent';
     document.getElementById('pay-order-num').textContent = '#' + order.order_number;
@@ -2568,6 +2662,8 @@
       <span id="pay-tip-show" class="text-emerald-400">₹0.00</span>
     </div>
   `;
+    document.getElementById('pay-coupon').value = order.coupon_code || '';
+    document.getElementById('pay-discount').value = currentDiscountAmount > 0 ? currentDiscountAmount.toFixed(2) : '';
     document.getElementById('custom-tip').value = '';
     document.getElementById('cash-received').value = '';
     document.querySelectorAll('.tip-btn').forEach(b => b.classList.remove('active'));
@@ -2723,7 +2819,20 @@
   async function completePayment(method) {
     const paidOrder = currentOrder ? { id: currentOrder.id, order_number: currentOrder.order_number, table: currentTable ? currentTable.number : (currentOrder.table || 'Takeaway') } : null;
     const customerPhone = (document.getElementById('customer-phone')?.value || '').trim();
-    const r = await api('/api/orders/' + currentOrder.id + '/pay', 'POST', { method, tip: currentTip });
+    
+    const discount = Math.max(0, parseFloat(document.getElementById('pay-discount')?.value || 0) || 0);
+    const coupon = document.getElementById('pay-coupon')?.value || '';
+    currentDiscountAmount = discount;
+    const total = getPaymentTotal();
+
+    const r = await api('/api/orders/' + currentOrder.id + '/pay', 'POST', { 
+      method, 
+      tip: currentTip,
+      discount_amount: discount,
+      coupon_code: coupon,
+      loyalty_points_used: currentLoyaltyPointsUsed,
+      total: total
+    });
     if (r.ok) {
       const totalWithTip = getPaymentTotal();
       let confirmText = formatCurrency(totalWithTip) + ' via ' + (method === 'cash' ? 'Cash' : method === 'upi' ? 'UPI' : method === 'razorpay' ? 'Razorpay' : 'Card');
@@ -2738,6 +2847,8 @@
       confirmReviewRating = 0;
       confirmReviewSubmitted = false;
       cart = []; currentOrder = null; currentTable = null; currentBill = null; currentTip = 0;
+      currentDiscountAmount = 0;
+      currentLoyaltyPointsUsed = 0;
       selectedMethod = null;
       showView('confirm');
       // ── CHANGE 4: Show WhatsApp button after payment ──
@@ -3228,6 +3339,106 @@
   loadPosReservations();
   setInterval(loadPosReservations, 30000);
 
+  let posQrScanner = null;
+  let qrScannerLibraryPromise = null;
+
+  function ensureQrScannerLibrary() {
+    if (window.Html5Qrcode) return Promise.resolve();
+    if (qrScannerLibraryPromise) return qrScannerLibraryPromise;
+
+    const sources = [
+      'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js',
+      'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js'
+    ];
+
+    qrScannerLibraryPromise = new Promise((resolve, reject) => {
+      const tryLoad = (index) => {
+        if (window.Html5Qrcode) {
+          resolve();
+          return;
+        }
+        if (index >= sources.length) {
+          reject(new Error('QR scanner library failed to load'));
+          return;
+        }
+        const script = document.createElement('script');
+        script.src = sources[index];
+        script.async = true;
+        script.onload = () => {
+          if (window.Html5Qrcode) resolve();
+          else tryLoad(index + 1);
+        };
+        script.onerror = () => tryLoad(index + 1);
+        document.head.appendChild(script);
+      };
+      tryLoad(0);
+    });
+
+    return qrScannerLibraryPromise;
+  }
+
+  async function openQrScanner() {
+    try {
+      await ensureQrScannerLibrary();
+    } catch (e) {
+      toast('QR scanner library could not be loaded.', 'error');
+      return;
+    }
+    document.getElementById('qr-scanner-modal').classList.remove('hidden');
+    const scannerEl = document.getElementById('qr-scanner');
+    scannerEl.innerHTML = '';
+    posQrScanner = new Html5Qrcode('qr-scanner');
+    try {
+      await posQrScanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 280, height: 280 } },
+        async (decodedText) => {
+          await verifyReservationToken(decodedText);
+        },
+        (errorMessage) => {
+          console.debug('QR scan error:', errorMessage);
+        }
+      );
+    } catch (e) {
+      toast('Unable to start camera for QR scanning.', 'error');
+      closeQrScanner();
+    }
+  }
+
+  async function closeQrScanner() {
+    if (posQrScanner) {
+      try {
+        await posQrScanner.stop();
+      } catch (e) {
+        console.debug('QR scanner stop failed:', e);
+      }
+      try {
+        posQrScanner.clear();
+      } catch (e) {
+        console.debug('QR scanner clear failed:', e);
+      }
+      posQrScanner = null;
+    }
+    document.getElementById('qr-scanner-modal').classList.add('hidden');
+  }
+
+  async function verifyReservationToken(token) {
+    if (!token) return;
+    if (!confirm('Verify this reservation QR code?')) return;
+    const result = await api('/api/reservations/verify-token', 'POST', { token });
+    closeQrScanner();
+    if (result.ok) {
+      if (result.already_verified) {
+        toast('Reservation already verified.', 'info');
+      } else {
+        toast('Reservation verified and seated!', 'success');
+      }
+      loadPosReservations();
+    } else {
+      toast(result.error || 'Unable to verify reservation.', 'error');
+    }
+  }
+
   // ─── Order History ────────────────────────────────────────
   async function loadOrderHistory() {
     const grid = document.getElementById('history-grid');
@@ -3321,6 +3532,8 @@
         `Subtotal:        ₹${Number(order.subtotal || 0).toFixed(0)}`,
         taxLines || null,
         order.round_off ? `Round off:       ₹${Number(order.round_off).toFixed(2)}` : null,
+        order.discount_amount ? `Discount${order.coupon_code ? ' (' + order.coupon_code + ')' : ''}: -₹${Number(order.discount_amount).toFixed(2)}` : null,
+        order.loyalty_points_used ? `Loyalty Used:   -₹${Number(order.loyalty_points_used).toFixed(2)}` : null,
         order.tip && order.tip > 0 ? `Tip:             ₹${Number(order.tip).toFixed(0)}` : null,
         `*TOTAL:          ₹${Number(order.grand_total || order.total || 0).toFixed(0)}*`,
         '━━━━━━━━━━━━━━━━━━━━━━━',
@@ -3456,6 +3669,7 @@
 
   init();
 </script>
+<script src="https://unpkg.com/html5-qrcode@2.3.7/minified/html5-qrcode.min.js"></script>
 
 <!-- ═══ MORE ACTIONS MODAL ═══ -->
 <div id="more-actions-modal"

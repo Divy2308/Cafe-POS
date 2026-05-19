@@ -363,6 +363,7 @@
       <button class="tab-btn text-sm font-medium text-gray-500" onclick="switchTab('inventory',this)">Inventory</button>
       <button class="tab-btn text-sm font-medium text-gray-500" onclick="switchTab('reports',this)">Reports</button>
       <button class="tab-btn text-sm font-medium text-gray-500" onclick="switchTab('reviews',this)">Reviews</button>
+      <button class="tab-btn text-sm font-medium text-gray-500" onclick="switchTab('coupons',this)">Coupons</button>
       <button class="tab-btn text-sm font-medium text-gray-500" onclick="switchTab('settings',this)">Settings</button>
     </div>
 
@@ -507,6 +508,29 @@
           <div id="reviews-list" class="space-y-4 max-w-4xl"></div>
           <div id="reviews-empty" class="hidden card p-8 text-center text-gray-500" style="border-radius:16px">No
             customer reviews yet.</div>
+        </div>
+
+        <!-- COUPONS TAB -->
+        <div id="tab-coupons" class="tab-content">
+          <div class="flex items-center justify-between mb-6 gap-3">
+            <h2 class="font-display text-xl font-700">Discount Coupons</h2>
+            <button onclick="openCouponModal()" class="btn-primary px-4 py-2 rounded-xl text-white text-sm font-medium flex-shrink-0">+ Create Coupon</button>
+          </div>
+          <div class="card overflow-hidden table-wrap">
+            <table class="w-full text-left">
+              <thead>
+                <tr class="border-b border-border">
+                  <th class="px-4 py-3 text-xs text-gray-500 uppercase tracking-wider">Code</th>
+                  <th class="px-4 py-3 text-xs text-gray-500 uppercase tracking-wider">Value</th>
+                  <th class="px-4 py-3 text-xs text-gray-500 uppercase tracking-wider">Type</th>
+                  <th class="px-4 py-3 text-xs text-gray-500 uppercase tracking-wider">Status</th>
+                  <th class="px-4 py-3 text-xs text-gray-500 uppercase tracking-wider text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="coupons-table-body">
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- SETTINGS TAB -->
@@ -973,6 +997,38 @@
       class="btn-primary w-full mt-6 py-3 rounded-xl text-sm font-bold">Got it</button>
   </div>
 </div>
+
+  <!-- Coupon Modal -->
+  <div id="coupon-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 modal-bg" onclick="closeCouponModal()"></div>
+    <div class="card w-full max-w-sm relative z-10 flex flex-col max-h-[90vh]">
+      <div class="p-5 border-b border-border flex items-center justify-between flex-shrink-0">
+        <h3 class="font-display font-700 text-lg">Create Coupon</h3>
+        <button onclick="closeCouponModal()" class="text-gray-500 hover:text-white p-2">✕</button>
+      </div>
+      <div class="p-5 overflow-y-auto space-y-4">
+        <div>
+          <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Coupon Code</label>
+          <input id="c-code" placeholder="e.g. SUMMER20" style="text-transform:uppercase">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Discount Type</label>
+          <select id="c-type">
+            <option value="percentage">Percentage (%)</option>
+            <option value="flat">Flat Amount (₹)</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Discount Value</label>
+          <input id="c-value" type="number" placeholder="e.g. 20">
+        </div>
+      </div>
+      <div class="p-5 border-t border-border flex justify-end gap-3 flex-shrink-0">
+        <button onclick="closeCouponModal()" class="btn-ghost">Cancel</button>
+        <button onclick="saveCoupon()" class="btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
 
 {% endblock %}
 {% block scripts %}

@@ -1,740 +1,2747 @@
-{% extends "base.html" %}
-{% block title %}Customer Portal — POS Cafè{% endblock %}
-{% block extra_head %}
-<style>
-  body { background:#050505; }
-  /* Tabs */
-  .tab-bar { display:flex; gap:0; border-bottom:2px solid #1a1a1a; }
-  .tab-btn { flex:1; padding:16px 8px; min-height:44px; font-size:13px; font-weight:600; cursor:pointer; border:none; background:transparent; color:#666; border-bottom:2px solid transparent; margin-bottom:-2px; transition:all .2s; display:flex; align-items:center; justify-content:center; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
-  .tab-btn:active { transform:scale(.98); }
-  .tab-btn:focus-visible { outline:2px solid rgba(249, 115, 22, 0.3); outline-offset:2px; }
-  .tab-btn.active { color:#f97316; border-bottom-color:#f97316; }
-  .tab-btn:hover:not(.active) { color:#ccc; }
-  .tab-panel { display:none; padding:20px; }
-  .tab-panel.active { display:block; }
-  /* Cards */
-  .res-card { background:#111; border:1px solid #222; border-radius:14px; padding:16px; margin-bottom:12px; transition:all .2s; }
-  .res-card:hover { border-color:#f97316; }
-  .table-pick { display:grid; grid-template-columns:repeat(auto-fill,minmax(100px,1fr)); gap:10px; margin-top:10px; }
-  .table-pick-btn { padding:12px 8px; border-radius:10px; border:2px solid #333; background:#111; cursor:pointer; text-align:center; transition:all .2s; min-height:44px; display:flex; align-items:center; justify-content:center; -webkit-tap-highlight-color:transparent; }
-  .table-pick-btn:hover { border-color:#f97316; }
-  .table-pick-btn:active { transform:scale(.95); }
-  .table-pick-btn.selected { border-color:#f97316; background:rgba(249,115,22,0.1); }
-  .table-pick-btn.unavailable { opacity:.4; cursor:not-allowed; }
-  /* Order cards */
-  .order-card { border:2px solid #333; border-radius:16px; padding:20px; transition:all .3s; }
-  .order-card.to_cook { border-color:rgba(239,68,68,0.4); background:rgba(239,68,68,0.05); }
-  .order-card.preparing { border-color:rgba(249,115,22,0.5); background:rgba(249,115,22,0.08); animation:pulse-prep 2s infinite; }
-  .order-card.completed { border-color:rgba(34,197,94,0.5); background:rgba(34,197,94,0.08); }
-  .order-card.paid { border-color:rgba(100,116,139,0.4); background:rgba(100,116,139,0.05); }
-  @keyframes pulse-prep { 0%,100%{opacity:1} 50%{opacity:.85} }
-  .progress-bar { width:100%; height:8px; background:rgba(255,255,255,0.08); border-radius:4px; overflow:hidden; margin:12px 0; }
-  .progress-fill { height:100%; border-radius:4px; transition:width .5s; }
-  .progress-fill.to_cook  { width:25%; background:linear-gradient(90deg,#ef4444,#f97316); }
-  .progress-fill.preparing { width:65%; background:linear-gradient(90deg,#f97316,#facc15); }
-  .progress-fill.completed { width:100%; background:linear-gradient(90deg,#22c55e,#86efac); }
-  .progress-fill.paid { width:100%; background:#334155; }
-  /* ETA */
-  .eta-badge { font-size:11px; font-weight:700; padding:2px 8px; border-radius:6px; }
-  .eta-good { background:rgba(34,197,94,0.15); color:#22c55e; }
-  .eta-mid  { background:rgba(249,115,22,0.15); color:#f97316; }
-  .eta-late { background:rgba(239,68,68,0.15); color:#ef4444; }
-  /* Pre-order menu */
-  .menu-product { background:#111; border:1px solid #222; border-radius:12px; padding:14px; cursor:pointer; transition:all .2s; min-height:48px; display:flex; align-items:center; justify-content:center; -webkit-tap-highlight-color:transparent; }
-  .menu-product:hover { border-color:#f97316; background:rgba(249,115,22,0.05); }
-  .menu-product:active { transform:scale(.97); }
-  /* Form */
-  .form-group { margin-bottom:14px; }
-  .form-group label { display:block; font-size:12px; color:#888; margin-bottom:6px; font-weight:500; }
-  .form-group input, .form-group select, .form-group textarea { width:100%; background:#111; border:1px solid #333; border-radius:8px; color:#fff; padding:10px 12px; font-size:13px; min-height:44px; -webkit-appearance:none; appearance:none; -webkit-tap-highlight-color:transparent; touch-action:manipulation; transition:border-color .2s, background .2s; }
-  .form-group input:focus, .form-group select:focus { outline:none; border-color:#f97316; background:rgba(249, 115, 22, 0.03); }
-  .form-group input:focus-visible, .form-group select:focus-visible { outline:2px solid rgba(249, 115, 22, 0.3); outline-offset:2px; }
-  .btn-orange { background:#f97316; color:#fff; border:none; border-radius:10px; padding:12px 20px; font-size:13px; font-weight:700; cursor:pointer; transition:all .2s; width:100%; min-height:44px; display:flex; align-items:center; justify-content:center; -webkit-tap-highlight-color:transparent; }
-  .btn-orange:hover { background:#ea580c; transform:translateY(-1px); }
-  .btn-orange:active { transform:scale(.97); }
-  .btn-orange:disabled { opacity:.5; cursor:not-allowed; transform:none; }
-  .status-badge { display:inline-block; padding:4px 12px; border-radius:8px; font-size:12px; font-weight:600; }
-  .status-pending { background:rgba(251,191,36,0.15); color:#fbbf24; }
-  .status-confirmed { background:rgba(34,197,94,0.15); color:#22c55e; }
-  .status-seated { background:rgba(99,102,241,0.15); color:#818cf8; }
-  .status-cancelled { background:rgba(239,68,68,0.12); color:#ef4444; }
-  /* Push prompt */
-  .push-prompt { background:rgba(249,115,22,0.07); border:1px solid rgba(249,115,22,0.2); border-radius:12px; padding:14px; display:flex; align-items:center; gap:12px; }
-  .cart-item-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #1a1a1a; }
-  .qty-ctrl { display:flex; align-items:center; gap:6px; }
-  .qty-btn { width:32px; height:32px; min-width:32px; min-height:32px; border-radius:6px; background:#222; border:none; color:#ccc; cursor:pointer; font-size:14px; font-weight:600; display:flex; align-items:center; justify-content:center; -webkit-tap-highlight-color:transparent; touch-action:manipulation; transition:all .2s; }
-  .qty-btn:hover { background:#333; }
-  .qty-btn:active { transform:scale(.90); }
-  .live-dot { width:8px; height:8px; border-radius:50%; background:#22c55e; animation:livepulse 1.5s infinite; display:inline-block; }
-  @keyframes livepulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
-  .floor-label { font-size:11px; color:#888; text-transform:uppercase; letter-spacing:.06em; margin:12px 0 6px; font-weight:600; }
-  /* Mobile optimizations */
-  @media (max-width:768px) {
-    body { padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
-    .tab-bar { gap:2px; }
-    .tab-btn { padding:12px 6px; font-size:12px; }
-    .btn-orange { min-height:44px; padding:12px 16px; }
-    .form-group input, .form-group select, .form-group textarea { min-height:44px; padding:12px 14px; font-size:16px; }
-    .qty-btn { width:32px; height:32px; font-size:16px; }
-    #orders-grid { grid-template-columns:repeat(auto-fill,minmax(280px,1fr)) !important; }
-    #reserve-form { max-width:100%; }
-    .table-pick { grid-template-columns:repeat(auto-fill,minmax(80px,1fr)); gap:8px; }
-    .table-pick-btn { padding:12px 8px; min-height:44px; }
-    .res-card { padding:12px; margin-bottom:10px; }
-    #bills-grid { grid-template-columns:1fr !important; }
-  }
-  @media (max-width:480px) {
-    div[style*="max-width:900px"] { padding:12px env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left) !important; }
-    .tab-bar { flex-wrap:wrap; gap:0; }
-    .tab-btn { flex:1; min-width:90px; padding:10px 6px; font-size:11px; }
-    .menu-product { padding:10px; min-height:48px; }
-    .order-card { padding:14px; border-radius:12px; }
-    #orders-grid { grid-template-columns:1fr !important; }
-    .cart-item-row { padding:6px 0; }
-    .progress-bar { height:6px; }
-    h1 { font-size:20px; }
-  }
-</style>
-{% endblock %}
-{% block body %}
-<div style="max-width:900px; margin:0 auto; padding:20px;">
-  <!-- Header -->
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
-    <div>
-      <h1 style="font-size:24px; font-weight:800; margin:0;">🍽️ POS Cafè</h1>
-      <div style="font-size:13px; color:#888; margin-top:4px;">
-        <span class="live-dot"></span>
-        <span id="user-greeting" style="margin-left:6px;">Welcome</span>
-        <span id="clock" style="float:right; font-family:monospace; color:#555;"></span>
-      </div>
-    </div>
-    <div style="display:flex; gap:10px; align-items:center;">
-      <button id="push-enable-btn" onclick="requestPushPermission()" style="display:none; background:rgba(249,115,22,0.12); color:#f97316; border:1px solid rgba(249,115,22,0.3); border-radius:8px; padding:8px 14px; font-size:12px; font-weight:600; cursor:pointer;">🔔 Enable Notifications</button>
-      <button onclick="logout()" style="background:#1a1a1a; color:#ccc; border:1px solid #333; border-radius:8px; padding:8px 16px; font-weight:600; cursor:pointer; font-size:13px;">Logout</button>
-    </div>
-  </div>
+<!DOCTYPE html>
+<html lang="en">
 
-  <!-- Tab Bar -->
-  <div class="tab-bar">
-    <button class="tab-btn active" id="tab-btn-orders" onclick="showTab('orders')">📦 My Orders</button>
-    <button class="tab-btn" id="tab-btn-reserve" onclick="showTab('reserve')">📅 Reserve Table</button>
-    <button class="tab-btn" id="tab-btn-preorder" onclick="showTab('preorder')">🛒 Pre-Order</button>
-    <button class="tab-btn" id="tab-btn-myres" onclick="showTab('myres')">🗓️ My Reservations</button>
-  </div>
-
-  <!-- ═══ TAB: My Orders ═══ -->
-  <div class="tab-panel active" id="tab-orders">
-    <div id="review-panel" style="display:none; margin-bottom:16px;"></div>
-    <div id="orders-grid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:16px;"></div>
-    <div id="orders-empty" style="text-align:center; padding:60px 20px; color:#555;">
-      <div style="font-size:48px; margin-bottom:12px;">🍽️</div>
-      <div style="font-size:16px;">No active orders right now</div>
-      <div style="font-size:13px; margin-top:8px; color:#444;">Reserve a table or scan QR to order</div>
-    </div>
-  </div>
-
-  <!-- ═══ TAB: Reserve Table ═══ -->
-  <div class="tab-panel" id="tab-reserve">
-    <div style="max-width:480px; margin:0 auto;">
-      <h2 style="font-size:18px; font-weight:700; margin-bottom:4px;">Reserve a Table</h2>
-      <p style="font-size:13px; color:#888; margin-bottom:20px;">Pick a date, time, and table. Optionally pre-order your food.</p>
-
-      <div class="form-group">
-        <label>Date & Time</label>
-        <input type="datetime-local" id="res-datetime" />
-      </div>
-
-      <div id="reservation-customer-info" style="margin-top:16px;">
-        <div class="form-group" style="margin-bottom:12px;">
-          <label>Your Name</label>
-          <input type="text" id="res-name" placeholder="Enter your full name" />
-        </div>
-        <div class="form-group">
-          <label>Phone Number</label>
-          <input type="tel" id="res-phone" placeholder="Enter phone for confirmation" />
-        </div>
-      </div>
-      <div class="form-group">
-        <label>Party Size</label>
-        <select id="res-party">
-          <option value="1">1 person</option>
-          <option value="2" selected>2 people</option>
-          <option value="3">3 people</option>
-          <option value="4">4 people</option>
-          <option value="5">5 people</option>
-          <option value="6">6 people</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Special notes (optional)</label>
-        <input type="text" id="res-notes" placeholder="e.g. birthday, window seat preferred" />
-      </div>
-
-      <div class="form-group">
-        <label>Select Table <span id="avail-loading" style="color:#888; font-size:11px; display:none;">Loading availability…</span></label>
-        <button onclick="checkAvailability()" class="btn-orange" style="margin-bottom:10px; padding:8px;">Check Available Tables</button>
-        <div id="table-picker" class="table-pick"></div>
-      </div>
-      <input type="hidden" id="res-table-id" value="" />
-
-      <button onclick="submitReservation()" class="btn-orange" id="res-submit-btn" disabled>Request Reservation</button>
-      <p style="font-size:11px; color:#555; margin-top:8px; text-align:center;">You can also add a pre-order on the Pre-Order tab before confirming.</p>
-    </div>
-  </div>
-
-  <!-- ═══ TAB: Pre-Order ═══ -->
-  <div class="tab-panel" id="tab-preorder">
-    <div style="display:grid; grid-template-columns:1fr 280px; gap:20px;" id="preorder-layout">
-      <!-- Menu -->
-      <div>
-        <h2 style="font-size:18px; font-weight:700; margin-bottom:4px;">Browse Menu</h2>
-        <p style="font-size:13px; color:#888; margin-bottom:14px;">Items will be pre-ordered for your reservation. Link a reservation first or they'll be added on arrival.</p>
-        <div id="preorder-cat-pills" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;"></div>
-        <div id="preorder-menu-grid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:10px; align-content:start;"></div>
-      </div>
-      <!-- Cart -->
-      <div style="position:sticky; top:20px; align-self:start;">
-        <div class="res-card">
-          <div style="font-size:15px; font-weight:700; margin-bottom:12px;">🛒 Pre-Order Cart</div>
-          <div id="preorder-cart-items" style="min-height:60px;">
-            <div style="color:#555; font-size:13px; text-align:center; padding:20px 0;">Cart is empty</div>
-          </div>
-          <div id="preorder-cart-total" style="display:none; border-top:1px solid #222; padding-top:10px; margin-top:10px;">
-            <div style="display:flex; justify-content:space-between; font-weight:700; font-size:15px;">
-              <span>Total</span>
-              <span style="color:#f97316;" id="preorder-total-amount">₹0</span>
-            </div>
-          </div>
-          <div style="margin-top:12px;">
-            <div id="preorder-linked-res" style="font-size:12px; color:#888; margin-bottom:8px;">
-              <span id="preorder-res-label">No reservation linked</span>
-            </div>
-            <button onclick="attachPreorderToReservation()" class="btn-orange" id="preorder-attach-btn" disabled style="margin-bottom:8px;">Save Pre-Order to Reservation</button>
-            <button onclick="clearPreorderCart()" style="width:100%; padding:8px; background:transparent; border:1px solid #333; border-radius:8px; color:#888; cursor:pointer; font-size:12px;">Clear Cart</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══ TAB: My Reservations ═══ -->
-  <div class="tab-panel" id="tab-myres">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-      <h2 style="font-size:18px; font-weight:700; margin:0;">My Reservations</h2>
-      <button onclick="loadReservations()" style="background:transparent; border:1px solid #333; border-radius:8px; padding:8px 14px; color:#888; cursor:pointer; font-size:12px;">↻ Refresh</button>
-    </div>
-    <div id="reservations-list"></div>
-    <div id="reservations-empty" style="display:none; text-align:center; padding:40px 0; color:#555;">No reservations yet. Book your first table! 📅</div>
-  </div>
-</div>
-{% endblock %}
-{% block scripts %}
-<script>
-const socket = io();
-const isPublic = {{ 'true' if is_public else 'false' }};
-const isLoggedIn = {{ 'true' if is_logged_in else 'false' }};
-const tenantId = {{ tenant_id or 'null' }};
-const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
-let orders = {}, orderTimestamps = {}, latestReviewRating = 5, latestReviewOrderId = null;
-const reviewedOrderIds = new Set();
-let menuData = [], preorderCart = [], activeReservationId = null;
-
-// Helper to add tenantId to API URLs
-function api(path) {
-    const url = new URL(path, window.location.origin);
-    if (tenantId) url.searchParams.set('tenant_id', tenantId);
-    return url.toString();
-}
-
-// ─── Socket events ─────────────────────────────────────────
-socket.on('new_ticket', t => {
-  if (tenantId && t.tenant_id != tenantId) return; // Ignore updates for other tenants
-  if (!orders[t.order_number]) {
-    orders[t.order_number] = {
-      id: t.order_id, order_number: t.order_number, table: t.table,
-      status: t.status || 'to_cook', items: t.items || [], total: t.total || 0,
-      sent_at: t.sent_at || new Date().toISOString(), eta_minutes: t.eta_minutes || 15
-    };
-  }
-  renderOrders();
-});
-
-socket.on('connect', () => {
-  if (tenantId) socket.emit('join_scope', { tenant_id: tenantId });
-});
-
-socket.on('ticket_update', d => {
-  if (tenantId && d.tenant_id != tenantId) return;
-  for (let on in orders) {
-    // Match by ticket id or order id
-    if (orders[on]) {
-      orders[on].status = d.status || orders[on].status;
-      if (d.started_at) orders[on].started_at = d.started_at;
-      if (d.eta_minutes !== undefined) orders[on].eta_minutes = d.eta_minutes;
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>POS Cafè</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet">
+  <style>
+    /* ── TOKENS ─────────────────────────────────────────────── */
+    :root {
+      --bg: #06080a;
+      --bg2: #0d1117;
+      --bg3: #141b22;
+      --bg4: #1c2530;
+      --gold: #c9a84c;
+      --gold2: #e8c96a;
+      --gold-dim: rgba(201, 168, 76, 0.12);
+      --cream: #f0e6d3;
+      --muted: #5a6a78;
+      --muted2: #3a4a58;
+      --text: #dde4ec;
+      --text2: #8fa3b8;
+      --red: #e05a5a;
+      --green: #4caf7d;
+      --amber: #e8a84c;
+      --border: rgba(255, 255, 255, 0.06);
+      --border2: rgba(201, 168, 76, 0.18);
+      --r: 16px;
+      --r2: 24px;
+      --shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+      --ff-head: 'Cormorant Garamond', serif;
+      --ff-body: 'Outfit', sans-serif;
+      --ff-mono: 'DM Mono', monospace;
     }
-  }
-  renderOrders();
-});
 
-socket.on('order_update', d => {
-  if (tenantId && d.tenant_id != tenantId) return;
-  if (orders[d.order_number]) {
-    orders[d.order_number].status = d.status;
-    if (d.started_at) orders[d.order_number].started_at = d.started_at;
-    if (d.completed_at) orders[d.order_number].completed_at = d.completed_at;
-    // Send push notification if completed
-    if (d.status === 'completed') {
-      showInPageAlert('🍽️ Your order is ready! Head to the counter to pick it up.');
+    /* ── RESET ──────────────────────────────────────────────── */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0
     }
-  }
-  renderOrders();
-});
 
-socket.on('order_paid', d => {
-  if (tenantId && d.tenant_id != tenantId) return;
-  if (orders[d.order_number]) orders[d.order_number].status = 'paid';
-  renderOrders();
-});
-
-socket.on('reservation_update', d => {
-  if (tenantId && d.tenant_id != tenantId) return;
-  if (document.getElementById('tab-myres').classList.contains('active')) loadReservations();
-});
-
-
-// ─── Init ──────────────────────────────────────────────────
-async function init() {
-  document.getElementById('user-greeting').textContent = '{{ tenant_name or user_name or "Customer" }}';
-  if (isPublic && !isLoggedIn) {
-    showTab('reserve');
-  } else {
-    await loadOrders();
-    if (isLoggedIn) {
-      await loadReservations();
-      // Pre-fill name and phone
-      document.getElementById('res-name').value = decodeURIComponent("{{ user_name|urlencode }}").replace(/\+/g, ' ') || '';
-      // If we had the phone in template context, we'd fill it. 
-      // For now, let's fetch it or just leave it blank if not available directly.
+    html {
+      scroll-behavior: smooth
     }
-  }
-  await loadMenu();
 
-  setupPushNotifications();
-  // Set min datetime to now
-  const now = new Date();
-  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-  document.getElementById('res-datetime').min = now.toISOString().slice(0,16);
-  document.getElementById('res-datetime').value = new Date(Date.now() + 3600000).toISOString().slice(0,16).replace('T00:','T').replace('T01:','T').replace(/T(\d{2}):/,  (_, h) => `T${String(parseInt(h)+1).padStart(2,'0')}:`);
-}
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--ff-body);
+      font-size: 15px;
+      line-height: 1.6;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
 
-async function loadOrders() {
-  if (isPublic && !isLoggedIn) return;
-  try {
-    const res = await fetch(api('/api/kitchen/tickets'));
-    const tickets = await res.json();
-    orders = {};
-    tickets.forEach(t => {
-      orders[t.order_number] = {
-        id: t.order_id, order_number: t.order_number, table: t.table,
-        is_takeaway: t.is_takeaway, customer_name: t.customer_name,
-        status: t.status, items: t.items || [], total: t.total || 0,
-        sent_at: t.sent_at, started_at: t.started_at,
-        eta_minutes: t.eta_minutes || 15, avg_prep: t.avg_prep_minutes || 15
-      };
-    });
-    renderOrders();
-  } catch(e) { console.error(e); }
-}
+    button {
+      font-family: var(--ff-body);
+      cursor: pointer
+    }
 
-// ─── Orders Tab ────────────────────────────────────────────
-function getEtaLabel(o) {
-  const eta = o.eta_minutes || 15;
-  if (o.status === 'completed') return 'Ready!';
-  if (o.status === 'paid') return '';
-  const cls = eta < 8 ? 'eta-good' : eta < 18 ? 'eta-mid' : 'eta-late';
-  return `<span class="eta-badge ${cls}">⏱ ~${eta}m</span>`;
-}
+    input,
+    select,
+    textarea {
+      font-family: var(--ff-body)
+    }
 
-function renderOrders() {
-  const list = Object.values(orders);
-  const grid = document.getElementById('orders-grid');
-  const empty = document.getElementById('orders-empty');
-  if (!list.length) {
-    grid.innerHTML = ''; empty.style.display = 'block';
-  } else {
-    empty.style.display = 'none';
-    grid.innerHTML = list.map(o => {
-      const statusLabel = {to_cook:'Awaiting',preparing:'Preparing…',completed:'Ready! 🎉',paid:'Paid ✓'}[o.status] || o.status;
-      const itemsHtml = (o.items||[]).map(i => `
-        <div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #1a1a1a; font-size:13px;">
-          <span style="color:#ccc;">${i.name}${i.notes ? ` <em style="color:#888;font-size:11px;">(${i.notes})</em>` : ''}</span>
-          <span style="color:#f97316; font-weight:600;">×${i.qty}</span>
-        </div>`).join('');
-      return `
-        <div class="order-card ${o.status}">
-          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.07); padding-bottom:10px;">
-            <div>
-              <div style="font-size:28px; font-weight:800; color:#f97316; font-family:monospace;">#${o.order_number.split('-')[1]}</div>
-              <div style="font-size:12px; color:#888; margin-top:2px;">${o.is_takeaway ? '🛵 Takeaway' : '🪑 Table '+o.table}</div>
-            </div>
-            <div style="text-align:right;">
-              <div style="font-size:13px; font-weight:700; color:#ccc;">${statusLabel}</div>
-              ${getEtaLabel(o)}
-            </div>
-          </div>
-          <div class="progress-bar"><div class="progress-fill ${o.status}"></div></div>
-          <div>${itemsHtml}</div>
-          <div style="display:flex; justify-content:space-between; border-top:1px solid rgba(255,255,255,0.07); margin-top:10px; padding-top:10px; font-weight:700; font-size:15px;">
-            <span style="color:#888;">Total</span>
-            <span style="color:#22c55e;">₹${(o.total||0).toFixed(0)}</span>
-          </div>
-        </div>`;
-    }).join('');
-  }
-  renderReviewPanel(list);
-}
+    img {
+      display: block;
+      max-width: 100%
+    }
 
-function renderReviewPanel(list) {
-  const panel = document.getElementById('review-panel');
-  const paid = list.filter(o => o.status === 'paid').sort((a,b) => new Date(b.sent_at||0) - new Date(a.sent_at||0));
-  if (!paid.length) { panel.style.display = 'none'; return; }
-  const latest = paid[0];
-  if (reviewedOrderIds.has(latest.id)) { panel.style.display = 'none'; return; }
-  panel.style.display = 'block';
-  panel.innerHTML = `
-    <div style="background:rgba(249,115,22,0.07); border:1px solid rgba(249,115,22,0.2); border-radius:14px; padding:16px;">
-      <div style="font-size:14px; font-weight:700; color:#f97316; margin-bottom:10px;">📝 Rate Your Experience — Order #${latest.order_number.split('-')[1]}</div>
-      <div style="display:flex; gap:6px; margin-bottom:10px;">
-        ${[1,2,3,4,5].map(n=>`<button onclick="setReview(${latest.id},${n})" id="star-${latest.id}-${n}" style="width:32px;height:32px;border:2px solid #444;background:transparent;border-radius:6px;font-size:18px;cursor:pointer;transition:all .2s;" data-rating="${n}">⭐</button>`).join('')}
-      </div>
-      <textarea id="review-comment-${latest.id}" placeholder="Share your experience… (optional)" style="width:100%; background:#111; border:1px solid #333; border-radius:8px; color:#ccc; padding:8px; font-size:12px; resize:vertical; min-height:60px; margin-bottom:8px;"></textarea>
-      <button onclick="submitReview(${latest.id})" class="btn-orange">Submit Review</button>
-    </div>`;
-}
+    /* ── NOISE TEXTURE ──────────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.4;
+    }
 
-let pendingReviewRating = {};
-function setReview(orderId, rating) {
-  pendingReviewRating[orderId] = rating;
-  [1,2,3,4,5].forEach(n => {
-    const btn = document.getElementById(`star-${orderId}-${n}`);
-    if (btn) btn.style.borderColor = n <= rating ? '#f97316' : '#444';
-  });
-}
+    /* ── SCREENS ────────────────────────────────────────────── */
+    .screen {
+      display: none;
+      min-height: 100vh;
+      position: relative;
+      z-index: 1
+    }
 
-async function submitReview(orderId) {
-  const rating = pendingReviewRating[orderId] || 5;
-  const comment = document.getElementById(`review-comment-${orderId}`)?.value?.trim() || '';
-  const res = await fetch(`/api/orders/${orderId}/review`, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ rating, comment })
-  });
-  if (res.ok) {
-    reviewedOrderIds.add(orderId);
-    document.getElementById('review-panel').style.display = 'none';
-    showInPageAlert('✓ Thank you for your review!');
-  }
-}
+    .screen.active {
+      display: block
+    }
 
-// ─── Reserve Tab ───────────────────────────────────────────
-async function checkAvailability() {
-  const dt = document.getElementById('res-datetime').value;
-  if (!dt) { toast('Please pick a date and time first.', 'warning'); return; }
-  document.getElementById('avail-loading').style.display = 'inline';
-  const res = await fetch(api(`/api/tables/availability?datetime=${encodeURIComponent(dt)}`));
+    /* ════════════════════════════════════════════════════════
+   SCREEN 1 — RESTAURANT SELECTION
+════════════════════════════════════════════════════════ */
+    #screen-restaurants {
+      background: radial-gradient(ellipse at 60% 0%, rgba(201, 168, 76, 0.06) 0%, transparent 60%),
+        radial-gradient(ellipse at 10% 80%, rgba(201, 168, 76, 0.04) 0%, transparent 50%),
+        var(--bg);
+    }
 
-  const floors = await res.json();
-  document.getElementById('avail-loading').style.display = 'none';
-  const picker = document.getElementById('table-picker');
-  const party = parseInt(document.getElementById('res-party').value) || 2;
-  picker.innerHTML = floors.map(f => {
-    const tbHtml = f.tables.map(t => {
-      const fits = t.seats >= party;
-      const avail = t.available_for_reservation && t.status !== 'occupied';
-      const cls = !avail ? 'unavailable' : fits ? '' : '';
-      return `<div class="table-pick-btn ${cls}" ${avail ? `onclick="selectResTable(${t.id},'${t.number}',${t.seats}, this)"` : ''} title="${!avail ? 'Not available' : `Table ${t.number}, ${t.seats} seats`}">
-        <div style="font-size:18px; font-weight:800; color:${avail ? (fits?'#f97316':'#888') : '#444'};">T${t.number}</div>
-        <div style="font-size:10px; color:#666;">${t.seats} seats</div>
-        ${!avail ? '<div style="font-size:9px;color:#ef4444;">Booked</div>' : !fits ? '<div style="font-size:9px;color:#888;">Too small</div>' : '<div style="font-size:9px;color:#22c55e;">Available</div>'}
-      </div>`;
-    }).join('');
-    return `<div><div class="floor-label">${f.name}</div><div class="table-pick">${tbHtml}</div></div>`;
-  }).join('');
-}
+    /* NAV */
+    .r-nav {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 48px;
+      background: rgba(6, 8, 10, 0.8);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
 
-function selectResTable(id, number, seats, el) {
-  document.querySelectorAll('.table-pick-btn').forEach(b => b.classList.remove('selected'));
-  el.classList.add('selected');
-  document.getElementById('res-table-id').value = id;
-  document.getElementById('res-submit-btn').disabled = false;
-}
+    .r-nav-logo {
+      font-family: var(--ff-head);
+      font-size: 26px;
+      font-weight: 600;
+      color: var(--cream);
+      letter-spacing: 0.02em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
 
-async function submitReservation() {
-  const dt = document.getElementById('res-datetime').value;
-  const party = document.getElementById('res-party').value;
-  const notes = document.getElementById('res-notes').value;
-  const tableId = document.getElementById('res-table-id').value;
-  
-  const payload = {
-    reserved_at: dt,
-    party_size: parseInt(party),
-    notes,
-    table_id: tableId ? parseInt(tableId) : null,
-    items: preorderCart.map(i => ({product_id:i.product_id,name:i.name,qty:i.qty,price:i.price,notes:i.notes||''}))
-  };
+    .r-nav-logo span {
+      color: var(--gold)
+    }
 
-  const rName = document.getElementById('res-name').value.trim();
-  const rPhone = document.getElementById('res-phone').value.trim();
-  if (!rName || !rPhone) {
-    showInPageAlert('Please enter your name and phone number for the reservation.');
-    return;
-  }
-  payload.customer_name = rName;
-  payload.customer_phone = rPhone;
+    .r-nav-tag {
+      font-family: var(--ff-mono);
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
 
-  if (!dt) { showInPageAlert('Please pick a date and time.'); return; }
-  const btn = document.getElementById('res-submit-btn');
-  btn.disabled = true; btn.textContent = 'Saving…';
-  
-  const res = await fetch(api('/api/reservations'), {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify(payload)
-  });
+    /* HERO */
+    .r-hero {
+      padding: 140px 48px 80px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
 
-  const data = await res.json();
-  btn.disabled = false; btn.textContent = 'Request Reservation';
-  if (data.ok) {
-    activeReservationId = data.id;
-    showInPageAlert('✅ Reservation request for {{ tenant_name }} sent! We\'ll confirm it shortly.');
-    document.getElementById('preorder-res-label').textContent = `Linked to Reservation #${data.id}`;
-    document.getElementById('preorder-attach-btn').disabled = false;
+    .r-hero::before {
+      content: '';
+      position: absolute;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(201, 168, 76, 0.08) 0%, transparent 70%);
+      filter: blur(80px);
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    .r-hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      font-family: var(--ff-mono);
+      font-size: 11px;
+      color: var(--gold);
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      margin-bottom: 32px;
+      opacity: 0;
+      animation: fadeInDown 0.8s forwards;
+    }
+
+    .r-hero-eyebrow::before,
+    .r-hero-eyebrow::after {
+      content: '';
+      width: 40px;
+      height: 1px;
+      background: linear-gradient(to right, transparent, var(--gold));
+      opacity: 0.4;
+    }
     
-    // Make tab visible for guests just for this session
-    document.getElementById('tab-btn-myres').style.display = 'block';
-    showTab('myres');
-    loadReservations();
-  } else {
-    showInPageAlert('❌ ' + (data.error || 'Error creating reservation'));
-  }
-}
+    .r-hero-eyebrow::after {
+      background: linear-gradient(to left, transparent, var(--gold));
+    }
 
-// ─── Pre-order Tab ─────────────────────────────────────────
-async function loadMenu() {
-  const res = await fetch(api('/api/products'));
+    .r-hero h1 {
+      font-family: var(--ff-head);
+      font-size: clamp(56px, 8vw, 100px);
+      font-weight: 300;
+      line-height: 1;
+      color: var(--cream);
+      letter-spacing: -0.03em;
+      margin-bottom: 24px;
+      opacity: 0;
+      animation: fadeInUp 0.8s 0.2s forwards;
+    }
 
-  menuData = await res.json();
-  renderMenu(menuData);
-  renderMenuPills(menuData);
-}
+    .r-hero h1 em {
+      font-style: italic;
+      color: var(--gold);
+      font-weight: 300;
+      position: relative;
+    }
 
-function renderMenuPills(cats) {
-  const el = document.getElementById('preorder-cat-pills');
-  el.innerHTML = `<button onclick="renderMenu(menuData)" class="cat-pill px-3 py-1 rounded-full text-xs border border-border active">All</button>` +
-    cats.map(c => `<button onclick="filterMenuCat(${c.id})" class="cat-pill px-3 py-1 rounded-full text-xs border border-border">${c.name}</button>`).join('');
-}
+    .r-hero-sub {
+      font-size: 18px;
+      color: var(--text2);
+      max-width: 520px;
+      margin: 0 auto 48px;
+      font-weight: 300;
+      line-height: 1.8;
+      opacity: 0;
+      animation: fadeInUp 0.8s 0.4s forwards;
+    }
 
-function filterMenuCat(catId) {
-  renderMenu(menuData.filter(c => c.id === catId));
-}
+    /* SEARCH */
+    .r-search-wrap {
+      max-width: 500px;
+      margin: 0 auto;
+      position: relative;
+      opacity: 0;
+      animation: fadeInUp 0.8s 0.6s forwards;
+    }
 
-function renderMenu(cats) {
-  const grid = document.getElementById('preorder-menu-grid');
-  const emojiMap = {Food:'🍽️',Beverages:'☕',Desserts:'🍰',Snacks:'🥨'};
-  grid.innerHTML = cats.flatMap(c => c.products.map(p => `
-    <div class="menu-product" onclick="addToPreorder(${p.id},'${p.name.replace(/'/g,"\\'")}',${p.price})">
-      <div style="font-size:22px; margin-bottom:6px;">${emojiMap[c.name]||'🛒'}</div>
-      <div style="font-size:13px; font-weight:600; line-height:1.3;">${p.name}</div>
-      <div style="font-size:13px; color:#f97316; font-weight:700; margin-top:4px;">₹${p.price}</div>
-    </div>`)).join('');
-}
+    .r-search-wrap input {
+      width: 100%;
+      padding: 18px 24px 18px 56px;
+      background: rgba(20, 27, 34, 0.6);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      color: var(--text);
+      font-size: 15px;
+      outline: none;
+      transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    }
 
-function addToPreorder(id, name, price) {
-  const ex = preorderCart.find(i => i.product_id === id);
-  if (ex) { ex.qty++; } else { preorderCart.push({product_id:id, name, price, qty:1, notes:''}); }
-  renderPreorderCart();
-}
+    .r-search-wrap input:focus {
+      border-color: var(--gold);
+      background: rgba(20, 27, 34, 0.9);
+      box-shadow: 0 0 0 4px rgba(201, 168, 76, 0.1), 0 20px 40px rgba(0, 0, 0, 0.4);
+      transform: translateY(-2px);
+    }
 
-function updatePreorderQty(idx, delta) {
-  preorderCart[idx].qty += delta;
-  if (preorderCart[idx].qty <= 0) preorderCart.splice(idx, 1);
-  renderPreorderCart();
-}
+    .r-search-wrap input::placeholder {
+      color: var(--muted);
+      opacity: 0.6;
+    }
 
-function clearPreorderCart() { preorderCart = []; renderPreorderCart(); }
+    .r-search-wrap svg {
+      position: absolute;
+      left: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--gold);
+      opacity: 0.8;
+      pointer-events: none;
+      transition: transform 0.3s;
+    }
+    
+    .r-search-wrap input:focus + svg {
+      transform: translateY(-50%) scale(1.1);
+      color: var(--gold2);
+    }
 
-function renderPreorderCart() {
-  const el = document.getElementById('preorder-cart-items');
-  const totalEl = document.getElementById('preorder-cart-total');
-  if (!preorderCart.length) {
-    el.innerHTML = '<div style="color:#555;font-size:13px;text-align:center;padding:20px 0;">Cart is empty</div>';
-    totalEl.style.display = 'none';
-    return;
-  }
-  el.innerHTML = preorderCart.map((i, idx) => `
-    <div class="cart-item-row">
-      <div style="flex:1; font-size:13px;">${i.name}</div>
-      <div class="qty-ctrl">
-        <button class="qty-btn" onclick="updatePreorderQty(${idx},-1)">−</button>
-        <span style="font-size:13px; font-weight:600;">${i.qty}</span>
-        <button class="qty-btn" onclick="updatePreorderQty(${idx},1)">+</button>
+    @keyframes fadeInDown {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* RESTAURANT GRID */
+    .r-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 32px;
+      padding: 0 48px 100px;
+      max-width: 1400px;
+      margin: 0 auto;
+      perspective: 1200px;
+    }
+
+    .r-card {
+      background: rgba(13, 17, 23, 0.4);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 32px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+      position: relative;
+      transform-style: preserve-3d;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .r-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(201, 168, 76, 0.15), transparent 60%);
+      opacity: 0;
+      transition: opacity 0.4s;
+      pointer-events: none;
+    }
+
+    .r-card:hover {
+      transform: translateY(-12px) rotateX(2deg) rotateY(-2deg);
+      border-color: rgba(201, 168, 76, 0.4);
+      box-shadow: 0 40px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(201, 168, 76, 0.2);
+    }
+
+    .r-card:hover::before {
+      opacity: 1;
+    }
+
+    .r-card-banner {
+      height: 180px;
+      background: #0d1117;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+    }
+
+    .r-card:hover .r-card-banner {
+      transform: scale(1.05);
+    }
+
+    .r-card-banner-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, transparent 20%, rgba(13, 17, 23, 0.9));
+      z-index: 1;
+    }
+
+    .r-card-logo {
+      position: absolute;
+      bottom: -15px;
+      left: 28px;
+      width: 64px;
+      height: 64px;
+      border-radius: 20px;
+      background: #1c2530;
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+      z-index: 5;
+      transition: all 0.4s;
+    }
+
+    .r-card:hover .r-card-logo {
+      transform: translateY(-5px) scale(1.1);
+      border-color: var(--gold);
+      box-shadow: 0 12px 32px rgba(201, 168, 76, 0.3);
+    }
+
+    .r-card-body {
+      padding: 40px 28px 32px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .r-card-slug {
+      font-family: var(--ff-mono);
+      font-size: 11px;
+      color: var(--gold);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      opacity: 0.8;
+    }
+
+    .r-card-name {
+      font-family: var(--ff-head);
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--cream);
+      margin-bottom: 12px;
+      line-height: 1.1;
+      letter-spacing: -0.01em;
+    }
+
+    .r-card-desc {
+      font-size: 14px;
+      color: var(--text2);
+      line-height: 1.7;
+      margin-bottom: 24px;
+      font-weight: 300;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .r-card-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+    }
+
+    .r-card-pill {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 100px;
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text2);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .r-card-pill.premium {
+      background: var(--gold-dim);
+      color: var(--gold);
+      border-color: var(--border2);
+    }
+
+    .r-card-btn {
+      width: 100%;
+      padding: 16px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, var(--gold), #b38e3a);
+      color: #06080a;
+      font-weight: 800;
+      font-size: 15px;
+      border: none;
+      letter-spacing: 0.02em;
+      transition: all 0.3s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 4px 15px rgba(201, 168, 76, 0.2);
+    }
+
+    .r-card:hover .r-card-btn {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(201, 168, 76, 0.4);
+      background: linear-gradient(135deg, var(--gold2), var(--gold));
+    }
+
+    /* ════════════════════════════════════════════════════════
+   SCREEN 2 — CUSTOMER PORTAL
+════════════════════════════════════════════════════════ */
+    #screen-portal {
+      background: radial-gradient(ellipse at 80% 10%, rgba(201, 168, 76, 0.04) 0%, transparent 50%),
+        var(--bg);
+    }
+
+    /* PORTAL NAV */
+    .p-nav {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 32px;
+      background: rgba(6, 8, 10, 0.9);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .p-nav-left {
+      display: flex;
+      align-items: center;
+      gap: 16px
+    }
+
+    .p-nav-back {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all .2s;
+    }
+
+    .p-nav-back:hover {
+      border-color: var(--gold);
+      color: var(--gold)
+    }
+
+    .p-nav-title {
+      font-family: var(--ff-head);
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--cream);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .p-nav-live {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--ff-mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .live-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: livepulse 1.8s infinite;
+    }
+
+    @keyframes livepulse {
+
+      0%,
+      100% {
+        opacity: 1;
+        transform: scale(1)
+      }
+
+      50% {
+        opacity: .4;
+        transform: scale(1.4)
+      }
+    }
+
+    .p-nav-right {
+      display: flex;
+      align-items: center;
+      gap: 10px
+    }
+
+    .p-nav-clock {
+      font-family: var(--ff-mono);
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+    }
+
+    .p-nav-logout {
+      padding: 8px 16px;
+      border-radius: 10px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text2);
+      font-size: 13px;
+      font-weight: 500;
+      transition: all .2s;
+    }
+
+    .p-nav-logout:hover {
+      border-color: var(--red);
+      color: var(--red)
+    }
+
+    /* PORTAL LAYOUT */
+    .p-layout {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 32px 32px 80px;
+    }
+
+    /* TAB BAR */
+    .p-tabs {
+      display: flex;
+      gap: 0;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 6px;
+      margin-bottom: 32px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .p-tabs::-webkit-scrollbar {
+      display: none
+    }
+
+    .p-tab {
+      flex: 1;
+      min-width: 120px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 500;
+      transition: all .25s;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .p-tab:hover:not(.active) {
+      color: var(--text)
+    }
+
+    .p-tab.active {
+      background: var(--bg4);
+      color: var(--gold);
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .p-tab-icon {
+      font-size: 16px
+    }
+
+    /* TAB PANELS */
+    .p-panel {
+      display: none
+    }
+
+    .p-panel.active {
+      display: block;
+      animation: panelIn .3s ease
+    }
+
+    @keyframes panelIn {
+      from {
+        opacity: 0;
+        transform: translateY(8px)
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0)
+      }
+    }
+
+    /* SECTION HEADING */
+    .p-section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .p-section-title {
+      font-family: var(--ff-head);
+      font-size: 28px;
+      font-weight: 600;
+      color: var(--cream);
+      line-height: 1;
+    }
+
+    .p-section-sub {
+      font-size: 13px;
+      color: var(--text2);
+      margin-top: 4px
+    }
+
+    /* ── INTRO PANEL ──────────────────────────── */
+    .intro-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--r2);
+      overflow: hidden;
+      margin-bottom: 32px;
+    }
+
+    .intro-cover {
+      height: 280px;
+      background: var(--bg4);
+      background-size: cover;
+      background-position: center;
+      position: relative;
+    }
+
+    .intro-cover::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, transparent 40%, var(--bg2));
+    }
+
+    .intro-content {
+      padding: 32px;
+      margin-top: -60px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .intro-title {
+      font-family: var(--ff-head);
+      font-size: 42px;
+      font-weight: 600;
+      color: var(--cream);
+      margin-bottom: 12px;
+    }
+
+    .intro-tags {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+
+    .intro-bio {
+      font-size: 17px;
+      color: var(--text2);
+      max-width: 720px;
+      line-height: 1.8;
+      margin-bottom: 32px;
+    }
+
+    .intro-info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 24px;
+      padding: 24px;
+      background: var(--bg3);
+      border-radius: var(--r);
+      margin-bottom: 32px;
+    }
+
+    .intro-info-item {
+      display: flex;
+      gap: 12px;
+    }
+
+    .intro-info-icon {
+      font-size: 24px;
+      opacity: 0.8;
+    }
+
+    .intro-info-text strong {
+      display: block;
+      font-size: 12px;
+      text-transform: uppercase;
+      color: var(--gold);
+      letter-spacing: 0.1em;
+      margin-bottom: 4px;
+    }
+
+    .intro-info-text div {
+      font-size: 15px;
+      color: var(--text);
+    }
+
+    .intro-actions {
+      display: flex;
+      gap: 16px;
+    }
+
+    /* ── ORDERS TAB ─────────────────────────────────────────── */
+    .orders-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+    }
+
+    .order-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--r2);
+      padding: 24px;
+      transition: border-color .3s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .order-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      border-radius: var(--r2) var(--r2) 0 0;
+    }
+
+    .order-card.to_cook {
+      border-color: rgba(224, 90, 90, 0.3)
+    }
+
+    .order-card.to_cook::before {
+      background: linear-gradient(90deg, #e05a5a, #c04040)
+    }
+
+    .order-card.preparing {
+      border-color: rgba(232, 168, 76, 0.4);
+      animation: prepPulse 2.5s infinite
+    }
+
+    .order-card.preparing::before {
+      background: linear-gradient(90deg, var(--amber), var(--gold))
+    }
+
+    .order-card.completed {
+      border-color: rgba(76, 175, 125, 0.4)
+    }
+
+    .order-card.completed::before {
+      background: linear-gradient(90deg, var(--green), #6bcf9a)
+    }
+
+    .order-card.paid {
+      border-color: var(--border)
+    }
+
+    .order-card.paid::before {
+      background: var(--muted2)
+    }
+
+    @keyframes prepPulse {
+
+      0%,
+      100% {
+        box-shadow: 0 0 0 0 rgba(232, 168, 76, 0)
+      }
+
+      50% {
+        box-shadow: 0 0 0 6px rgba(232, 168, 76, 0)
+      }
+    }
+
+    .order-num {
+      font-family: var(--ff-head);
+      font-size: 40px;
+      font-weight: 600;
+      color: var(--gold);
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .order-table-tag {
+      font-size: 12px;
+      color: var(--text2);
+      margin-bottom: 16px
+    }
+
+    .order-status-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .order-status-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text)
+    }
+
+    .order-eta {
+      font-family: var(--ff-mono);
+      font-size: 11px;
+      font-weight: 500;
+      padding: 3px 10px;
+      border-radius: 6px;
+    }
+
+    .eta-good {
+      background: rgba(76, 175, 125, 0.12);
+      color: var(--green)
+    }
+
+    .eta-mid {
+      background: rgba(232, 168, 76, 0.12);
+      color: var(--amber)
+    }
+
+    .eta-late {
+      background: rgba(224, 90, 90, 0.12);
+      color: var(--red)
+    }
+
+    /* PROGRESS BAR */
+    .prog-track {
+      height: 4px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    .prog-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width .6s cubic-bezier(.4, 0, .2, 1);
+    }
+
+    .prog-fill.to_cook {
+      width: 20%;
+      background: linear-gradient(90deg, #e05a5a, #f07070)
+    }
+
+    .prog-fill.preparing {
+      width: 60%;
+      background: linear-gradient(90deg, var(--amber), var(--gold))
+    }
+
+    .prog-fill.completed {
+      width: 100%;
+      background: linear-gradient(90deg, var(--green), #6bcf9a)
+    }
+
+    .prog-fill.paid {
+      width: 100%;
+      background: var(--muted2)
+    }
+
+    .order-items {
+      margin-bottom: 16px
+    }
+
+    .order-item-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+
+    .order-item-row:last-child {
+      border-bottom: none
+    }
+
+    .order-item-name {
+      color: var(--text2)
+    }
+
+    .order-item-qty {
+      color: var(--gold);
+      font-weight: 600;
+      font-family: var(--ff-mono)
+    }
+
+    .order-total-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid var(--border);
+      padding-top: 12px;
+      font-weight: 600;
+    }
+
+    .order-total-label {
+      font-size: 13px;
+      color: var(--muted)
+    }
+
+    .order-total-val {
+      font-size: 18px;
+      color: var(--green);
+      font-family: var(--ff-mono)
+    }
+
+    /* EMPTY STATE */
+    .empty-state {
+      text-align: center;
+      padding: 80px 20px;
+      grid-column: 1/-1;
+    }
+
+    .empty-state-icon {
+      font-size: 56px;
+      margin-bottom: 16px;
+      opacity: 0.5
+    }
+
+    .empty-state-title {
+      font-family: var(--ff-head);
+      font-size: 24px;
+      color: var(--text2);
+      margin-bottom: 8px
+    }
+
+    .empty-state-sub {
+      font-size: 13px;
+      color: var(--muted)
+    }
+
+    /* REVIEW CARD */
+    .review-card {
+      background: var(--gold-dim);
+      border: 1px solid var(--border2);
+      border-radius: var(--r2);
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .review-title {
+      font-family: var(--ff-head);
+      font-size: 20px;
+      color: var(--gold);
+      margin-bottom: 16px
+    }
+
+    .star-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px
+    }
+
+    .star-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      border: 2px solid var(--muted2);
+      background: transparent;
+      font-size: 20px;
+      transition: all .2s;
+    }
+
+    .star-btn.active {
+      border-color: var(--gold);
+      background: var(--gold-dim)
+    }
+
+    .review-textarea {
+      width: 100%;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 13px;
+      resize: vertical;
+      min-height: 80px;
+      outline: none;
+      transition: border-color .2s;
+      margin-bottom: 12px;
+    }
+
+    .review-textarea:focus {
+      border-color: var(--gold)
+    }
+
+    /* ── RESERVE TAB ─────────────────────────────────────────── */
+    .reserve-layout {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 24px;
+      align-items: start;
+    }
+
+    .form-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--r2);
+      padding: 28px;
+    }
+
+    .form-card-title {
+      font-family: var(--ff-head);
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--cream);
+      margin-bottom: 4px;
+    }
+
+    .form-card-sub {
+      font-size: 13px;
+      color: var(--text2);
+      margin-bottom: 24px
+    }
+
+    .form-group {
+      margin-bottom: 18px
+    }
+
+    .form-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .form-label .req {
+      color: var(--red)
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 12px 16px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      transition: border-color .2s, box-shadow .2s;
+      -webkit-appearance: none;
+    }
+
+    .form-input:focus {
+      border-color: var(--gold);
+      box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.08);
+    }
+
+    .form-input::placeholder {
+      color: var(--muted)
+    }
+
+    .form-input-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px
+    }
+
+    /* TABLE PICKER */
+    .table-section-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin: 8px 0 6px;
+    }
+
+    .floor-block {
+      margin-bottom: 16px
+    }
+
+    .table-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+      gap: 8px;
+    }
+
+    .table-btn {
+      padding: 14px 8px;
+      border-radius: 12px;
+      border: 1.5px solid var(--border);
+      background: var(--bg3);
+      text-align: center;
+      cursor: pointer;
+      transition: all .2s;
+    }
+
+    .table-btn:hover:not(.unavailable) {
+      border-color: var(--gold);
+      background: var(--gold-dim);
+    }
+
+    .table-btn.selected {
+      border-color: var(--gold);
+      background: var(--gold-dim);
+      box-shadow: 0 0 0 2px rgba(201, 168, 76, 0.2);
+    }
+
+    .table-btn.unavailable {
+      opacity: 0.3;
+      cursor: not-allowed
+    }
+
+    .table-btn-num {
+      font-family: var(--ff-head);
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--gold);
+      line-height: 1;
+    }
+
+    .table-btn.unavailable .table-btn-num {
+      color: var(--muted)
+    }
+
+    .table-btn-seats {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 2px
+    }
+
+    .table-btn-avail {
+      font-size: 9px;
+      margin-top: 2px;
+      font-weight: 600
+    }
+
+    .avail-yes {
+      color: var(--green)
+    }
+
+    .avail-no {
+      color: var(--red)
+    }
+
+    .avail-small {
+      color: var(--amber)
+    }
+
+    /* RESERVATION SIDEBAR */
+    .reserve-sidebar {}
+
+    .info-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--r2);
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+
+    .info-card-title {
+      font-family: var(--ff-head);
+      font-size: 18px;
+      color: var(--cream);
+      margin-bottom: 16px;
+    }
+
+    .info-item {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 12px;
+      font-size: 13px;
+    }
+
+    .info-item:last-child {
+      margin-bottom: 0
+    }
+
+    .info-icon {
+      font-size: 16px;
+      margin-top: 1px;
+      flex-shrink: 0
+    }
+
+    .info-text {
+      color: var(--text2);
+      line-height: 1.5
+    }
+
+    .info-text strong {
+      color: var(--text);
+      display: block
+    }
+
+    /* ── PRE-ORDER TAB ──────────────────────────────────────── */
+    .preorder-layout {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 24px;
+      align-items: start;
+    }
+
+    .menu-section {}
+
+    .cat-pills {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .cat-pill {
+      padding: 6px 16px;
+      border-radius: 100px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text2);
+      font-size: 12px;
+      font-weight: 500;
+      transition: all .2s;
+      cursor: pointer;
+    }
+
+    .cat-pill:hover,
+    .cat-pill.active {
+      border-color: var(--gold);
+      background: var(--gold-dim);
+      color: var(--gold);
+    }
+
+    .menu-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 12px;
+    }
+
+    .menu-item {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 16px 12px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .25s;
+    }
+
+    .menu-item:hover {
+      border-color: var(--gold);
+      transform: translateY(-3px);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .menu-item:active {
+      transform: scale(.97)
+    }
+
+    .menu-item-emoji {
+      font-size: 28px;
+      margin-bottom: 8px
+    }
+
+    .menu-item-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.3;
+      margin-bottom: 6px
+    }
+
+    .menu-item-price {
+      font-family: var(--ff-mono);
+      font-size: 13px;
+      color: var(--gold);
+      font-weight: 500;
+    }
+
+    /* CART */
+    .cart-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--r2);
+      padding: 20px;
+      position: sticky;
+      top: 100px;
+    }
+
+    .cart-title {
+      font-family: var(--ff-head);
+      font-size: 20px;
+      color: var(--cream);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .cart-badge {
+      font-size: 11px;
+      font-family: var(--ff-mono);
+      background: var(--gold-dim);
+      color: var(--gold);
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+
+    .cart-items {
+      min-height: 80px;
+      margin-bottom: 16px
+    }
+
+    .cart-empty {
+      text-align: center;
+      padding: 24px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .cart-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      gap: 8px;
+    }
+
+    .cart-row:last-child {
+      border-bottom: none
+    }
+
+    .cart-row-name {
+      font-size: 13px;
+      color: var(--text);
+      flex: 1
+    }
+
+    .qty-ctrl {
+      display: flex;
+      align-items: center;
+      gap: 6px
+    }
+
+    .qty-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all .15s;
+    }
+
+    .qty-btn:hover {
+      border-color: var(--gold);
+      color: var(--gold)
+    }
+
+    .qty-btn:active {
+      transform: scale(.9)
+    }
+
+    .qty-num {
+      font-family: var(--ff-mono);
+      font-size: 13px;
+      color: var(--text);
+      width: 20px;
+      text-align: center;
+    }
+
+    .cart-row-price {
+      font-family: var(--ff-mono);
+      font-size: 13px;
+      color: var(--gold);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .cart-total {
+      border-top: 1px solid var(--border2);
+      padding-top: 12px;
+      margin-top: 4px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .cart-total-label {
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 500
+    }
+
+    .cart-total-val {
+      font-family: var(--ff-head);
+      font-size: 22px;
+      color: var(--gold);
+      font-weight: 600;
+    }
+
+    /* ── MY RESERVATIONS TAB ────────────────────────────────── */
+    .res-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px
+    }
+
+    .res-item {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--r2);
+      padding: 20px 24px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      transition: border-color .2s;
+    }
+
+    .res-item:hover {
+      border-color: var(--border2)
+    }
+
+    .res-item-left {}
+
+    .res-item-date {
+      font-family: var(--ff-head);
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--cream);
+      margin-bottom: 4px;
+    }
+
+    .res-item-meta {
+      font-size: 13px;
+      color: var(--text2);
+      line-height: 1.6
+    }
+
+    .res-item-preorder {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--muted);
+      background: var(--bg3);
+      border-radius: 8px;
+      padding: 8px 12px;
+    }
+
+    .res-item-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 8px;
+    }
+
+    .status-pill {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 8px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      font-family: var(--ff-mono);
+    }
+
+    .status-pending {
+      background: rgba(232, 168, 76, 0.12);
+      color: var(--amber)
+    }
+
+    .status-confirmed {
+      background: rgba(76, 175, 125, 0.12);
+      color: var(--green)
+    }
+
+    .status-seated {
+      background: rgba(138, 163, 184, 0.1);
+      color: #8fa3b8
+    }
+
+    .status-cancelled {
+      background: rgba(224, 90, 90, 0.1);
+      color: var(--red)
+    }
+
+    .res-cancel-btn {
+      font-size: 11px;
+      color: var(--muted);
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 10px;
+      transition: all .2s;
+    }
+
+    .res-cancel-btn:hover {
+      border-color: var(--red);
+      color: var(--red)
+    }
+
+    /* ── BUTTONS ────────────────────────────────────────────── */
+    .btn-gold {
+      width: 100%;
+      padding: 13px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--gold), var(--gold2));
+      color: var(--bg);
+      font-weight: 700;
+      font-size: 14px;
+      border: none;
+      letter-spacing: 0.03em;
+      transition: opacity .2s, transform .15s, box-shadow .2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-gold:hover {
+      opacity: 0.92;
+      transform: translateY(-1px);
+      box-shadow: 0 8px 24px rgba(201, 168, 76, 0.3)
+    }
+
+    .btn-gold:active {
+      transform: scale(.98)
+    }
+
+    .btn-gold:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none
+    }
+
+    .btn-ghost {
+      width: 100%;
+      padding: 11px;
+      border-radius: 12px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text2);
+      font-size: 13px;
+      font-weight: 500;
+      transition: all .2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .btn-ghost:hover {
+      border-color: var(--muted);
+      color: var(--text)
+    }
+
+    .btn-sm {
+      padding: 8px 16px;
+      border-radius: 10px;
+      background: var(--gold-dim);
+      border: 1px solid var(--border2);
+      color: var(--gold);
+      font-size: 12px;
+      font-weight: 600;
+      transition: all .2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-sm:hover {
+      background: rgba(201, 168, 76, 0.2)
+    }
+
+    /* ── TOAST ──────────────────────────────────────────────── */
+    #toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 9999;
+      pointer-events: none;
+    }
+
+    .toast {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 20px;
+      border-radius: 14px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      font-size: 13px;
+      color: var(--text);
+      animation: toastIn .3s cubic-bezier(.175, .885, .32, 1.275);
+      pointer-events: all;
+      max-width: 360px;
+    }
+
+    .toast.success {
+      border-color: rgba(76, 175, 125, 0.3)
+    }
+
+    .toast.warning {
+      border-color: rgba(232, 168, 76, 0.3)
+    }
+
+    .toast.error {
+      border-color: rgba(224, 90, 90, 0.3)
+    }
+
+    .toast-icon {
+      font-size: 18px;
+      flex-shrink: 0
+    }
+
+    @keyframes toastIn {
+      from {
+        opacity: 0;
+        transform: translateX(20px)
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(0)
+      }
+    }
+
+    @keyframes toastOut {
+      to {
+        opacity: 0;
+        transform: translateX(20px)
+      }
+    }
+
+    /* ── THEME SWITCHER ─────────────────────────────────────── */
+    .theme-switcher {
+      position: fixed;
+      bottom: 32px;
+      left: 32px;
+      z-index: 200;
+      display: flex;
+      gap: 12px;
+      padding: 8px 12px;
+      background: rgba(13, 17, 23, 0.4);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 100px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      animation: fadeInUp 0.8s 1s forwards;
+      opacity: 0;
+    }
+
+    .theme-dot {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+      position: relative;
+    }
+
+    .theme-dot:hover {
+      transform: scale(1.25) translateY(-2px);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .theme-dot.active {
+      border-color: var(--gold);
+      transform: scale(1.15);
+      box-shadow: 0 0 15px rgba(201, 168, 76, 0.3);
+    }
+
+    .theme-dot[data-theme="dark"] { background: linear-gradient(135deg, #06080a, #c9a84c); }
+    .theme-dot[data-theme="slate"] { background: linear-gradient(135deg, #0f172a, #38bdf8); }
+    .theme-dot[data-theme="forest"] { background: linear-gradient(135deg, #0a1a0f, #4ade80); }
+    .theme-dot[data-theme="rose"] {
+      background: linear-gradient(135deg, #1a0a10, #fb7185)
+    }
+
+    /* THEME: SLATE */
+    .theme-slate {
+      --bg: #080f1a;
+      --bg2: #0f1929;
+      --bg3: #162235;
+      --bg4: #1e2e45;
+      --gold: #38bdf8;
+      --gold2: #7dd3fc;
+      --gold-dim: rgba(56, 189, 248, 0.1);
+      --border2: rgba(56, 189, 248, 0.15);
+      --green: #34d399;
+      --amber: #fbbf24;
+    }
+
+    /* THEME: FOREST */
+    .theme-forest {
+      --bg: #060e0a;
+      --bg2: #0c1810;
+      --bg3: #122016;
+      --bg4: #1a2d1e;
+      --gold: #4ade80;
+      --gold2: #86efac;
+      --gold-dim: rgba(74, 222, 128, 0.1);
+      --border2: rgba(74, 222, 128, 0.15);
+      --green: #4ade80;
+      --amber: #fb923c;
+    }
+
+    /* THEME: ROSE */
+    .theme-rose {
+      --bg: #130810;
+      --bg2: #1c0f18;
+      --bg3: #261422;
+      --bg4: #30192c;
+      --gold: #fb7185;
+      --gold2: #fda4af;
+      --gold-dim: rgba(251, 113, 133, 0.1);
+      --border2: rgba(251, 113, 133, 0.15);
+      --green: #34d399;
+      --amber: #fbbf24;
+    }
+
+    /* ── RESPONSIVE ─────────────────────────────────────────── */
+    @media(max-width:900px) {
+
+      .reserve-layout,
+      .preorder-layout {
+        grid-template-columns: 1fr
+      }
+
+      .cart-card {
+        position: static
+      }
+
+      .r-nav,
+      .r-grid,
+      .r-hero {
+        padding-left: 20px;
+        padding-right: 20px
+      }
+
+      .p-nav {
+        padding: 12px 20px
+      }
+
+      .p-layout {
+        padding: 20px 16px 60px
+      }
+
+      .form-input-2col {
+        grid-template-columns: 1fr
+      }
+    }
+
+    @media(max-width:640px) {
+      .p-tab {
+        min-width: 90px;
+        font-size: 12px;
+        padding: 10px 8px
+      }
+
+      .p-tab-icon {
+        display: none
+      }
+
+      .orders-grid {
+        grid-template-columns: 1fr
+      }
+
+      .menu-grid {
+        grid-template-columns: repeat(3, 1fr)
+      }
+
+      .r-hero h1 {
+        font-size: 42px
+      }
+    }
+
+    /* ── FADE IN ─────────────────────────────────────────────── */
+    .fade-up {
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity .5s ease, transform .5s ease
+    }
+
+    .fade-up.in {
+      opacity: 1;
+      transform: translateY(0)
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ═══════════════════════════════════════════════
+     SCREEN 1: RESTAURANT SELECTION
+═══════════════════════════════════════════════ -->
+  <div id="screen-restaurants" class="screen active">
+    <nav class="r-nav">
+      <div class="r-nav-logo">POS <span>Cafè</span></div>
+      <div class="r-nav-tag">Fine Dining · Reservations · Experiences</div>
+    </nav>
+
+    <div class="r-hero">
+      <div class="r-hero-eyebrow">Choose Your Experience</div>
+      <h1>Select Your <em>Restaurant</em></h1>
+      <p class="r-hero-sub">Discover premium dining across all our curated locations. Each space, a story.</p>
+      <div class="r-search-wrap">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.35-4.35" />
+        </svg>
+        <input type="text" id="r-search" placeholder="Search restaurants…" oninput="filterRestaurants(this.value)">
       </div>
-      <div style="font-size:13px; font-weight:700; color:#f97316; margin-left:10px;">₹${(i.price*i.qty).toFixed(0)}</div>
-    </div>`).join('');
-  const total = preorderCart.reduce((s,i) => s + i.price*i.qty, 0);
-  document.getElementById('preorder-total-amount').textContent = '₹'+total.toFixed(0);
-  totalEl.style.display = 'block';
-}
+    </div>
 
-async function attachPreorderToReservation() {
-  if (isPublic && !{{ 'true' if is_logged_in else 'false' }}) {
-     window.location.href = `/auth?next=${encodeURIComponent(window.location.pathname)}`;
-     return;
-  }
-  if (!activeReservationId || !preorderCart.length) {
-    toast('Create a reservation first in the Reserve tab.', 'warning'); return;
-  }
-  const res = await fetch(api(`/api/reservations/${activeReservationId}`), {
-    method:'PUT', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ items: preorderCart.map(i=>({product_id:i.product_id,name:i.name,qty:i.qty,price:i.price,notes:i.notes||''})) })
-  });
+    <div class="r-grid" id="r-grid">
+      <!-- Populated by JS -->
+    </div>
+  </div>
 
-  if (res.ok) {
-    showInPageAlert('✅ Pre-order saved to your reservation!');
-    loadReservations();
-    showTab('myres');
-  }
-}
+  <!-- ═══════════════════════════════════════════════
+     SCREEN 2: CUSTOMER PORTAL
+═══════════════════════════════════════════════ -->
+  <div id="screen-portal" class="screen">
+    <nav class="p-nav">
+      <div class="p-nav-left">
+        <button class="p-nav-back" onclick="showScreen('restaurants')" title="Back">←</button>
+        <div>
+          <div class="p-nav-title">
+            <span id="p-nav-emoji">🍽️</span>
+            <span id="p-nav-name">Restaurant</span>
+          </div>
+          <div class="p-nav-live">
+            <span class="live-dot"></span>
+            <span>Live · Welcome, <span id="p-greeting">Guest</span></span>
+          </div>
+        </div>
+      </div>
+      <div class="p-nav-right">
+        <div class="p-nav-clock" id="p-clock"></div>
+        <button class="p-nav-logout" onclick="showToast('Logged out','success')">Logout</button>
+      </div>
+    </nav>
 
-// ─── My Reservations Tab ───────────────────────────────────
-async function loadReservations() {
-  if (isPublic && !isLoggedIn) return;
-  const res = await fetch(api('/api/reservations'));
+    <div class="p-layout">
+      <!-- TAB BAR -->
+      <div class="p-tabs">
+        <button class="p-tab active" id="tab-btn-home" onclick="showTab('home')">
+          <span class="p-tab-icon">🏠</span> About
+        </button>
+        <button class="p-tab" id="tab-btn-orders" onclick="showTab('orders')">
+          <span class="p-tab-icon">📦</span> My Orders
+        </button>
+        <button class="p-tab" id="tab-btn-reserve" onclick="showTab('reserve')">
+          <span class="p-tab-icon">📅</span> Reserve
+        </button>
+        <button class="p-tab" id="tab-btn-preorder" onclick="showTab('preorder')">
+          <span class="p-tab-icon">🛒</span> Pre-Order
+        </button>
+        <button class="p-tab" id="tab-btn-myres" onclick="showTab('myres')">
+          <span class="p-tab-icon">🗓️</span> My Reservations
+        </button>
+      </div>
 
-  const reservations = await res.json();
-  const el = document.getElementById('reservations-list');
-  const empty = document.getElementById('reservations-empty');
-  const active = reservations.filter(r => r.status !== 'cancelled');
-  if (!active.length) {
-    el.innerHTML = ''; empty.style.display = 'block'; return;
-  }
-  empty.style.display = 'none';
-  el.innerHTML = active.map(r => {
-    const dt = new Date(r.reserved_at);
-    const dtLabel = dt.toLocaleString('en-IN', {dateStyle:'medium', timeStyle:'short'});
-    const itemsHtml = r.items.length ? `<div style="margin-top:10px; font-size:12px; color:#888;">Pre-order: ${r.items.map(i=>`${i.product_name} ×${i.qty}`).join(', ')}</div>` : '';
-    return `
-      <div class="res-card">
-        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-          <div>
-            <div style="font-size:16px; font-weight:700;">📅 ${dtLabel}</div>
-            <div style="font-size:12px; color:#888; margin-top:4px;">
-              ${r.table ? '🪑 Table ' + r.table : 'No table assigned'} · ${r.party_size} people
-              ${r.notes ? ` · <em>${r.notes}</em>` : ''}
+      <!-- ── HOME PANEL ──────────────────────────── -->
+      <div class="p-panel active" id="panel-home">
+        <div class="intro-card">
+          <div class="intro-cover" id="intro-cover"></div>
+          <div class="intro-content">
+            <h2 class="intro-title" id="intro-title">Welcome</h2>
+            <div class="intro-tags" id="intro-tags"></div>
+            <p class="intro-bio" id="intro-bio">Loading restaurant information...</p>
+
+            <div class="intro-info-grid">
+              <div class="intro-info-item">
+                <span class="intro-info-icon">📍</span>
+                <div class="intro-info-text">
+                  <strong>Location</strong>
+                  <div id="intro-address">—</div>
+                </div>
+              </div>
+              <div class="intro-info-item">
+                <span class="intro-info-icon">📞</span>
+                <div class="intro-info-text">
+                  <strong>Contact</strong>
+                  <div id="intro-phone">—</div>
+                </div>
+              </div>
+              <div class="intro-info-item">
+                <span class="intro-info-icon">✨</span>
+                <div class="intro-info-text">
+                  <strong>Experience</strong>
+                  <div>Curated Dining</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="intro-actions">
+              <button class="btn-gold" onclick="showTab('reserve')">Book a Table</button>
+              <button class="btn-ghost" onclick="showTab('preorder')">Explore Menu</button>
             </div>
           </div>
-          <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
-            <span class="status-badge status-${r.status}">${r.status.charAt(0).toUpperCase()+r.status.slice(1)}</span>
-            ${r.status !== 'seated' && r.status !== 'confirmed' ?
-              `<button onclick="cancelReservation(${r.id})" style="font-size:11px; color:#888; background:transparent; border:1px solid #333; border-radius:6px; padding:4px 10px; cursor:pointer;">Cancel</button>` : ''}
+        </div>
+      </div>
+
+      <!-- ── ORDERS PANEL ──────────────────────────── -->
+      <div class="p-panel" id="panel-orders">
+        <div id="review-panel"></div>
+        <div class="orders-grid" id="orders-grid">
+          <!-- demo data -->
+        </div>
+      </div>
+
+      <!-- ── RESERVE PANEL ─────────────────────────── -->
+      <div class="p-panel" id="panel-reserve">
+        <div class="reserve-layout">
+          <div>
+            <div class="form-card">
+              <div class="form-card-title">Reserve a Table</div>
+              <div class="form-card-sub">Pick your date, party size, and preferred table.</div>
+
+              <div class="form-input-2col">
+                <div class="form-group">
+                  <label class="form-label">Your Name <span class="req">*</span></label>
+                  <input class="form-input" id="res-name" placeholder="Full name" type="text">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Phone <span class="req">*</span></label>
+                  <input class="form-input" id="res-phone" placeholder="+91 XXXXX XXXXX" type="tel">
+                </div>
+              </div>
+
+              <div class="form-input-2col">
+                <div class="form-group">
+                  <label class="form-label">Date & Time <span class="req">*</span></label>
+                  <input class="form-input" id="res-datetime" type="datetime-local">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Party Size</label>
+                  <select class="form-input" id="res-party">
+                    <option value="1">1 person</option>
+                    <option value="2" selected>2 people</option>
+                    <option value="3">3 people</option>
+                    <option value="4">4 people</option>
+                    <option value="5">5 people</option>
+                    <option value="6">6 people</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Special Notes</label>
+                <input class="form-input" id="res-notes" placeholder="Birthday, window seat, dietary needs…">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Select Table</label>
+                <button class="btn-sm" onclick="checkAvailability()" style="margin-bottom:12px">
+                  ✦ Check Available Tables
+                </button>
+                <div id="table-picker"></div>
+              </div>
+              <input type="hidden" id="res-table-id">
+
+              <button class="btn-gold" id="res-submit-btn" disabled onclick="submitReservation()">
+                Request Reservation
+              </button>
+            </div>
           </div>
+
+          <div class="reserve-sidebar">
+            <div class="info-card">
+              <div class="info-card-title">Before You Arrive</div>
+              <div class="info-item">
+                <span class="info-icon">⏰</span>
+                <div class="info-text">
+                  <strong>Reservation Window</strong>
+                  We hold your table for 15 minutes past your booking time.
+                </div>
+              </div>
+              <div class="info-item">
+                <span class="info-icon">🛒</span>
+                <div class="info-text">
+                  <strong>Pre-Order</strong>
+                  Use the Pre-Order tab to select dishes in advance for a faster experience.
+                </div>
+              </div>
+              <div class="info-item">
+                <span class="info-icon">📞</span>
+                <div class="info-text">
+                  <strong>Confirmation</strong>
+                  We'll call you to confirm within 30 minutes.
+                </div>
+              </div>
+              <div class="info-item">
+                <span class="info-icon">❌</span>
+                <div class="info-text">
+                  <strong>Cancellation</strong>
+                  Cancel anytime from My Reservations before your slot.
+                </div>
+              </div>
+            </div>
+
+            <div class="info-card" id="preorder-summary-card" style="display:none">
+              <div class="info-card-title">Pre-Order Attached</div>
+              <div id="preorder-summary-content"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── PRE-ORDER PANEL ───────────────────────── -->
+      <div class="p-panel" id="panel-preorder">
+        <div class="preorder-layout">
+          <div class="menu-section">
+            <div class="p-section-head">
+              <div>
+                <div class="p-section-title">Browse Menu</div>
+                <div class="p-section-sub">Add items to your pre-order cart</div>
+              </div>
+            </div>
+            <div class="cat-pills" id="cat-pills"></div>
+            <div class="menu-grid" id="menu-grid"></div>
+          </div>
+
+          <div>
+            <div class="cart-card">
+              <div class="cart-title">
+                Cart <span class="cart-badge" id="cart-count">0</span>
+              </div>
+              <div class="cart-items" id="cart-items">
+                <div class="cart-empty">Your cart is empty</div>
+              </div>
+              <div class="cart-total" id="cart-total" style="display:none">
+                <span class="cart-total-label">Total</span>
+                <span class="cart-total-val" id="cart-total-val">₹0</span>
+              </div>
+              <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px">
+                <div style="font-size:12px;color:var(--muted);margin-bottom:4px" id="cart-res-label">No reservation
+                  linked yet</div>
+                <button class="btn-gold" id="cart-attach-btn" disabled onclick="attachCart()">Save to
+                  Reservation</button>
+                <button class="btn-ghost" onclick="clearCart()">Clear Cart</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── MY RESERVATIONS PANEL ─────────────────── -->
+      <div class="p-panel" id="panel-myres">
+        <div class="p-section-head">
+          <div>
+            <div class="p-section-title">My Reservations</div>
+            <div class="p-section-sub">Manage your upcoming bookings</div>
+          </div>
+          <button class="btn-sm" onclick="loadReservations()">↻ Refresh</button>
+        </div>
+        <div class="res-list" id="res-list"></div>
+        <div id="res-empty" style="display:none">
+          <div class="empty-state">
+            <div class="empty-state-icon">📅</div>
+            <div class="empty-state-title">No reservations yet</div>
+            <div class="empty-state-sub">Book your first table from the Reserve tab</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST CONTAINER -->
+  <div id="toast-container"></div>
+
+  <script>
+    let RESTAURANTS = [];
+    let MENU = [];
+    let availableFloors = [];
+    let currentRestaurant = null;
+    let cart = [];
+    let activeReservationId = null;
+    let reservations = [];
+
+    async function api(url, method = 'GET', body = null) {
+      const options = {
+        method,
+        headers: {
+          'Accept': 'application/json',
+          'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || ''
+        }
+      };
+      if (body !== null) {
+        options.headers['Content-Type'] = 'application/json';
+        options.body = JSON.stringify(body);
+      }
+      const response = await fetch(url, options);
+      const contentType = response.headers.get('content-type') || '';
+      const payload = contentType.includes('application/json')
+        ? await response.json()
+        : await response.text();
+      if (!response.ok) {
+        const message = payload && typeof payload === 'object'
+          ? (payload.error || payload.message || `Request failed with status ${response.status}`)
+          : `Request failed with status ${response.status}`;
+        throw new Error(message);
+      }
+      return payload;
+    }
+
+    async function syncRestaurantContext(tenantId) {
+      await api('/api/customer/context', 'POST', { tenant_id: tenantId });
+    }
+
+    /* ── SCREEN ROUTER ──────────────────────────────────────── */
+    function showScreen(name) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById('screen-' + name).classList.add('active');
+      window.scrollTo(0, 0);
+    }
+
+    /* ── RESTAURANTS SCREEN ─────────────────────────────────── */
+    function renderRestaurants(list) {
+      const grid = document.getElementById('r-grid');
+      if (list.length === 0) {
+        grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-title">No restaurants found</div></div>';
+        return;
+      }
+      grid.innerHTML = list.map((r, i) => {
+        const logoHtml = r.logo_b64
+          ? `<div class="r-card-logo" style="background:white;padding:5px"><img src="${r.logo_b64}" style="width:100%;height:100%;object-fit:contain"></div>`
+          : `<div class="r-card-logo">🍽️</div>`;
+
+        const bannerStyle = r.cover_image_b64
+          ? `background-image:url(${r.cover_image_b64});background-size:cover;background-position:center;`
+          : `background:linear-gradient(135deg, #1c2530, #0d1117);`;
+
+        return `
+      <div class="r-card fade-up" style="transition-delay:${i * 0.1}s" 
+           onclick="openRestaurant(${r.id})"
+           onmousemove="handleCardTilt(event, this)"
+           onmouseleave="resetCardTilt(this)">
+        <div class="r-card-banner" style="${bannerStyle}">
+          <div class="r-card-banner-overlay"></div>
+          ${logoHtml}
+        </div>
+        <div class="r-card-body">
+          <div class="r-card-slug">${r.slug || 'premium'}</div>
+          <h3 class="r-card-name">${r.name}</h3>
+          <p class="r-card-desc">${r.description || 'Experience the height of culinary excellence and bespoke service.'}</p>
+          <div class="r-card-meta">
+            ${(r.tags || []).map(t => `<span class="r-card-pill">${t}</span>`).join('')}
+            <span class="r-card-pill premium">✨ Premium</span>
+          </div>
+          <button class="r-card-btn">
+            Enter Restaurant
+            <svg style="width:18px;height:18px;margin-left:8px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M5 12h14m-7-7 7 7-7 7"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    `}).join('');
+
+      setTimeout(() => {
+        document.querySelectorAll('.r-card').forEach(c => c.classList.add('in'));
+      }, 50);
+    }
+
+    function filterRestaurants(q) {
+      const filtered = RESTAURANTS.filter(r =>
+        r.name.toLowerCase().includes(q.toLowerCase()) ||
+        r.slug.toLowerCase().includes(q.toLowerCase()) ||
+        r.tags.some(t => t.toLowerCase().includes(q.toLowerCase()))
+      );
+      renderRestaurants(filtered);
+    }
+
+    async function openRestaurant(id) {
+      currentRestaurant = RESTAURANTS.find(r => r.id === id);
+      if (!currentRestaurant) return;
+
+      await syncRestaurantContext(currentRestaurant.id);
+
+      // Update Nav
+      document.getElementById('p-nav-name').textContent = currentRestaurant.name;
+      if (currentRestaurant.logo_b64) {
+        document.getElementById('p-nav-emoji').innerHTML = `<img src="${currentRestaurant.logo_b64}" style="width:24px;height:24px;border-radius:4px">`;
+      } else {
+        document.getElementById('p-nav-emoji').textContent = '🍽️';
+      }
+
+      // Populate Intro Panel
+      document.getElementById('intro-title').textContent = currentRestaurant.name;
+      document.getElementById('intro-bio').textContent = currentRestaurant.description || 'Welcome to our restaurant. Experience the finest flavors curated just for you.';
+      document.getElementById('intro-address').textContent = currentRestaurant.address || 'Location information coming soon';
+      document.getElementById('intro-phone').textContent = currentRestaurant.phone || 'Contact us for details';
+
+      const cover = document.getElementById('intro-cover');
+      if (currentRestaurant.cover_image_b64) {
+        cover.style.backgroundImage = `url(${currentRestaurant.cover_image_b64})`;
+      } else {
+        cover.style.background = 'var(--bg4)';
+      }
+
+      const tagsWrap = document.getElementById('intro-tags');
+      tagsWrap.innerHTML = (currentRestaurant.tags || []).map(t => `<span class="r-card-pill">${t}</span>`).join('');
+
+      showScreen('portal');
+      showTab('home');
+
+      // Fetch dynamic data
+      await loadRestaurantMenu(currentRestaurant.id);
+      await loadReservations();
+      availableFloors = [];
+      renderOrders();
+      renderMenu(null);
+    }
+
+    async function loadRestaurantMenu(tenantId) {
+      const grid = document.getElementById('menu-grid');
+      if (grid) {
+        grid.innerHTML = `<div class="empty-state">
+          <div class="empty-state-icon">⌛</div>
+          <div class="empty-state-title">Loading menu…</div>
+        </div>`;
+      }
+      try {
+        const response = await api(`/api/restaurants/${tenantId}/products`);
+        MENU = Array.isArray(response) ? response.map(c => ({
+          id: c.id,
+          name: c.name,
+          items: (c.products || []).map(p => ({
+            ...p,
+            emoji: p.name ? p.name.charAt(0) : '🍽️'
+          }))
+        })) : [];
+      } catch (err) {
+        MENU = [];
+      }
+    }
+
+    /* ── TAB SYSTEM ─────────────────────────────────────────── */
+    function showTab(name) {
+      document.querySelectorAll('.p-tab').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.p-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById('tab-btn-' + name).classList.add('active');
+      document.getElementById('panel-' + name).classList.add('active');
+    }
+
+    /* ── ORDERS ─────────────────────────────────────────────── */
+    function getEta(o) {
+      if (o.status === 'completed') return '<span class="order-eta eta-good">Ready! 🎉</span>';
+      if (o.status === 'paid') return '';
+      const cls = o.eta_minutes < 8 ? 'eta-good' : o.eta_minutes < 18 ? 'eta-mid' : 'eta-late';
+      return `<span class="order-eta ${cls}">⏱ ~${o.eta_minutes}m</span>`;
+    }
+
+    function renderOrders() {
+      const grid = document.getElementById('orders-grid');
+      grid.innerHTML = `<div class="empty-state">
+      <div class="empty-state-icon">🍽️</div>
+      <div class="empty-state-title">No active orders</div>
+      <div class="empty-state-sub">Reserve a table or scan QR at your table to order</div>
+    </div>`;
+    }
+
+    function setStars(n) {
+      document.querySelectorAll('.star-btn').forEach(b => {
+        b.classList.toggle('active', parseInt(b.dataset.n) <= n);
+      });
+    }
+
+    function submitReview() {
+      document.getElementById('review-panel').innerHTML = '';
+      showToast('Thank you for your review! ✓', 'success');
+    }
+
+    /* ── TABLE PICKER ───────────────────────────────────────── */
+    async function checkAvailability() {
+      if (!currentRestaurant) {
+        showToast('Please choose a restaurant first', 'warning');
+        return;
+      }
+      const dt = document.getElementById('res-datetime').value;
+      if (!dt) { showToast('Please pick a date and time first', 'warning'); return; }
+      const party = parseInt(document.getElementById('res-party').value) || 2;
+      const picker = document.getElementById('table-picker');
+      picker.innerHTML = `<div class="empty-state">
+          <div class="empty-state-icon">⌛</div>
+          <div class="empty-state-title">Checking availability…</div>
+          <div class="empty-state-sub">Please wait while we load available tables.</div>
+        </div>`;
+
+      try {
+        const floors = await api(`/api/restaurants/${currentRestaurant.id}/tables/availability?datetime=${encodeURIComponent(dt)}`);
+        availableFloors = Array.isArray(floors) ? floors : [];
+        if (!availableFloors.length) {
+          picker.innerHTML = `<div class="empty-state">
+            <div class="empty-state-icon">🪑</div>
+            <div class="empty-state-title">No seating information</div>
+            <div class="empty-state-sub">This restaurant has not published seating details yet.</div>
+          </div>`;
+          return;
+        }
+
+        picker.innerHTML = availableFloors.map(f => `
+          <div class="floor-block">
+            <div class="table-section-label">${f.name}</div>
+            <div class="table-grid">
+              ${f.tables.map(t => {
+                const avail = t.available_for_reservation && t.status !== 'occupied';
+                const fits = t.seats >= party;
+                const classes = `table-btn ${!avail ? 'unavailable' : ''}`;
+                const action = avail ? `onclick="selectTable(${t.id},'${t.number}',this)"` : '';
+                return `<div class="${classes}" ${action}>
+                  <div class="table-btn-num">T${t.number}</div>
+                  <div class="table-btn-seats">${t.seats} seats</div>
+                  <div class="table-btn-avail ${!avail ? 'avail-no' : fits ? 'avail-yes' : 'avail-small'}">
+                    ${!avail ? 'Booked' : fits ? 'Available' : 'Too small'}
+                  </div>
+                </div>`;
+              }).join('')}
+            </div>
+          </div>`).join('');
+      } catch (err) {
+        picker.innerHTML = `<div class="empty-state">
+            <div class="empty-state-icon">⚠️</div>
+            <div class="empty-state-title">Could not load availability</div>
+            <div class="empty-state-sub">Try again later.</div>
+          </div>`;
+      }
+    }
+
+    function selectTable(id, num, el) {
+      document.querySelectorAll('.table-btn').forEach(b => b.classList.remove('selected'));
+      el.classList.add('selected');
+      document.getElementById('res-table-id').value = id;
+      document.getElementById('res-submit-btn').disabled = false;
+    }
+
+    async function submitReservation() {
+      if (!currentRestaurant) {
+        showToast('Please choose a restaurant first', 'warning');
+        return;
+      }
+      const name = document.getElementById('res-name').value.trim();
+      const phone = document.getElementById('res-phone').value.trim();
+      const dt = document.getElementById('res-datetime').value;
+      const party = document.getElementById('res-party').value;
+      const notes = document.getElementById('res-notes').value;
+      const tableId = document.getElementById('res-table-id').value;
+      if (!name || !phone) { showToast('Please enter your name and phone number', 'warning'); return; }
+      if (!dt) { showToast('Please select a date and time', 'warning'); return; }
+      try {
+        await syncRestaurantContext(currentRestaurant.id);
+        const response = await api('/api/reservations', 'POST', {
+          customer_name: name,
+          customer_phone: phone,
+          reserved_at: dt,
+          party_size: parseInt(party, 10) || 2,
+          table_id: tableId || null,
+          notes,
+          items: cart.map(i => ({
+            product_id: i.id,
+            name: i.name,
+            qty: i.qty,
+            price: i.price
+          }))
+        });
+        const reservation = response.reservation || {};
+        activeReservationId = reservation.id || response.id || null;
+        document.getElementById('cart-res-label').textContent = activeReservationId
+          ? `Linked to reservation #${activeReservationId}`
+          : 'Reservation created';
+        document.getElementById('cart-attach-btn').disabled = true;
+        showToast(
+          reservation.status === 'confirmed'
+            ? '✅ Reservation confirmed.'
+            : '✅ Reservation request sent! We\'ll confirm shortly.',
+          'success'
+        );
+        await loadReservations();
+        showTab('myres');
+      } catch (err) {
+        showToast(err.message || 'Unable to create reservation', 'error');
+      }
+    }
+
+    /* ── MENU & CART ────────────────────────────────────────── */
+    function renderMenu(filterCat) {
+      const pills = document.getElementById('cat-pills');
+      pills.innerHTML = `<button class="cat-pill ${!filterCat ? 'active' : ''}" onclick="renderMenu(null)">All</button>` +
+        MENU.map(c => `<button class="cat-pill ${filterCat === c.id ? 'active' : ''}" onclick="renderMenu('${c.id}')">${c.name}</button>`).join('');
+
+      const grid = document.getElementById('menu-grid');
+      if (!MENU.length) {
+        grid.innerHTML = `<div class="empty-state">
+          <div class="empty-state-icon">🍽️</div>
+          <div class="empty-state-title">Menu unavailable</div>
+          <div class="empty-state-sub">This restaurant has not published any menu items yet.</div>
+        </div>`;
+        return;
+      }
+      const cats = filterCat ? MENU.filter(c => c.id === filterCat) : MENU;
+      grid.innerHTML = cats.flatMap(c => c.items.map(p => `
+    <div class="menu-item" onclick="addToCart(${p.id},'${p.name}',${p.price})">
+      <div class="menu-item-emoji">${p.emoji}</div>
+      <div class="menu-item-name">${p.name}</div>
+      <div class="menu-item-price">₹${p.price}</div>
+    </div>`)).join('');
+    }
+
+    function addToCart(id, name, price) {
+      const ex = cart.find(i => i.id === id);
+      if (ex) ex.qty++;
+      else cart.push({ id, name, price, qty: 1 });
+      renderCart();
+      showToast(`Added ${name}`, 'success');
+    }
+
+    function updateQty(id, delta) {
+      const idx = cart.findIndex(i => i.id === id);
+      if (idx === -1) return;
+      cart[idx].qty += delta;
+      if (cart[idx].qty <= 0) cart.splice(idx, 1);
+      renderCart();
+    }
+
+    function clearCart() {
+      cart = [];
+      renderCart();
+    }
+
+    function renderCart() {
+      const el = document.getElementById('cart-items');
+      const totalEl = document.getElementById('cart-total');
+      const badge = document.getElementById('cart-count');
+      const totalQty = cart.reduce((s, i) => s + i.qty, 0);
+      badge.textContent = totalQty;
+      if (!cart.length) {
+        el.innerHTML = '<div class="cart-empty">Your cart is empty</div>';
+        totalEl.style.display = 'none';
+        document.getElementById('cart-attach-btn').disabled = true;
+        return;
+      }
+      el.innerHTML = cart.map(i => `
+    <div class="cart-row">
+      <span class="cart-row-name">${i.name}</span>
+      <div class="qty-ctrl">
+        <button class="qty-btn" onclick="updateQty(${i.id},-1)">−</button>
+        <span class="qty-num">${i.qty}</span>
+        <button class="qty-btn" onclick="updateQty(${i.id},1)">+</button>
+      </div>
+      <span class="cart-row-price">₹${(i.price * i.qty).toFixed(0)}</span>
+    </div>`).join('');
+      const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
+      document.getElementById('cart-total-val').textContent = '₹' + total.toFixed(0);
+      totalEl.style.display = 'flex';
+      if (activeReservationId) document.getElementById('cart-attach-btn').disabled = false;
+    }
+
+    function attachCart() {
+      if (!activeReservationId) { showToast('Create a reservation first', 'warning'); return; }
+      showToast('Pre-order items are attached when you submit the reservation.', 'warning');
+      showTab('myres');
+    }
+
+    /* ── RESERVATIONS ───────────────────────────────────────── */
+    async function loadReservations() {
+      if (!currentRestaurant) {
+        reservations = [];
+        renderReservations();
+        return;
+      }
+      try {
+        await syncRestaurantContext(currentRestaurant.id);
+        const data = await api('/api/reservations');
+        reservations = Array.isArray(data) ? data : [];
+      } catch (err) {
+        reservations = [];
+        showToast(err.message || 'Unable to load reservations', 'error');
+      }
+      renderReservations();
+    }
+
+    function renderReservations() {
+      const list = document.getElementById('res-list');
+      const empty = document.getElementById('res-empty');
+      const active = reservations.filter(r => r.status !== 'cancelled');
+      if (!active.length) {
+        list.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+      list.innerHTML = active.map(r => {
+        const dt = new Date(r.reserved_at);
+        const label = dt.toLocaleString('en-IN', { dateStyle: 'long', timeStyle: 'short' });
+        const itemsHtml = (r.items || []).length ?
+          `<div class="res-item-preorder">🛒 Pre-order: ${r.items.map(i => `${i.product_name} ×${i.qty}`).join(' · ')}</div>` : '';
+        const canCancel = r.status !== 'seated' && r.status !== 'confirmed';
+        return `<div class="res-item">
+      <div class="res-item-left">
+        <div class="res-item-date">📅 ${label}</div>
+        <div class="res-item-meta">
+          ${r.table ? '🪑 ' + r.table : 'No table assigned'} · ${r.party_size} guests
+          ${r.notes ? ` · <em style="color:var(--muted)">${r.notes}</em>` : ''}
         </div>
         ${itemsHtml}
-        ${r.items.length ? `<div style="margin-top:8px; color:#888; font-size:11px;">Pre-order total: ₹${r.items.reduce((s,i)=>s+i.qty*i.price,0).toFixed(0)}</div>` : ''}
-      </div>`;
-  }).join('');
-}
+      </div>
+      <div class="res-item-right">
+        <span class="status-pill status-${r.status}">${r.status}</span>
+        ${r.status === 'confirmed' ? `<button class="btn-ghost res-qr-btn" onclick="showReservationQr(${r.id})">Show QR</button>` : ''}
+        ${canCancel ? `<button class="res-cancel-btn" onclick="cancelRes(${r.id})">Cancel</button>` : ''}
+      </div>
+    </div>`;
+      }).join('');
+    }
 
-async function cancelReservation(id) {
-  if (!confirm('Cancel this reservation?')) return;
-  await fetch(`/api/reservations/${id}`, { method:'DELETE' });
-  loadReservations();
-  showInPageAlert('Reservation cancelled.');
-}
+    async function cancelRes(id) {
+      if (!confirm('Cancel this reservation?')) return;
+      try {
+        await api('/api/reservations/' + id, 'DELETE');
+        showToast('Reservation cancelled.', 'warning');
+        await loadReservations();
+      } catch (err) {
+        showToast(err.message || 'Unable to cancel reservation', 'error');
+      }
+    }
 
-// ─── Push Notifications ────────────────────────────────────
-async function setupPushNotifications() {
-  if (!isLoggedIn || !('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
-  if (Notification.permission === 'default') {
-    document.getElementById('push-enable-btn').style.display = 'block';
-  } else if (Notification.permission === 'granted') {
-    await registerPush();
-  }
-}
+    async function showReservationQr(id) {
+      const modal = document.getElementById('res-qr-modal');
+      const img = document.getElementById('res-qr-img');
+      const label = document.getElementById('res-qr-label');
+      modal.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+      img.src = '';
+      label.textContent = 'Loading QR code…';
+      const response = await api('/api/reservations/' + id + '/qr');
+      if (response.qr) {
+        img.src = response.qr;
+        label.textContent = 'Show this QR code to staff when you arrive.';
+      } else {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+      }
+    }
 
-async function requestPushPermission() {
-  if (!isLoggedIn) return;
-  const result = await Notification.requestPermission();
-  if (result === 'granted') {
-    document.getElementById('push-enable-btn').style.display = 'none';
-    await registerPush();
-    showInPageAlert('🔔 Notifications enabled! You\'ll be notified when your order is ready.');
-  }
-}
+    function closeReservationQr() {
+      document.getElementById('res-qr-modal').style.display = 'none';
+      document.body.style.overflow = '';
+    }
 
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = atob(base64);
-  return Uint8Array.from([...rawData].map(ch => ch.charCodeAt(0)));
-}
+    /* ── TOAST ──────────────────────────────────────────────── */
+    function showToast(msg, type = 'success') {
+      const icons = { success: '✓', warning: '⚠', error: '✕' };
+      const container = document.getElementById('toast-container');
+      const t = document.createElement('div');
+      t.className = `toast ${type}`;
+      t.innerHTML = `<span class="toast-icon">${icons[type] || 'ℹ'}</span><span>${msg}</span>`;
+      container.appendChild(t);
+      setTimeout(() => {
+        t.style.animation = 'toastOut .3s ease forwards';
+        setTimeout(() => t.remove(), 300);
+      }, 3000);
+    }
 
-async function registerPush() {
-  if (!isLoggedIn || Notification.permission !== 'granted') return false;
-  const keyRes = await fetch(api('/api/push/vapid-public-key'));
-  const keyData = await keyRes.json().catch(() => ({}));
-  if (!keyData.key) {
-    window._pushEnabled = true;
-    return false;
-  }
-  const registration = await navigator.serviceWorker.register('/sw.js');
-  let subscription = await registration.pushManager.getSubscription();
-  if (!subscription) {
-    subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(keyData.key)
-    });
-  }
-  const res = await fetch(api('/api/push/subscribe'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-    body: JSON.stringify({ subscription })
-  });
-  const data = await res.json().catch(() => ({}));
-  window._pushEnabled = !!data.ok;
-  return window._pushEnabled;
-}
+    /* ── THEME ──────────────────────────────────────────────── */
+    /* ── TILT EFFECT ── */
+    function handleCardTilt(e, card) {
+      const rect = card.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      
+      const rotateX = (y - centerY) / 15;
+      const rotateY = (centerX - x) / 15;
+      
+      card.style.transform = `translateY(-12px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+      card.style.setProperty('--mouse-x', `${(x / rect.width) * 100}%`);
+      card.style.setProperty('--mouse-y', `${(y / rect.height) * 100}%`);
+    }
 
-function showInPageAlert(msg) {
-  // Show browser notification if permission granted
-  if (window._pushEnabled || Notification.permission === 'granted') {
-    try { new Notification('POS Cafè', { body: msg, icon: '/favicon.ico' }); } catch(e) {}
-  }
-  // Also show in-page toast
-  toast(msg, 'success');
-}
+    function resetCardTilt(card) {
+      card.style.transform = `translateY(0) rotateX(0) rotateY(0)`;
+    }
 
-// ─── Tabs ──────────────────────────────────────────────────
-function showTab(name) {
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('tab-'+name).classList.add('active');
-  document.getElementById('tab-btn-'+name).classList.add('active');
-  if (name === 'myres') loadReservations();
-}
+    function setTheme(name) {
+      document.body.className = name === 'dark' ? '' : 'theme-' + name;
+      document.querySelectorAll('.theme-dot').forEach(d => {
+        d.classList.toggle('active', d.dataset.theme === name);
+      });
+    }
 
-// ─── Clock & Poll ──────────────────────────────────────────
-setInterval(() => {
-  document.getElementById('clock').textContent = new Date().toLocaleTimeString();
-}, 1000);
+    /* ── CLOCK ──────────────────────────────────────────────── */
+    function updateClock() {
+      const el = document.getElementById('p-clock');
+      if (el) el.textContent = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
 
-loadOrders();
-setInterval(loadOrders, 15000);
-init();
+    /* ── INIT ───────────────────────────────────────────────── */
+    async function fetchRestaurants() {
+      try {
+        const res = await fetch('/api/restaurants');
+        RESTAURANTS = await res.json();
+        renderRestaurants(RESTAURANTS);
+      } catch (err) {
+        console.error('Failed to fetch restaurants:', err);
+        showToast('Unable to load restaurants', 'error');
+      }
+    }
 
-async function logout() {
-  if (!confirm('Log out from Customer Portal?')) return;
-  const r = await api('/api/logout', 'POST');
-  if (!r || r.error) return;
-  window.location.href = '/auth';
-}
-</script>
-{% endblock %}
+    async function initPage() {
+      try {
+        // Set datetime min to 1hr from now (if element exists)
+        const dt = document.getElementById('res-datetime');
+        if (dt) {
+          const soon = new Date(Date.now() + 3600000);
+          soon.setMinutes(0, 0, 0);
+          dt.min = soon.toISOString().slice(0, 16);
+          dt.value = soon.toISOString().slice(0, 16);
+        }
+
+        await fetchRestaurants();
+        
+        // Render cart if element exists
+        if (document.getElementById('cart-items')) {
+          renderCart();
+        }
+      } catch (err) {
+        console.error('Init error:', err);
+      }
+    }
+
+    // Run init when DOM is ready
+    document.addEventListener('DOMContentLoaded', initPage);
+    // Also run immediately in case script is at the end
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initPage);
+    } else {
+      initPage();
+    }
+  </script>
+
+  <div id="res-qr-modal" onclick="if(event.target===this) closeReservationQr()" style="display:none;position:fixed;inset:0;z-index:9999;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,0.68);backdrop-filter:blur(6px);">
+    <div style="width:min(100%,420px);background:#10161e;border:1px solid rgba(255,255,255,0.08);border-radius:24px;box-shadow:0 32px 80px rgba(0,0,0,0.55);overflow:hidden;">
+      <div style="padding:18px 20px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+        <div>
+          <div style="font-size:18px;font-weight:700;color:var(--cream);">Reservation QR Code</div>
+          <div id="res-qr-label" style="font-size:12px;color:var(--text2);margin-top:4px;">Scan this code when you arrive.</div>
+        </div>
+        <button onclick="closeReservationQr()" style="border:none;background:transparent;color:var(--text2);font-size:28px;line-height:1;padding:0 4px;cursor:pointer;">&times;</button>
+      </div>
+      <div style="padding:24px;display:flex;flex-direction:column;align-items:center;gap:18px;">
+        <img id="res-qr-img" src="" alt="Reservation QR" style="width:min(100%,280px);aspect-ratio:1/1;object-fit:contain;background:#fff;border-radius:24px;padding:12px;" />
+        <button onclick="closeReservationQr()" class="btn-ghost" style="padding:10px 18px;border-radius:12px;font-size:14px;">Close</button>
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>

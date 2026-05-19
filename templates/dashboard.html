@@ -408,6 +408,14 @@
         </svg>
         Staff
       </button>
+      <button onclick="switchDashTab('users')"
+        class="dash-nav-btn w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+        Users
+      </button>
       <button onclick="switchDashTab('attendance')"
         class="dash-nav-btn w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -464,7 +472,16 @@
   <div class="flex-1 overflow-auto main-content">
 
     <!-- Analytics Tab -->
-    <div id="tab-analytics" class="tab-panel">
+    <div id="tab-analytics" class="tab-panel relative">
+      <!-- Plan Lock Overlay -->
+      <div id="dashboard-plan-lock" class="hidden absolute inset-0 bg-black/60 backdrop-blur-md z-[100] flex flex-col items-center justify-center text-center p-10">
+        <div class="w-20 h-20 bg-orange-500/20 text-orange-500 rounded-full flex items-center justify-center mb-6">
+          <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+        </div>
+        <h2 class="text-3xl font-display font-800 mb-2">Not in your plan</h2>
+        <p class="text-gray-400 max-w-md">The advanced analytics dashboard is not included in your current subscription plan. Please upgrade to access sales reports and insights.</p>
+      </div>
+
       <div class="border-b border-border dash-header flex items-center justify-between"
         style="background:var(--bg);position:sticky;top:0;z-index:10;">
         <h2 class="font-display text-xl font-700">Reports &amp; Analytics</h2>
@@ -570,6 +587,28 @@
           </div>
         </div>
 
+      </div>
+    </div>
+
+    <!-- Users Tab -->
+    <div id="tab-users" class="tab-panel hidden">
+      <div class="border-b border-border px-6 py-4" style="background:var(--bg);position:sticky;top:0;z-index:10">
+        <h2 class="font-display text-xl font-700">Customer Management</h2>
+        <div class="text-sm text-gray-500 mt-1">Manage customers, loyalty points, and history.</div>
+      </div>
+      <div class="p-6">
+        <div class="card overflow-hidden">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-border text-xs text-gray-500 uppercase">
+                <th class="px-6 py-4">Customer</th>
+                <th class="px-6 py-4">Loyalty Points</th>
+                <th class="px-6 py-4">Joined</th>
+              </tr>
+            </thead>
+            <tbody id="customers-list"></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -945,9 +984,45 @@
     if (bnavId) { const b = document.getElementById(bnavId); if (b) b.classList.add('active'); }
     currentTab = tab;
     if (tab === 'staff') loadStaff();
+    if (tab === 'users') loadCustomers();
     if (tab === 'attendance') loadAttendanceReport();
     if (tab === 'compare') loadBranchComparison();
     if (tab === 'settings') loadCafeSettings();
+    
+    // Plan Lock Check
+    const lock = document.getElementById('dashboard-plan-lock');
+    if (lock) {
+        // Example: Lock for certain roles or plans.
+        // User said: "not in your plan"
+        // We'll show it if current plan is not 'pro' (assuming 'pro' has dashboard)
+        {% if tenant and tenant.plan != 'pro' %}
+        if (tab === 'analytics') lock.classList.remove('hidden');
+        else lock.classList.add('hidden');
+        {% endif %}
+    }
+  }
+
+  async function loadCustomers() {
+    try {
+      const r = await fetch('/api/customers');
+      const data = await r.json();
+      const tbody = document.getElementById('customers-list');
+      if (!tbody) return;
+      if (Array.isArray(data)) {
+        tbody.innerHTML = data.map(c => `
+          <tr class="border-b border-border hover:bg-white/5 transition">
+            <td class="px-6 py-4">
+              <div class="font-semibold">${escHtml(c.name)}</div>
+              <div class="text-xs text-gray-500">${escHtml(c.phone || c.email || '')}</div>
+            </td>
+            <td class="px-6 py-4">
+              <span class="text-brand-500 font-bold">${c.loyalty_points || 0}</span> pts
+            </td>
+            <td class="px-6 py-4 text-xs text-gray-500">${formatDateTime(c.created_at)}</td>
+          </tr>
+        `).join('') || '<tr><td colspan="3" class="text-center py-10 text-gray-500">No customers found.</td></tr>';
+      }
+    } catch(e) { console.error('loadCustomers', e); }
   }
 
   function escHtml(s) { const el = document.createElement('div'); el.textContent = s || ''; return el.innerHTML; }

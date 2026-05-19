@@ -253,9 +253,30 @@
     </div>
     {% endif %}
 
+    {% if order.discount_amount %}
+    <div class="r-totals-row">
+      <div class="r-totals-label">Discount{% if order.coupon_code %} ({{ order.coupon_code }}){% endif %}</div>
+      <div class="r-totals-val">-{{ "%.2f"|format(order.discount_amount) }}</div>
+    </div>
+    {% endif %}
+
+    {% if order.loyalty_points_used %}
+    <div class="r-totals-row">
+      <div class="r-totals-label">Loyalty Used</div>
+      <div class="r-totals-val">-{{ "%.2f"|format(order.loyalty_points_used) }}</div>
+    </div>
+    {% endif %}
+
+    {% if order.tip %}
+    <div class="r-totals-row">
+      <div class="r-totals-label">Tip</div>
+      <div class="r-totals-val">{{ "%.2f"|format(order.tip) }}</div>
+    </div>
+    {% endif %}
+
     <div class="r-grand r-totals-row">
       <div class="r-totals-label r-bold">Grand Total</div>
-      <div class="r-totals-val r-bold">₹{{ "%.2f"|format(order.total + order.tip) }}</div>
+      <div class="r-totals-val r-bold">₹{{ "%.2f"|format(order.total) }}</div>
     </div>
   </div>
 

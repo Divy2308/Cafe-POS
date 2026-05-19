@@ -23,6 +23,7 @@ import secrets
 import re
 import hmac
 import hashlib
+import uuid
 import urllib.request
 import urllib.error
 import smtplib
@@ -274,6 +275,15 @@ class Category(db.Model):
     products = db.relationship('Product', backref='category', lazy=True)
     tenant = db.relationship('Tenant', backref='categories')
 
+class Coupon(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(50), nullable=False)
+    discount_type = db.Column(db.String(20), default='percentage')
+    value = db.Column(db.Float, nullable=False)
+    active = db.Column(db.Boolean, default=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -462,6 +472,8 @@ class Reservation(db.Model):
     reserved_at = db.Column(db.DateTime, nullable=False)  # date+time of booking
     party_size = db.Column(db.Integer, default=2)
     status = db.Column(db.String(20), default='pending')  # pending, confirmed, seated, completed, cancelled
+    qr_token = db.Column(db.String(64), unique=True, index=True, nullable=True)
+    is_verified = db.Column(db.Boolean, default=False, nullable=False)
     notes = db.Column(db.Text, default='')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     items = db.relationship('ReservationItem', backref='reservation', cascade='all, delete-orphan', lazy=True)
@@ -608,7 +620,7 @@ def admin_required(f):
             if is_api:
                 return jsonify({'error': 'unauthorized'}), 401
             return redirect(url_for('auth'))
-        user = User.query.get(session['user_id'])
+        user = db.session.get(User, session['user_id'])
         if not user:
             if is_api:
                 return jsonify({'error': 'unauthorized'}), 401
@@ -623,7 +635,7 @@ def admin_required(f):
 
 def get_current_user():
     if 'user_id' in session:
-        return User.query.get(session['user_id'])
+        return db.session.get(User, session['user_id'])
     return None
 
 def find_user_by_email(email):
@@ -635,7 +647,7 @@ def find_user_by_email(email):
 def get_tenant_access_block_message(user):
     if not user or not user.tenant_id or getattr(user, 'is_platform_admin', False):
         return None
-    tenant = Tenant.query.get(user.tenant_id)
+    tenant = db.session.get(Tenant, user.tenant_id)
     if not tenant:
         return None
 
@@ -672,14 +684,14 @@ def get_current_tenant():
     """Get the current Tenant object."""
     tid = get_current_tenant_id()
     if tid:
-        return Tenant.query.get(tid)
+        return db.session.get(Tenant, tid)
     return None
 
 
 def get_tenant_feature_flags(tenant=None, tenant_id=None):
     defaults = get_default_tenant_feature_flags()
     if tenant is None and tenant_id is not None:
-        tenant = Tenant.query.get(tenant_id)
+        tenant = db.session.get(Tenant, tenant_id)
     if tenant is None:
         tenant = get_current_tenant()
     if not tenant:
@@ -769,8 +781,8 @@ def apply_tenant_scope(query, model_class):
         return query.filter(model_class.tenant_id == tid)
     return query
 
-def get_default_branch():
-    tid = get_current_tenant_id()
+def get_default_branch(tenant_id=None):
+    tid = tenant_id if tenant_id is not None else get_current_tenant_id()
     q = Branch.query
     if tid:
         q = q.filter_by(tenant_id=tid)
@@ -837,7 +849,7 @@ def get_selected_branch():
     active_branch_id = get_active_branch_id()
     if not active_branch_id:
         return None
-    return Branch.query.get(active_branch_id)
+    return db.session.get(Branch, active_branch_id)
 
 def get_current_shift_start(staff_id):
     events = AttendanceEvent.query.filter_by(staff_id=staff_id).order_by(AttendanceEvent.timestamp.asc(), AttendanceEvent.id.asc()).all()
@@ -1045,6 +1057,13 @@ def cleanup_reset_codes():
         PASSWORD_RESET_CODES.pop(email, None)
 
 # ─── Auth Routes ───────────────────────────────────────────
+@app.route('/favicon.ico')
+def favicon():
+    logo_path = os.path.join(os.path.dirname(__file__), 'pos_cafe_logo.svg')
+    if os.path.exists(logo_path):
+        return send_from_directory(os.path.dirname(__file__), 'pos_cafe_logo.svg', mimetype='image/svg+xml')
+    return '', 204
+
 @app.route('/')
 def index():
     if 'user_id' in session:
@@ -1103,6 +1122,23 @@ def restaurant_chooser():
 def restaurant_discover_public():
     return redirect(url_for('customer'))
 
+@app.route('/api/customer/context', methods=['POST'])
+def set_customer_context():
+    d = request.json or {}
+    try:
+        tenant_id = int(d.get('tenant_id'))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Valid tenant_id is required'}), 400
+
+    tenant = Tenant.query.filter_by(id=tenant_id, is_active=True).first_or_404()
+    role = normalize_role(session.get('user_role')) if session.get('user_id') else 'customer'
+    if role != 'customer':
+        return jsonify({'error': 'forbidden'}), 403
+
+    session['tenant_id'] = tenant.id
+    session.modified = True
+    return jsonify({'ok': True, 'tenant_id': tenant.id, 'tenant_slug': tenant.slug, 'tenant_name': tenant.name})
+
 @app.route('/api/restaurants')
 def get_restaurants():
     tenants = Tenant.query.filter_by(is_active=True).all()
@@ -1120,6 +1156,133 @@ def get_restaurants():
             'tags': json.loads(t.tags_json or '[]'),
         })
     return jsonify(results)
+
+def _serialize_coupon(coupon):
+    return {
+        'id': coupon.id,
+        'code': coupon.code,
+        'discount_type': coupon.discount_type,
+        'value': coupon.value,
+        'active': bool(coupon.active),
+    }
+
+@app.route('/api/coupons', methods=['GET'])
+@staff_required
+def get_coupons():
+    coupons = apply_tenant_scope(Coupon.query.order_by(Coupon.code.asc()), Coupon).all()
+    return jsonify([_serialize_coupon(c) for c in coupons])
+
+@app.route('/api/coupons', methods=['POST'])
+@admin_required
+def create_coupon():
+    d = request.json or {}
+    code = (d.get('code') or '').strip().upper()
+    discount_type = (d.get('discount_type') or '').strip().lower()
+    if not code:
+        return jsonify({'error': 'Coupon code is required'}), 400
+    if discount_type not in ('percentage', 'flat'):
+        return jsonify({'error': 'discount_type must be percentage or flat'}), 400
+    try:
+        value = float(d.get('value'))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Valid coupon value is required'}), 400
+    if value < 0:
+        return jsonify({'error': 'Coupon value cannot be negative'}), 400
+
+    tid = get_current_tenant_id()
+    existing = Coupon.query.filter(func.upper(Coupon.code) == code, Coupon.tenant_id == tid).first()
+    if existing:
+        return jsonify({'error': 'Coupon code already exists'}), 409
+
+    coupon = Coupon(
+        code=code,
+        discount_type=discount_type,
+        value=value,
+        active=bool(d.get('active', True)),
+        tenant_id=tid,
+    )
+    db.session.add(coupon)
+    db.session.commit()
+    return jsonify({'ok': True, 'coupon': _serialize_coupon(coupon)})
+
+@app.route('/api/coupons/<int:coupon_id>', methods=['DELETE'])
+@admin_required
+def delete_coupon(coupon_id):
+    coupon = apply_tenant_scope(Coupon.query, Coupon).filter_by(id=coupon_id).first_or_404()
+    db.session.delete(coupon)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/api/restaurants/<int:tenant_id>/products')
+def get_restaurant_products(tenant_id):
+    tenant = Tenant.query.filter_by(id=tenant_id, is_active=True).first_or_404()
+    public_branch = get_default_branch(tenant_id=tenant.id)
+    products = Product.query.filter_by(active=True, tenant_id=tenant_id)
+    if public_branch:
+        products = products.filter(or_(Product.branch_id == public_branch.id, Product.branch_id.is_(None)))
+    products = products.all()
+    products_by_category = {}
+    for product in products:
+        products_by_category.setdefault(product.category_id, []).append(product)
+
+    cats = Category.query.filter_by(tenant_id=tenant_id).all()
+    result = []
+    for c in cats:
+        prods = [{
+            'id': p.id,
+            'name': p.name,
+            'price': p.price,
+            'description': p.description,
+            'tax': p.tax,
+            'unit': p.unit,
+            'image_b64': p.image_b64 or '',
+            'branch_id': p.branch_id,
+            'addons': [{'id': a.id, 'name': a.name, 'price': a.price} for a in p.addons]
+        } for p in products_by_category.get(c.id, [])]
+        if prods:
+            result.append({'id': c.id, 'name': c.name, 'products': prods})
+    return jsonify(result)
+
+@app.route('/api/restaurants/<int:tenant_id>/tables/availability')
+def get_restaurant_table_availability(tenant_id):
+    tenant = Tenant.query.filter_by(id=tenant_id, is_active=True).first_or_404()
+    public_branch = get_default_branch(tenant_id=tenant.id)
+    dt_str = request.args.get('datetime', '')
+    try:
+        dt = datetime.fromisoformat(dt_str)
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid datetime'}), 400
+
+    window_start = dt - timedelta(minutes=90)
+    window_end = dt + timedelta(minutes=90)
+    busy_table_ids = set(
+        r.table_id for r in Reservation.query.filter(
+            Reservation.tenant_id == tenant_id,
+            Reservation.status.in_(['pending', 'confirmed']),
+            Reservation.reserved_at >= window_start,
+            Reservation.reserved_at <= window_end,
+            Reservation.table_id.isnot(None),
+        ).all()
+    )
+
+    q = Floor.query.filter_by(tenant_id=tenant_id)
+    if public_branch:
+        q = q.filter(or_(Floor.branch_id == public_branch.id, Floor.branch_id.is_(None)))
+    floors = q.all()
+    result = []
+    for f in floors:
+        tables = []
+        for t in f.tables:
+            if t.active and (not public_branch or t.branch_id in (None, public_branch.id)):
+                tables.append({
+                    'id': t.id,
+                    'number': t.number,
+                    'seats': t.seats,
+                    'status': t.status,
+                    'available_for_reservation': t.id not in busy_table_ids,
+                })
+        result.append({'id': f.id, 'name': f.name, 'tables': tables})
+    return jsonify(result)
 
 @app.route('/api/tenant/settings', methods=['GET', 'POST'])
 @page_login_required(allowed_roles=('restaurant',))
@@ -1413,7 +1576,7 @@ def dashboard():
     )
 
 def _serialize_shrey_request(tenant):
-    owner = User.query.get(tenant.owner_id) if tenant.owner_id else User.query.filter_by(
+    owner = db.session.get(User, tenant.owner_id) if tenant.owner_id else User.query.filter_by(
         tenant_id=tenant.id, role='restaurant'
     ).order_by(User.id.asc()).first()
     branch = Branch.query.filter_by(tenant_id=tenant.id).order_by(Branch.id.asc()).first()
@@ -1784,36 +1947,46 @@ def merge_tables():
     tid = get_current_tenant_id()
     bid = get_active_branch_id()
     d = request.json or {}
-    source_id = d.get('source_table_id')
+    
+    # Support both singular (legacy) and plural (current frontend) source IDs
+    source_ids = d.get('source_table_ids')
+    if not source_ids:
+        single_id = d.get('source_table_id')
+        source_ids = [single_id] if single_id else []
+        
     target_id = d.get('target_table_id')
 
-    if not source_id or not target_id:
+    if not source_ids or not target_id:
         return jsonify({'error': 'Source and target table IDs are required'}), 400
-    if source_id == target_id:
-        return jsonify({'error': 'Source and target must be different'}), 400
-
-    source = Table.query.filter_by(id=source_id, tenant_id=tid, active=True).first_or_404()
+    
     target = Table.query.filter_by(id=target_id, tenant_id=tid, active=True).first_or_404()
 
-    # Move all active orders from source to target
-    active_orders = Order.query.filter(
-        Order.table_id == source.id,
-        Order.status.in_(['draft', 'sent']),
-        Order.tenant_id == tid,
-        Order.branch_id == bid
-    ).all()
+    for s_id in source_ids:
+        if s_id == target_id:
+            continue
+        source = Table.query.filter_by(id=s_id, tenant_id=tid, active=True).first()
+        if not source:
+            continue
 
-    for order in active_orders:
-        order.table_id = target.id
+        # Move all active orders from source to target
+        active_orders = Order.query.filter(
+            Order.table_id == source.id,
+            Order.status.in_(['draft', 'sent']),
+            Order.tenant_id == tid,
+            Order.branch_id == bid
+        ).all()
 
-    source.merged_to_id = target.id
-    source.status = 'occupied'
+        for order in active_orders:
+            order.table_id = target.id
+
+        source.merged_to_id = target.id
+        source.status = 'occupied'
+        
     target.status = 'occupied'
-
     db.session.commit()
 
     emit_scoped('table_merged', {
-        'source_table_id': source.id,
+        'source_table_ids': source_ids,
         'target_table_id': target.id
     }, tenant_id=tid, branch_id=bid)
 
@@ -1920,7 +2093,7 @@ def _find_order_for_razorpay(razorpay_order_id=None, local_order_id=None, order_
     local_order_id = local_order_id or notes.get('order_id')
     if local_order_id is not None:
         try:
-            return Order.query.get(int(local_order_id))
+            return db.session.get(Order, int(local_order_id))
         except (TypeError, ValueError):
             pass
     order_number = (order_number or notes.get('order_number') or '').strip()
@@ -2047,7 +2220,18 @@ def get_qr_image(upi_id, amount):
 
 @app.route('/qr.jpeg')
 def qr_image():
-    return send_from_directory(os.path.dirname(__file__), 'qr.jpeg')
+    root_dir = os.path.dirname(__file__)
+    candidates = [
+        ('static/img', 'paymentqr.png'),
+        ('', 'paymentqr.png'),
+        ('', 'qr.jpeg'),
+    ]
+    for rel_dir, filename in candidates:
+        directory = os.path.join(root_dir, rel_dir) if rel_dir else root_dir
+        path = os.path.join(directory, filename)
+        if os.path.exists(path):
+            return send_from_directory(directory, filename)
+    return '', 204
 
 # ─── API: Razorpay Payment Integration ──────────────────────
 @app.route('/api/razorpay-webhook', methods=['POST'])
@@ -2232,7 +2416,7 @@ def process_loyalty_earning(order):
     ratio = settings.loyalty_points_per_100 or 10.0
     points_earned = (order.total / 100.0) * ratio
     
-    customer = Customer.query.get(order.customer_id)
+    customer = db.session.get(Customer, order.customer_id)
     if customer:
         customer.loyalty_points = (customer.loyalty_points or 0) + points_earned
 
@@ -2421,7 +2605,7 @@ def create_order():
                 return jsonify({'error': 'Invalid item: missing product_id, price, or qty'}), 400
             
             try:
-                prod = Product.query.get(item['product_id'])
+                prod = db.session.get(Product, item['product_id'])
                 item_price = float(item['price'])
                 qty = int(item['qty'])
                 if qty <= 0:
@@ -2535,12 +2719,12 @@ def create_order():
                 o.customer_phone = customer_phone
                 o.customer_name = customer_name
             if table_id:
-                t = Table.query.get(table_id)
+                t = db.session.get(Table, table_id)
                 if t:
                     t.status = 'occupied'
             order_num = o.order_number
         else:
-            count = Order.query.count() + 1
+            count = Order.query.filter_by(branch_id=branch_id).count() + 1
             order_num = f"ORD-{count:04d}"
             o = Order(
                 order_number=order_num,
@@ -2577,7 +2761,7 @@ def create_order():
                 )
                 db.session.add(oi)
             if table_id and not is_takeaway:
-                t = Table.query.get(table_id)
+                t = db.session.get(Table, table_id)
                 if t:
                     t.status = 'occupied'
         
@@ -2848,7 +3032,7 @@ def delete_order(oid):
             .first()
         )
         if not has_active_orders:
-            table = Table.query.get(table_id)
+            table = db.session.get(Table, table_id)
             if table:
                 table.status = 'free'
 
@@ -3089,11 +3273,14 @@ def _serialize_reservation(r):
         'id': r.id,
         'customer_id': r.customer_id,
         'customer_name': c_name,
+        'customer_phone': r.customer_phone or '',
         'table_id': r.table_id,
         'table': r.table.number if r.table else None,
         'reserved_at': r.reserved_at.isoformat(),
         'party_size': r.party_size,
         'status': r.status,
+        'is_verified': r.is_verified,
+        'qr_token': r.qr_token,
         'notes': r.notes,
         'created_at': r.created_at.isoformat(),
         'items': [{
@@ -3104,6 +3291,71 @@ def _serialize_reservation(r):
             'notes': i.notes or '',
         } for i in r.items]
     }
+
+
+def _ensure_reservation_qr_token(reservation):
+    if not reservation.qr_token:
+        reservation.qr_token = uuid.uuid4().hex
+    return reservation.qr_token
+
+
+def _seat_reservation_internal(reservation):
+    reservation.status = 'seated'
+    reservation.is_verified = True
+    if reservation.table:
+        reservation.table.status = 'occupied'
+    if reservation.items:
+        s = Session.query.filter_by(user_id=session['user_id'], status='open').first()
+        if not s:
+            s = Session(user_id=session['user_id'])
+            db.session.add(s)
+            db.session.flush()
+        count = Order.query.filter_by(branch_id=get_active_branch_id()).count() + 1
+        order_num = f'ORD-{count:04d}'
+        total = sum(i.qty * i.price for i in reservation.items)
+        o = Order(
+            order_number=order_num,
+            table_id=reservation.table_id,
+            session_id=s.id,
+            user_id=session['user_id'],
+            branch_id=get_active_branch_id(),
+            tenant_id=get_current_tenant_id(),
+            total=total,
+            status='sent',
+            sent_to_kitchen_at=datetime.utcnow(),
+        )
+        db.session.add(o)
+        db.session.flush()
+        for ri in reservation.items:
+            oi = OrderItem(
+                order_id=o.id,
+                product_id=ri.product_id,
+                product_name=ri.product_name,
+                qty=ri.qty,
+                price=ri.price,
+                notes=ri.notes or '',
+                kitchen_status='to_cook',
+            )
+            db.session.add(oi)
+        kt = KitchenTicket(order_id=o.id, tenant_id=get_current_tenant_id())
+        db.session.add(kt)
+        db.session.commit()
+        ticket_data = {
+            'id': kt.id,
+            'order_id': o.id,
+            'order_number': o.order_number,
+            'table': reservation.table.number if reservation.table else 'Takeaway',
+            'status': 'to_cook',
+            'total': total,
+            'sent_at': kt.sent_at.isoformat(),
+            'tenant_id': o.tenant_id,
+            'branch_id': o.branch_id,
+            'items': [{'id': i.id, 'name': i.product_name, 'qty': i.qty, 'price': i.price, 'notes': i.notes or '', 'status': i.kitchen_status} for i in o.items]
+        }
+        emit_scoped('new_ticket', ticket_data, tenant_id=o.tenant_id, branch_id=o.branch_id)
+    else:
+        db.session.commit()
+    _emit_reservation_update(reservation, action='seated')
 
 
 def _emit_reservation_update(reservation, action='updated'):
@@ -3170,7 +3422,7 @@ def create_reservation():
                 return jsonify({'error': 'Invalid table ID'}), 400
         
         # Verify tenant exists
-        if tid and not Tenant.query.get(tid):
+        if tid and not db.session.get(Tenant, tid):
             print(f"[ERROR] tenant_id {tid} not found")
             return jsonify({'error': f'Tenant {tid} not found'}), 404
         
@@ -3195,6 +3447,9 @@ def create_reservation():
             notes=d.get('notes', ''),
             tenant_id=tid,
         )
+        if auto_confirm:
+            r.qr_token = uuid.uuid4().hex
+            r.is_verified = False
         db.session.add(r)
         db.session.flush()  # Get ID early
         print(f"[DEBUG] created reservation id: {r.id}")
@@ -3289,15 +3544,20 @@ def update_reservation(rid):
     return jsonify({'ok': True, 'reservation': _serialize_reservation(r)})
 
 @app.route('/api/reservations/<int:rid>', methods=['DELETE'])
-@login_required
 def cancel_reservation(rid):
     r = Reservation.query.get_or_404(rid)
     if r.tenant_id != get_current_tenant_id():
         return jsonify({'error': 'forbidden'}), 403
-    uid = session['user_id']
-    role = normalize_role(session.get('user_role'))
-    if role == 'customer' and r.customer_id != uid:
-        return jsonify({'error': 'forbidden'}), 403
+    uid = session.get('user_id')
+    role = normalize_role(session.get('user_role')) if uid else 'customer'
+    if role == 'customer':
+        if uid:
+            if r.customer_id != uid:
+                return jsonify({'error': 'forbidden'}), 403
+        elif r.id not in session.get('guest_res_ids', []):
+            return jsonify({'error': 'forbidden'}), 403
+    elif not uid:
+        return jsonify({'error': 'unauthorized'}), 401
     r.status = 'cancelled'
     db.session.commit()
     _emit_reservation_update(r, action='cancelled')
@@ -3310,63 +3570,7 @@ def seat_reservation(rid):
     r = Reservation.query.get_or_404(rid)
     if r.tenant_id != get_current_tenant_id():
         return jsonify({'error': 'forbidden'}), 403
-    r.status = 'seated'
-    # Mark table occupied
-    if r.table:
-        r.table.status = 'occupied'
-    # Convert pre-order items to a live Order
-    if r.items:
-        s = Session.query.filter_by(user_id=session['user_id'], status='open').first()
-        if not s:
-            s = Session(user_id=session['user_id'])
-            db.session.add(s)
-            db.session.flush()
-        count = Order.query.count() + 1
-        order_num = f'ORD-{count:04d}'
-        total = sum(i.qty * i.price for i in r.items)
-        o = Order(
-            order_number=order_num,
-            table_id=r.table_id,
-            session_id=s.id,
-            user_id=session['user_id'],
-            branch_id=get_active_branch_id(),
-            tenant_id=get_current_tenant_id(),
-            total=total,
-            status='sent',
-            sent_to_kitchen_at=datetime.utcnow(),
-        )
-        db.session.add(o)
-        db.session.flush()
-        for ri in r.items:
-            oi = OrderItem(
-                order_id=o.id,
-                product_id=ri.product_id,
-                product_name=ri.product_name,
-                qty=ri.qty,
-                price=ri.price,
-                notes=ri.notes or '',
-                kitchen_status='to_cook',
-            )
-            db.session.add(oi)
-        kt = KitchenTicket(order_id=o.id, tenant_id=get_current_tenant_id())
-        db.session.add(kt)
-        db.session.commit()
-        ticket_data = {
-            'id': kt.id,
-            'order_id': o.id,
-            'order_number': o.order_number,
-            'table': r.table.number if r.table else 'Takeaway',
-            'status': 'to_cook',
-            'total': total,
-            'sent_at': kt.sent_at.isoformat(),
-            'tenant_id': o.tenant_id,
-            'branch_id': o.branch_id,
-            'items': [{'id': i.id, 'name': i.product_name, 'qty': i.qty, 'price': i.price, 'notes': i.notes or '', 'status': i.kitchen_status} for i in o.items]
-        }
-        emit_scoped('new_ticket', ticket_data, tenant_id=o.tenant_id, branch_id=o.branch_id)
-    else:
-        db.session.commit()
-    _emit_reservation_update(r, action='seated')
+    _seat_reservation_internal(r)
     return jsonify({'ok': True})
 
 @app.route('/api/reservations/<int:rid>/confirm', methods=['POST'])
@@ -3376,9 +3580,55 @@ def confirm_reservation(rid):
     if r.tenant_id != get_current_tenant_id():
         return jsonify({'error': 'forbidden'}), 403
     r.status = 'confirmed'
+    _ensure_reservation_qr_token(r)
+    r.is_verified = False
     db.session.commit()
     _emit_reservation_update(r, action='confirmed')
     return jsonify({'ok': True})
+
+@app.route('/api/reservations/<int:rid>/qr')
+def get_reservation_qr(rid):
+    r = Reservation.query.get_or_404(rid)
+    if r.tenant_id != get_current_tenant_id():
+        return jsonify({'error': 'forbidden'}), 403
+    uid = session.get('user_id')
+    role = normalize_role(session.get('user_role')) if uid else 'customer'
+    if role == 'customer' and r.customer_id != uid and r.id not in session.get('guest_res_ids', []):
+        return jsonify({'error': 'forbidden'}), 403
+    if r.status != 'confirmed' and r.status != 'seated':
+        return jsonify({'error': 'QR not available until reservation is confirmed'}), 400
+    _ensure_reservation_qr_token(r)
+    db.session.commit()
+    qr = qrcode.QRCode(box_size=8, border=2)
+    qr.add_data(r.qr_token)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color='black', back_color='white')
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    b64 = base64.b64encode(buf.getvalue()).decode()
+    return jsonify({'qr': f'data:image/png;base64,{b64}', 'reservation_id': r.id})
+
+@app.route('/api/reservations/verify-token', methods=['POST'])
+@staff_required
+def verify_reservation_token():
+    d = request.json or {}
+    token = (d.get('token') or '').strip()
+    if not token:
+        return jsonify({'error': 'Missing token'}), 400
+    r = Reservation.query.filter_by(qr_token=token, tenant_id=get_current_tenant_id()).first()
+    if not r:
+        return jsonify({'error': 'Reservation not found'}), 404
+    if r.is_verified:
+        return jsonify({'ok': True, 'already_verified': True, 'reservation': _serialize_reservation(r)})
+    if r.status == 'confirmed':
+        _seat_reservation_internal(r)
+        return jsonify({'ok': True, 'reservation': _serialize_reservation(r)})
+    if r.status == 'seated':
+        r.is_verified = True
+        db.session.commit()
+        _emit_reservation_update(r, action='updated')
+        return jsonify({'ok': True, 'reservation': _serialize_reservation(r)})
+    return jsonify({'error': 'Cannot verify reservation in its current status'}), 400
 
 @app.route('/api/reservations/<int:rid>/done', methods=['POST'])
 @staff_required
@@ -3447,7 +3697,7 @@ def _guest_token_from_order(o):
 def self_order_page(table_id):
     """Table QR landing page – no login required for customers."""
     t = Table.query.get_or_404(table_id)
-    tenant = Tenant.query.get(t.tenant_id)
+    tenant = db.session.get(Tenant, t.tenant_id)
     if not tenant_feature_enabled('self_order', tenant=tenant):
         return tenant_feature_block_response('self_order', is_api=False)
     cafe_name = tenant.name if tenant else 'POS Cafè'
@@ -3644,7 +3894,7 @@ def create_self_order():
         }, tenant_id=tid, branch_id=o.branch_id)
         return jsonify({'ok': True, 'order_id': o.id, 'order_number': o.order_number, 'merged': True})
 
-    count = Order.query.count() + 1
+    count = Order.query.filter_by(branch_id=branch_id).count() + 1
     order_num = f'ORD-{count:04d}'
 
     o = Order(
@@ -4094,7 +4344,7 @@ def update_attendance_shift(clock_in_event_id):
 
     clock_out_event = None
     if d.get('clock_out_event_id'):
-        clock_out_event = AttendanceEvent.query.get(int(d['clock_out_event_id']))
+        clock_out_event = db.session.get(AttendanceEvent, int(d['clock_out_event_id']))
     if not clock_out_event:
         clock_out_event = AttendanceEvent.query.filter(
             AttendanceEvent.staff_id == clock_in_event.staff_id,
@@ -4173,7 +4423,7 @@ def compare_branches():
 @app.route('/api/users', methods=['GET'])
 @staff_required
 def get_users():
-    user = User.query.get(session['user_id'])
+    user = db.session.get(User, session['user_id'])
     if not user or (normalize_role(user.role) != 'restaurant' and not user.is_superadmin):
         return jsonify({'error': 'unauthorized'}), 403
 
@@ -4236,7 +4486,7 @@ def create_user():
         return jsonify({'error': password_error}), 400
     if not admin.is_superadmin:
         branch_id = admin.branch_id
-    elif branch_id and not Branch.query.get(branch_id):
+    elif branch_id and not db.session.get(Branch, branch_id):
         return jsonify({'error': 'Branch not found'}), 404
 
     new_user = User(
@@ -4257,7 +4507,7 @@ def create_user():
 @app.route('/api/users/<int:uid>', methods=['DELETE'])
 @staff_required
 def delete_user(uid):
-    admin = User.query.get(session['user_id'])
+    admin = db.session.get(User, session['user_id'])
     if not admin or (normalize_role(admin.role) != 'restaurant' and not admin.is_superadmin):
         return jsonify({'error': 'unauthorized'}), 403
     
@@ -4296,7 +4546,7 @@ def update_user(uid):
 
     if not admin.is_superadmin:
         branch_id = admin.branch_id
-    elif branch_id and not Branch.query.get(branch_id):
+    elif branch_id and not db.session.get(Branch, branch_id):
         return jsonify({'error': 'Branch not found'}), 404
 
     user.name = name
@@ -4311,7 +4561,7 @@ def update_user(uid):
 @admin_required
 def delete_all_users():
     """Delete all staff except the current admin"""
-    admin = User.query.get(session['user_id'])
+    admin = db.session.get(User, session['user_id'])
     if not admin or (normalize_role(admin.role) != 'restaurant' and not admin.is_superadmin):
         return jsonify({'error': 'unauthorized'}), 403
 
@@ -4481,7 +4731,13 @@ def save_cafe_settings():
         settings.logo_b64 = (d.get('logo_b64') or '').strip()
     settings.open_time = (d.get('open_time') or '').strip()
     settings.close_time = (d.get('close_time') or '').strip()
-    settings.tax_rate = float(d.get('tax_rate', 5.0))
+    def safe_float(v, default):
+        try:
+            return float(v) if v not in (None, "") else default
+        except ValueError:
+            return default
+
+    settings.tax_rate = safe_float(d.get('tax_rate'), 5.0)
     settings.gst_no = (d.get('gst_no') or '').strip()
     settings.fssai_no = (d.get('fssai_no') or '').strip()
     settings.footer_note = (d.get('footer_note') or '').strip()
@@ -4495,8 +4751,8 @@ def save_cafe_settings():
     settings.show_footer = d.get('show_footer', True)
     settings.receipt_layout = d.get('receipt_layout', 'standard')
     settings.receipt_alignment = d.get('receipt_alignment', 'center')
-    settings.loyalty_points_per_100 = float(d.get('loyalty_points_per_100', 10.0))
-    settings.points_redemption_value = float(d.get('points_redemption_value', 0.5))
+    settings.loyalty_points_per_100 = safe_float(d.get('loyalty_points_per_100'), 10.0)
+    settings.points_redemption_value = safe_float(d.get('points_redemption_value'), 0.5)
     settings.reservation_auto_confirm = bool(d.get('reservation_auto_confirm', False))
     
     db.session.add(settings)
@@ -4699,7 +4955,7 @@ def on_join_scope(data):
     table_id = data.get('table_id')
     if table_id and not tenant_id:
         try:
-            tbl = Table.query.get(int(table_id))
+            tbl = db.session.get(Table, int(table_id))
         except (TypeError, ValueError):
             tbl = None
         if tbl:
@@ -4734,7 +4990,7 @@ def on_call_waiter(data):
             except (TypeError, ValueError):
                 tid = None
     if not tid and data.get('table_id'):
-        tbl = Table.query.get(data['table_id'])
+        tbl = db.session.get(Table, data['table_id'])
         if tbl:
             tid = tbl.tenant_id
     if tid and bid is None:
@@ -4823,6 +5079,16 @@ def ensure_tenant_schema():
             conn.exec_driver_sql('ALTER TABLE "tenant" ADD COLUMN approval_status VARCHAR(20) DEFAULT "approved"')
         if 'features_json' not in columns:
             conn.exec_driver_sql('ALTER TABLE "tenant" ADD COLUMN features_json TEXT DEFAULT "{}"')
+        if 'description' not in columns:
+            conn.exec_driver_sql('ALTER TABLE "tenant" ADD COLUMN description TEXT DEFAULT ""')
+        if 'address' not in columns:
+            conn.exec_driver_sql('ALTER TABLE "tenant" ADD COLUMN address TEXT DEFAULT ""')
+        if 'phone' not in columns:
+            conn.exec_driver_sql('ALTER TABLE "tenant" ADD COLUMN phone VARCHAR(20) DEFAULT ""')
+        if 'cover_image_b64' not in columns:
+            conn.exec_driver_sql('ALTER TABLE "tenant" ADD COLUMN cover_image_b64 TEXT DEFAULT ""')
+        if 'tags_json' not in columns:
+            conn.exec_driver_sql('ALTER TABLE "tenant" ADD COLUMN tags_json TEXT DEFAULT "[]"')
         conn.exec_driver_sql(
             "UPDATE tenant SET approval_status = 'approved' "
             "WHERE approval_status IS NULL OR TRIM(approval_status) = ''"
@@ -4924,6 +5190,11 @@ def ensure_order_table_schema():
             conn.exec_driver_sql('ALTER TABLE "reservation" ADD COLUMN customer_name VARCHAR(100) DEFAULT NULL')
         if 'customer_phone' not in colsR:
             conn.exec_driver_sql('ALTER TABLE "reservation" ADD COLUMN customer_phone VARCHAR(20) DEFAULT NULL')
+        if 'qr_token' not in colsR:
+            conn.exec_driver_sql('ALTER TABLE "reservation" ADD COLUMN qr_token VARCHAR(64) DEFAULT NULL')
+            conn.exec_driver_sql('CREATE UNIQUE INDEX IF NOT EXISTS ix_reservation_qr_token ON reservation(qr_token)')
+        if 'is_verified' not in colsR:
+            conn.exec_driver_sql('ALTER TABLE "reservation" ADD COLUMN is_verified BOOLEAN NOT NULL DEFAULT 0')
 
         # Branch scoping for Floor, Table, InventoryItem
         rows_floor = conn.exec_driver_sql('PRAGMA table_info("floor")').fetchall()
@@ -5479,6 +5750,8 @@ def ensure_sample_data():
             party_size=2,
             reserved_at=datetime.utcnow() + timedelta(days=2),
             status='confirmed',
+            qr_token=uuid.uuid4().hex,
+            is_verified=False,
             notes='Reservation for 2, celebrate anniversary',
             table_id=Table.query.filter_by(number='G1').first().id if Table.query.filter_by(number='G1').first() else None,
             tenant_id=default_tenant.id,

@@ -108,7 +108,18 @@
     if (cafe.show_round_off !== false && order.round_off) {
       data.push(escPosRaw(padLine('Round off', 'Rs.' + Number(order.round_off).toFixed(2), cols)));
     }
-    var grand = order.grand_total != null ? Number(order.grand_total) : (Number(order.total || 0) + Number(order.tip || 0));
+    if (order.discount_amount) {
+      var discountLabel = 'Discount';
+      if (order.coupon_code) discountLabel += ' (' + order.coupon_code + ')';
+      data.push(escPosRaw(padLine(discountLabel, '-Rs.' + Number(order.discount_amount).toFixed(2), cols)));
+    }
+    if (order.loyalty_points_used) {
+      data.push(escPosRaw(padLine('Loyalty Used', '-Rs.' + Number(order.loyalty_points_used).toFixed(2), cols)));
+    }
+    if (order.tip) {
+      data.push(escPosRaw(padLine('Tip', 'Rs.' + Number(order.tip).toFixed(2), cols)));
+    }
+    var grand = order.grand_total != null ? Number(order.grand_total) : Number(order.total || 0);
     data.push(escPosRaw('================================\n'));
     data.push(escPosRaw(ESC + 'E' + '\x01'));
     data.push(escPosRaw(ESC + '!' + '\x30'));
@@ -117,7 +128,6 @@
     data.push(escPosRaw(ESC + 'E' + '\x00'));
     var pm = order.payment_method || '—';
     data.push(escPosRaw('Payment: ' + pm + '\n'));
-    if (order.tip) data.push(escPosRaw(padLine('Tip', 'Rs.' + Number(order.tip).toFixed(2), cols)));
     data.push(escPosRaw(lineSep(cols)));
     data.push(escPosRaw(ESC + 'a' + '\x01'));
     data.push(escPosRaw((cafe.footer_note || 'Thank you! Visit again.') + '\n'));
