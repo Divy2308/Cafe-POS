@@ -5819,9 +5819,9 @@ def ensure_sample_data():
                 db.session.add(inv)
         db.session.commit()
     
-    # Create sample recipes for products
+# Create sample recipes for products
 
-if __name__ == '__main__':
+def initialize_app_data():
     with app.app_context():
         db.create_all()
         ensure_tenant_schema()
@@ -5835,6 +5835,10 @@ if __name__ == '__main__':
         # ensure_demo_catalog()
         # ensure_demo_floors_and_tables()
         # ensure_sample_data()
+
+initialize_app_data()
+
+if __name__ == '__main__':
 
     import os
     port = int(os.environ.get('PORT', 5000))
