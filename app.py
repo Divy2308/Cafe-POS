@@ -83,9 +83,17 @@ if os.path.exists(DB_PATH):
 app = Flask(__name__)
 _secret_key = os.getenv('SECRET_KEY', 'pos-cafe-default-insecure-key')
 app.config['SECRET_KEY'] = _secret_key
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + DB_PATH.replace('\\', '/')
+database_url = (os.getenv('DATABASE_URL') or '').strip()
+if database_url.startswith('postgres://'):
+    database_url = 'postgresql://' + database_url[len('postgres://'):]
+if database_url:
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+else:
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + DB_PATH.replace('\\', '/')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'connect_args': {'timeout': 30}}
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True}
+if app.config['SQLALCHEMY_DATABASE_URI'].startswith('sqlite:///'):
+    app.config['SQLALCHEMY_ENGINE_OPTIONS']['connect_args'] = {'timeout': 30}
 # Security: protect session cookies from JS access and downgrade attacks
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
@@ -1081,8 +1089,12 @@ def auth():
 @app.route('/api/login', methods=['POST'])
 def login():
     d = request.json or {}
-    u = User.query.filter_by(email=d['email']).first()
-    if not u or not check_password_hash(u.password, d['password']):
+    email = (d.get('email') or '').strip()
+    password = d.get('password') or ''
+    if not email or not password:
+        return jsonify({'error': 'Email and password are required'}), 400
+    u = find_user_by_email(email)
+    if not u or not check_password_hash(u.password, password):
         return jsonify({'error': 'Invalid credentials'}), 401
     blocked_message = get_tenant_access_block_message(u)
     if blocked_message:
@@ -5048,7 +5060,12 @@ def ensure_payment_methods():
     if changed:
         db.session.commit()
 
+def is_sqlite_database():
+    return db.engine.dialect.name == 'sqlite'
+
 def ensure_payment_method_schema():
+    if not is_sqlite_database():
+        return
     # Older SQLite databases may not have newer payment method columns.
     with db.engine.connect() as conn:
         rows = conn.exec_driver_sql('PRAGMA table_info("payment_method")').fetchall()
@@ -5062,6 +5079,8 @@ def ensure_payment_method_schema():
         conn.commit()
 
 def ensure_cafe_settings_schema():
+    if not is_sqlite_database():
+        return
     # Older SQLite databases may not have newer cafe settings columns.
     with db.engine.connect() as conn:
         rows = conn.exec_driver_sql('PRAGMA table_info("cafe_settings")').fetchall()
@@ -5071,6 +5090,8 @@ def ensure_cafe_settings_schema():
         conn.commit()
 
 def ensure_tenant_schema():
+    if not is_sqlite_database():
+        return
     # Older SQLite databases may not have the tenant approval_status column yet.
     with db.engine.connect() as conn:
         rows = conn.exec_driver_sql('PRAGMA table_info("tenant")').fetchall()
@@ -5100,6 +5121,8 @@ def ensure_tenant_schema():
         conn.commit()
 
 def ensure_order_table_schema():
+    if not is_sqlite_database():
+        return
     # Older SQLite databases may not have the newer order columns added in code.
     # Add them in-place so existing data stays intact.
     with db.engine.connect() as conn:

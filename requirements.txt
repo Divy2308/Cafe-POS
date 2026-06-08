@@ -6,6 +6,7 @@ flask-wtf
 qrcode[pil]
 pillow
 werkzeug
+psycopg2-binary
 resend
 gevent
 gevent-websocket
