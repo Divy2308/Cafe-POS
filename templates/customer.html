@@ -1033,7 +1033,7 @@
       border: 2px solid var(--muted2);
       background: transparent;
       font-size: 20px;
-      transition: all .2s;
+      transition: transform .12s ease, border-color .2s, background .2s;
     }
 
     .star-btn.active {
@@ -1312,7 +1312,7 @@
       padding: 16px 12px;
       text-align: center;
       cursor: pointer;
-      transition: all .25s;
+      transition: border-color .25s, transform .12s ease, box-shadow .25s;
     }
 
     .menu-item:hover {
@@ -1322,7 +1322,8 @@
     }
 
     .menu-item:active {
-      transform: scale(.97)
+      transform: scale(.96);
+      box-shadow: none;
     }
 
     .menu-item-emoji {
@@ -1423,7 +1424,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: all .15s;
+      transition: transform .1s ease, border-color .15s, color .15s;
     }
 
     .qty-btn:hover {
@@ -1646,6 +1647,51 @@
 
     .btn-sm:hover {
       background: rgba(201, 168, 76, 0.2)
+    }
+
+    .btn-loading {
+      position: relative;
+      pointer-events: none;
+      color: transparent !important;
+      user-select: none;
+    }
+
+    .btn-loading > * {
+      opacity: 0;
+    }
+
+    .btn-loading::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 16px;
+      height: 16px;
+      margin: -8px 0 0 -8px;
+      border: 2px solid var(--spinner-color, currentColor);
+      border-right-color: transparent;
+      border-radius: 50%;
+      animation: btnSpin .7s linear infinite;
+    }
+
+    .btn-gold.btn-loading {
+      --spinner-color: var(--bg);
+    }
+
+    .btn-sm.btn-loading,
+    .btn-ghost.btn-loading {
+      --spinner-color: var(--gold);
+    }
+
+    .res-cancel-btn.btn-loading,
+    .review-submit.btn-loading {
+      --spinner-color: var(--red);
+    }
+
+    @keyframes btnSpin {
+      to {
+        transform: rotate(360deg);
+      }
     }
 
     /* ── TOAST ──────────────────────────────────────────────── */
@@ -1891,7 +1937,7 @@
           <circle cx="11" cy="11" r="8" />
           <path d="m21 21-4.35-4.35" />
         </svg>
-        <input type="text" id="r-search" placeholder="Search restaurants…" oninput="filterRestaurants(this.value)">
+        <input type="text" id="r-search" placeholder="Search restaurants…" oninput="filterRestaurantsInput(this.value)">
       </div>
     </div>
 
@@ -2037,14 +2083,14 @@
 
               <div class="form-group">
                 <label class="form-label">Select Table</label>
-                <button class="btn-sm" onclick="checkAvailability()" style="margin-bottom:12px">
+                <button class="btn-sm" onclick="checkAvailability(this)" style="margin-bottom:12px">
                   ✦ Check Available Tables
                 </button>
                 <div id="table-picker"></div>
               </div>
               <input type="hidden" id="res-table-id">
 
-              <button class="btn-gold" id="res-submit-btn" disabled onclick="submitReservation()">
+              <button class="btn-gold" id="res-submit-btn" disabled onclick="submitReservation(this)">
                 Request Reservation
               </button>
             </div>
@@ -2120,7 +2166,7 @@
               <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px">
                 <div style="font-size:12px;color:var(--muted);margin-bottom:4px" id="cart-res-label">No reservation
                   linked yet</div>
-                <button class="btn-gold" id="cart-attach-btn" disabled onclick="attachCart()">Save to
+                <button class="btn-gold" id="cart-attach-btn" disabled onclick="attachCart(this)">Save to
                   Reservation</button>
                 <button class="btn-ghost" onclick="clearCart()">Clear Cart</button>
               </div>
@@ -2161,6 +2207,71 @@
     let cart = [];
     let activeReservationId = null;
     let reservations = [];
+
+    function throttle(fn, wait) {
+      let throttled = false;
+      return function (...args) {
+        if (throttled) return;
+        throttled = true;
+        fn.apply(this, args);
+        setTimeout(() => {
+          throttled = false;
+        }, wait);
+      };
+    }
+
+    function debounce(fn, wait) {
+      let timeoutId = null;
+      return function (...args) {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          fn.apply(this, args);
+        }, wait);
+      };
+    }
+
+    function getButtonText(btn) {
+      return (btn?.dataset.originalText || btn?.textContent || '').replace(/\s+/g, ' ').trim();
+    }
+
+    async function withLoadingBtn(btn, asyncFn, options = {}) {
+      if (!btn) return asyncFn();
+      if (btn.dataset.loading === 'true') return;
+
+      const {
+        loadingText = 'Working…',
+        successText = null,
+        restoreOnSuccess = true,
+        restoreOnError = true,
+        keepDisabledOnSuccess = false
+      } = options;
+
+      const originalText = getButtonText(btn);
+      btn.dataset.originalText = originalText;
+      btn.dataset.loading = 'true';
+      btn.disabled = true;
+      btn.setAttribute('aria-busy', 'true');
+      if (loadingText) btn.textContent = loadingText;
+      btn.classList.add('btn-loading');
+
+      try {
+        const result = await asyncFn();
+        btn.classList.remove('btn-loading');
+        btn.removeAttribute('aria-busy');
+        btn.dataset.loading = 'false';
+        if (successText) btn.textContent = successText;
+        else if (restoreOnSuccess) btn.textContent = originalText;
+        btn.disabled = !!keepDisabledOnSuccess;
+        return result;
+      } catch (error) {
+        btn.classList.remove('btn-loading');
+        btn.removeAttribute('aria-busy');
+        btn.dataset.loading = 'false';
+        if (restoreOnError) btn.textContent = originalText;
+        btn.disabled = false;
+        throw error;
+      }
+    }
 
     async function api(url, method = 'GET', body = null) {
       const options = {
@@ -2256,6 +2367,12 @@
       renderRestaurants(filtered);
     }
 
+    const debouncedFilterRestaurants = debounce(filterRestaurants, 200);
+
+    function filterRestaurantsInput(q) {
+      debouncedFilterRestaurants(q);
+    }
+
     async function openRestaurant(id) {
       currentRestaurant = RESTAURANTS.find(r => r.id === id);
       if (!currentRestaurant) return;
@@ -2345,19 +2462,41 @@
     </div>`;
     }
 
-    function setStars(n) {
+    function applyStars(n) {
       document.querySelectorAll('.star-btn').forEach(b => {
         b.classList.toggle('active', parseInt(b.dataset.n) <= n);
       });
     }
 
-    function submitReview() {
+    const throttledSetStars = throttle(applyStars, 200);
+
+    function setStars(n) {
+      throttledSetStars(n);
+    }
+
+    async function submitReviewCore() {
       document.getElementById('review-panel').innerHTML = '';
       showToast('Thank you for your review! ✓', 'success');
     }
 
+    function submitReview(btn) {
+      const targetBtn = btn instanceof HTMLElement
+        ? btn
+        : document.querySelector('#review-panel .review-submit, #review-panel .btn-gold, #review-panel button');
+      const run = () => submitReviewCore();
+      if (!targetBtn) {
+        run().catch(() => {});
+        return;
+      }
+      withLoadingBtn(targetBtn, run, {
+        loadingText: 'Submitting…',
+        successText: 'Submitted',
+        keepDisabledOnSuccess: true
+      }).catch(() => {});
+    }
+
     /* ── TABLE PICKER ───────────────────────────────────────── */
-    async function checkAvailability() {
+    async function checkAvailabilityCore() {
       if (!currentRestaurant) {
         showToast('Please choose a restaurant first', 'warning');
         return;
@@ -2409,7 +2548,24 @@
             <div class="empty-state-title">Could not load availability</div>
             <div class="empty-state-sub">Try again later.</div>
           </div>`;
+        throw err;
       }
+    }
+
+    function checkAvailability(btn) {
+      if (!currentRestaurant) {
+        showToast('Please choose a restaurant first', 'warning');
+        return;
+      }
+      const dt = document.getElementById('res-datetime').value;
+      if (!dt) {
+        showToast('Please pick a date and time first', 'warning');
+        return;
+      }
+      const targetBtn = btn instanceof HTMLElement ? btn : document.querySelector('#panel-reserve .btn-sm');
+      withLoadingBtn(targetBtn, () => checkAvailabilityCore(), {
+        loadingText: 'Checking…'
+      }).catch(() => {});
     }
 
     function selectTable(id, num, el) {
@@ -2419,7 +2575,7 @@
       document.getElementById('res-submit-btn').disabled = false;
     }
 
-    async function submitReservation() {
+    async function submitReservationCore() {
       if (!currentRestaurant) {
         showToast('Please choose a restaurant first', 'warning');
         return;
@@ -2464,7 +2620,32 @@
         showTab('myres');
       } catch (err) {
         showToast(err.message || 'Unable to create reservation', 'error');
+        throw err;
       }
+    }
+
+    function submitReservation(btn) {
+      if (!currentRestaurant) {
+        showToast('Please choose a restaurant first', 'warning');
+        return;
+      }
+      const name = document.getElementById('res-name').value.trim();
+      const phone = document.getElementById('res-phone').value.trim();
+      const dt = document.getElementById('res-datetime').value;
+      if (!name || !phone) {
+        showToast('Please enter your name and phone number', 'warning');
+        return;
+      }
+      if (!dt) {
+        showToast('Please select a date and time', 'warning');
+        return;
+      }
+      const targetBtn = btn instanceof HTMLElement ? btn : document.getElementById('res-submit-btn');
+      withLoadingBtn(targetBtn, () => submitReservationCore(), {
+        loadingText: 'Sending…',
+        successText: 'Sent',
+        keepDisabledOnSuccess: true
+      }).catch(() => {});
     }
 
     /* ── MENU & CART ────────────────────────────────────────── */
@@ -2484,14 +2665,14 @@
       }
       const cats = filterCat ? MENU.filter(c => c.id === filterCat) : MENU;
       grid.innerHTML = cats.flatMap(c => c.items.map(p => `
-    <div class="menu-item" onclick="addToCart(${p.id},'${p.name}',${p.price})">
+    <div class="menu-item" onclick='addToCart(${p.id},${JSON.stringify(p.name)},${p.price})'>
       <div class="menu-item-emoji">${p.emoji}</div>
       <div class="menu-item-name">${p.name}</div>
       <div class="menu-item-price">₹${p.price}</div>
     </div>`)).join('');
     }
 
-    function addToCart(id, name, price) {
+    function addToCartCore(id, name, price) {
       const ex = cart.find(i => i.id === id);
       if (ex) ex.qty++;
       else cart.push({ id, name, price, qty: 1 });
@@ -2499,12 +2680,24 @@
       showToast(`Added ${name}`, 'success');
     }
 
-    function updateQty(id, delta) {
+    const throttledAddToCart = throttle(addToCartCore, 800);
+
+    function addToCart(id, name, price) {
+      throttledAddToCart(id, name, price);
+    }
+
+    function updateQtyCore(id, delta) {
       const idx = cart.findIndex(i => i.id === id);
       if (idx === -1) return;
       cart[idx].qty += delta;
       if (cart[idx].qty <= 0) cart.splice(idx, 1);
       renderCart();
+    }
+
+    const throttledUpdateQty = throttle(updateQtyCore, 300);
+
+    function updateQty(id, delta) {
+      throttledUpdateQty(id, delta);
     }
 
     function clearCart() {
@@ -2540,10 +2733,23 @@
       if (activeReservationId) document.getElementById('cart-attach-btn').disabled = false;
     }
 
-    function attachCart() {
+    async function attachCartCore() {
       if (!activeReservationId) { showToast('Create a reservation first', 'warning'); return; }
       showToast('Pre-order items are attached when you submit the reservation.', 'warning');
       showTab('myres');
+    }
+
+    function attachCart(btn) {
+      if (!activeReservationId) {
+        showToast('Create a reservation first', 'warning');
+        return;
+      }
+      const targetBtn = btn instanceof HTMLElement ? btn : document.getElementById('cart-attach-btn');
+      withLoadingBtn(targetBtn, () => attachCartCore(), {
+        loadingText: 'Saving…',
+        successText: 'Saved',
+        keepDisabledOnSuccess: true
+      }).catch(() => {});
     }
 
     /* ── RESERVATIONS ───────────────────────────────────────── */
@@ -2592,21 +2798,31 @@
       <div class="res-item-right">
         <span class="status-pill status-${r.status}">${r.status}</span>
         ${r.status === 'confirmed' ? `<button class="btn-ghost res-qr-btn" onclick="showReservationQr(${r.id})">Show QR</button>` : ''}
-        ${canCancel ? `<button class="res-cancel-btn" onclick="cancelRes(${r.id})">Cancel</button>` : ''}
+        ${canCancel ? `<button class="res-cancel-btn" onclick="cancelRes(${r.id}, this)">Cancel</button>` : ''}
       </div>
     </div>`;
       }).join('');
     }
 
-    async function cancelRes(id) {
-      if (!confirm('Cancel this reservation?')) return;
+    async function cancelResCore(id) {
       try {
         await api('/api/reservations/' + id, 'DELETE');
         showToast('Reservation cancelled.', 'warning');
         await loadReservations();
       } catch (err) {
         showToast(err.message || 'Unable to cancel reservation', 'error');
+        throw err;
       }
+    }
+
+    function cancelRes(id, btn) {
+      if (!confirm('Cancel this reservation?')) return;
+      const targetBtn = btn instanceof HTMLElement ? btn : null;
+      withLoadingBtn(targetBtn, () => cancelResCore(id), {
+        loadingText: 'Cancelling…',
+        successText: 'Cancelled',
+        keepDisabledOnSuccess: true
+      }).catch(() => {});
     }
 
     async function showReservationQr(id) {
