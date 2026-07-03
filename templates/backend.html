@@ -501,7 +501,6 @@
               <h2 class="font-display text-xl font-700 mb-1">Customer Reviews</h2>
               <p class="text-gray-500 text-sm">All reviews submitted from paid customer orders</p>
             </div>
-            <button onclick="loadReviews()" class="btn-ghost px-4 py-2 rounded-xl text-sm">Reload</button>
           </div>
           <div id="reviews-summary" class="grid gap-4 mb-6 reviews-summary-grid"
             style="grid-template-columns:repeat(3,1fr)"></div>
@@ -536,6 +535,9 @@
         <!-- SETTINGS TAB -->
         <div id="tab-settings" class="tab-content">
           <div class="mb-6">
+            <h2 class="font-display text-xl font-700 mb-1">Settings</h2>
+            <p class="text-gray-500 text-sm">Business profile, billing, printer, and reservation options</p>
+          </div>
           <div class="card p-6 max-w-2xl mb-6" style="border-radius:20px">
             <h3 class="text-sm font-bold text-white mb-4 uppercase tracking-wider">Public Restaurant Profile</h3>
             <p class="text-[10px] text-gray-500 mb-4">This information is shown to customers on the reservation portal.</p>
@@ -1111,13 +1113,16 @@
     tbody.innerHTML = allProducts.map(p => {
       const catName = (getCatName(p.category_id) || '').toLowerCase();
       let imgPath = '';
-      if (catName.includes('pizza')) imgPath = '/static/img/categories/pizza.png';
+      if (catName.includes('tea') || catName.includes('coffee')) imgPath = '/static/img/categories/teaorcoffee.png';
+      else if (catName.includes('snack')) imgPath = '/static/img/categories/Snacks.png';
+      else if (catName.includes('sizzler')) imgPath = '/static/img/categories/sizzler.png';
+      else if (catName.includes('pizza')) imgPath = '/static/img/categories/pizza.png';
       else if (catName.includes('burger')) imgPath = '/static/img/categories/burger.png';
       else if (catName.includes('pasta')) imgPath = '/static/img/categories/pasta.png';
       else if (catName.includes('salad')) imgPath = '/static/img/categories/salads.png';
       else if (catName.includes('dessert')) imgPath = '/static/img/categories/Desserts.png';
       else if (catName.includes('mains')) imgPath = '/static/img/categories/mains.png';
-      else if (catName.includes('drink') || catName.includes('water') || catName.includes('beverage') || catName.includes('juice') || catName.includes('coffee') || catName.includes('tea')) {
+      else if (catName.includes('drink') || catName.includes('water') || catName.includes('beverage') || catName.includes('juice')) {
           imgPath = '/static/img/categories/Beverages.png';
       }
 
@@ -1143,8 +1148,8 @@
       <td class="px-4 py-3 text-sm text-gray-400">${p.tax}%</td>
       <td class="px-4 py-3 text-sm text-gray-400">${escHtml(p.unit || 'pcs')}</td>
       <td class="px-4 py-3">
-        <span class="status-badge ${p.is_active ? 'active' : 'inactive'}">
-          ${p.is_active ? 'Active' : 'Inactive'}
+        <span class="status-badge ${p.active !== false ? 'active' : 'inactive'}">
+          ${p.active !== false ? 'Active' : 'Inactive'}
         </span>
       </td>
       <td class="px-4 py-3 text-center">
@@ -1406,7 +1411,7 @@
     document.getElementById('p-category').value = getCatName(p.category_id);
     document.getElementById('p-unit').value = p.unit || 'pcs';
     document.getElementById('p-desc').value = p.description || '';
-    document.getElementById('p-active').checked = p.active;
+    document.getElementById('p-active').checked = p.active !== false;
     document.getElementById('p-addons-container').innerHTML = '';
     if (p.addons && p.addons.length) {
       p.addons.forEach(a => addAddonRow(a.name, a.price));
@@ -1452,7 +1457,7 @@
     let r;
     if (editId) { r = await api('/api/products/' + editId, 'PUT', d); if (r.ok) toast('Product updated!'); }
     else { r = await api('/api/products', 'POST', d); if (r.ok) toast('Product added!'); }
-    if (r.ok) { closeProductModal(); const pd = await api('/api/products/all'); allProducts = pd.products; allCats = pd.categories; renderProductsTable(); }
+    if (r.ok) { closeProductModal(); const pd = await api('/api/products/all'); allProducts = pd.products || []; allCats = pd.categories || []; renderProductsTable(); }
     else if (r.error) toast(r.error, 'error');
   }
 

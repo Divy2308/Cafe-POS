@@ -260,6 +260,19 @@ class Branch(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     tenant = db.relationship('Tenant', backref='branches')
 
+class BranchRequest(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    branch_name = db.Column(db.String(100), nullable=False)
+    address = db.Column(db.Text, default='')
+    phone = db.Column(db.String(20), default='')
+    status = db.Column(db.String(20), default='pending')  # pending, approved, rejected
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+    reviewed_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    tenant = db.relationship('Tenant', backref='branch_requests', foreign_keys=[tenant_id])
+
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -1677,6 +1690,142 @@ def reject_shrey_request(tenant_id):
     tenant.approval_status = 'rejected'
     db.session.commit()
     return jsonify({'ok': True, 'request': _serialize_shrey_request(tenant)})
+
+@csrf.exempt
+@app.route('/api/shrey/requests/<int:tenant_id>/delete', methods=['DELETE'])
+def delete_shrey_restaurant(tenant_id):
+    if not session.get('shrey_admin'):
+        return jsonify({'error': 'unauthorized'}), 401
+
+    tenant = Tenant.query.get_or_404(tenant_id)
+    name = tenant.name
+
+    try:
+        # Delete all child records in dependency order (deepest first)
+        # 1. Kitchen tickets
+        KitchenTicket.query.filter_by(tenant_id=tenant_id).delete(synchronize_session=False)
+        # 2. Order items (via orders)
+        order_ids = [o.id for o in Order.query.filter_by(tenant_id=tenant_id).all()]
+        if order_ids:
+            OrderItem.query.filter(OrderItem.order_id.in_(order_ids)).delete(synchronize_session=False)
+        # 3. Orders
+        Order.query.filter_by(tenant_id=tenant_id).delete(synchronize_session=False)
+        # 4. Sessions
+        Session.query.filter_by(tenant_id=tenant_id).delete(synchronize_session=False)
+        # 5. Reservations + items
+        res_ids = [r.id for r in Reservation.query.filter_by(tenant_id=tenant_id).all()]
+        if res_ids:
+            ReservationItem.query.filter(ReservationItem.reservation_id.in_(res_ids)).delete(synchronize_session=False)
+        Reservation.query.filter_by(tenant_id=tenant_id).delete(synchronize_session=False)
+        # 6. Addons (via products)
+        prod_ids = [p.id for p in Product.query.filter_by(tenant_id=tenant_id).all()]
+        if prod_ids:
+            Addon.query.filter(Addon.product_id.in_(prod_ids)).delete(synchronize_session=False)
+        # 7. Products
+        Product.query.filter_by(tenant_id=tenant_id).delete(synchronize_session=False)
+        # 8. Categories
+        Category.query.filter_by(tenant_id=tenant_id).delete(synchronize_session=False)
+        # 9. Tables
+        Table.query.filter_by(tenant_id=tenant_id).delete(synchronize_session=False)
+        # 10. Floors
+        Floor.query.filter_by(tenant_id=tenant_id).delete(synchronize_session=False)
+        # 11. Customers
+        Customer.query.filter_by(tenant_id=tenant_id).delete(synchronize_session=False)
+        # 12. Payment methods
+        PaymentMethod.query.filter_by(tenant_id=tenant_id).delete(synchronize_session=False)
+        # 13. Inventory logs then items
+        inv_ids = [i.id for i in InventoryItem.query.filter_by(tenant_id=tenant_id).all()]
+        if inv_ids:
+            InventoryLog.query.filter(InventoryLog.inventory_item_id.in_(inv_ids)).delete(synchronize_session=False)
+            WastageLog.query.filter(WastageLog.inventory_item_id.in_(inv_ids)).delete(synchronize_session=False)
+        InventoryItem.query.filter_by(tenant_id=tenant_id).delete(synchronize_session=False)
+        # 14. Attendance, push subs, coupons, settings
+        AttendanceEvent.query.filter_by(tenant_id=tenant_id).delete(synchronize_session=False)
+        PushSubscription.query.filter_by(tenant_id=tenant_id).delete(synchronize_session=False)
+        Coupon.query.filter_by(tenant_id=tenant_id).delete(synchronize_session=False)
+        CafeSettings.query.filter_by(tenant_id=tenant_id).delete(synchronize_session=False)
+        # 15. Users
+        User.query.filter_by(tenant_id=tenant_id).delete(synchronize_session=False)
+        # 16. Branch requests & branches
+        BranchRequest.query.filter_by(tenant_id=tenant_id).delete(synchronize_session=False)
+        Branch.query.filter_by(tenant_id=tenant_id).delete(synchronize_session=False)
+        # 17. Finally the tenant
+        db.session.delete(tenant)
+        db.session.commit()
+        return jsonify({'ok': True, 'name': name})
+    except Exception as e:
+        db.session.rollback()
+        app.logger.exception('Failed deleting Shrey restaurant %s', tenant_id)
+        return jsonify({'error': 'Delete failed', 'details': str(e)}), 500
+
+@app.route('/api/shrey/branch-requests')
+def shrey_branch_requests_api():
+    if not session.get('shrey_admin'):
+        return jsonify({'error': 'unauthorized'}), 401
+
+    try:
+        branch_reqs = BranchRequest.query.order_by(BranchRequest.created_at.desc()).all()
+        result = []
+        for br in branch_reqs:
+            result.append({
+                'id': br.id,
+                'tenant_id': br.tenant_id,
+                'user_id': br.user_id,
+                'branch_name': br.branch_name,
+                'address': br.address or '',
+                'phone': br.phone or '',
+                'status': br.status,
+                'created_at': br.created_at.strftime('%Y-%m-%d %H:%M') if br.created_at else '',
+                'reviewed_at': br.reviewed_at.strftime('%Y-%m-%d %H:%M') if br.reviewed_at else None,
+            })
+        return jsonify({'requests': result})
+    except Exception as e:
+        app.logger.exception('Shrey branch requests failed')
+        return jsonify({'error': 'Failed to load branch requests', 'details': str(e)}), 500
+
+@csrf.exempt
+@app.route('/api/shrey/branch-requests/<int:br_id>/approve', methods=['POST'])
+def approve_shrey_branch_request(br_id):
+    if not session.get('shrey_admin'):
+        return jsonify({'error': 'unauthorized'}), 401
+
+    br = BranchRequest.query.get_or_404(br_id)
+    br.status = 'approved'
+    br.reviewed_at = datetime.utcnow()
+
+    # Create the actual Branch record so the tenant can use it
+    existing = Branch.query.filter_by(tenant_id=br.tenant_id, name=br.branch_name).first()
+    if not existing:
+        new_branch = Branch(
+            name=br.branch_name,
+            address=br.address or '',
+            phone=br.phone or '',
+            tenant_id=br.tenant_id,
+        )
+        db.session.add(new_branch)
+
+    db.session.commit()
+    return jsonify({'ok': True, 'request': {
+        'id': br.id, 'status': br.status,
+        'branch_name': br.branch_name, 'tenant_id': br.tenant_id,
+        'reviewed_at': br.reviewed_at.strftime('%Y-%m-%d %H:%M'),
+    }})
+
+@csrf.exempt
+@app.route('/api/shrey/branch-requests/<int:br_id>/reject', methods=['POST'])
+def reject_shrey_branch_request(br_id):
+    if not session.get('shrey_admin'):
+        return jsonify({'error': 'unauthorized'}), 401
+
+    br = BranchRequest.query.get_or_404(br_id)
+    br.status = 'rejected'
+    br.reviewed_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify({'ok': True, 'request': {
+        'id': br.id, 'status': br.status,
+        'branch_name': br.branch_name, 'tenant_id': br.tenant_id,
+        'reviewed_at': br.reviewed_at.strftime('%Y-%m-%d %H:%M'),
+    }})
 
 
 @csrf.exempt
@@ -4221,23 +4370,27 @@ def switch_branch():
 @admin_required
 def update_branch_detail(bid):
     user = get_current_user()
-    if not is_superadmin(user):
-         return jsonify({'error': 'Only super-admins can manage branches'}), 403
-    
     branch = Branch.query.filter_by(id=bid, tenant_id=get_current_tenant_id()).first_or_404()
-    
+
+    if not is_superadmin(user):
+        role = normalize_role(user.role)
+        if role == 'manager':
+            if branch.id != user.branch_id:
+                return jsonify({'error': 'Managers can only modify their own branch'}), 403
+        elif role != 'restaurant':
+            return jsonify({'error': 'Only restaurant admins and branch managers can manage branches'}), 403
+
     if request.method == 'DELETE':
-        # Safety check: don't delete if it has users or orders?
         db.session.delete(branch)
         db.session.commit()
         return jsonify({'ok': True})
-    
+
     d = request.json or {}
     branch.name = (d.get('name') or branch.name).strip()
     branch.address = (d.get('address') or branch.address).strip()
     branch.phone = (d.get('phone') or branch.phone).strip()
     branch.monthly_target = float(d.get('monthly_target', branch.monthly_target or 0))
-    
+
     db.session.commit()
     return jsonify({'ok': True})
 

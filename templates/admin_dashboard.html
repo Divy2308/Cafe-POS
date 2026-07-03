@@ -291,7 +291,7 @@
 
 <div id="branchModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
   <div class="card p-8 max-w-lg w-full mx-4">
-    <h2 class="text-2xl font-bold mb-6">Add Branch</h2>
+    <h2 class="text-2xl font-bold mb-6" id="branchModalTitle">Add Branch</h2>
     <div class="space-y-4">
       <div>
         <label class="block text-sm text-gray-500 mb-2">Branch Name</label>
@@ -301,10 +301,19 @@
         <label class="block text-sm text-gray-500 mb-2">Address</label>
         <textarea id="branchAddress" rows="3"></textarea>
       </div>
+      <div>
+        <label class="block text-sm text-gray-500 mb-2">Phone</label>
+        <input type="tel" id="branchPhone">
+      </div>
+      <div>
+        <label class="block text-sm text-gray-500 mb-2">Monthly Target</label>
+        <input type="number" id="branchTarget" min="0" step="1">
+      </div>
+      <p id="branchModalNote" class="text-sm text-gray-400"></p>
     </div>
     <div class="flex gap-3 mt-6">
       <button onclick="closeBranchModal()" class="flex-1 btn-ghost py-2 rounded-lg font-semibold">Cancel</button>
-      <button onclick="createBranch()" class="flex-1 btn-primary py-2 rounded-lg text-white font-semibold">Add Branch</button>
+      <button id="branchSubmitBtn" onclick="createBranch()" class="flex-1 btn-primary py-2 rounded-lg text-white font-semibold">Add Branch</button>
     </div>
   </div>
 </div>
@@ -399,12 +408,19 @@ function closeAddUserModal() {
 
 function openBranchModal() {
   document.getElementById('branchModal').classList.remove('hidden');
+  const title = DASHBOARD_CONTEXT.isSuperadmin ? 'Add Branch' : 'Request New Branch';
+  const actionText = DASHBOARD_CONTEXT.isSuperadmin ? 'Add Branch' : 'Request Branch';
+  document.getElementById('branchModalTitle').textContent = title;
+  document.getElementById('branchSubmitBtn').textContent = actionText;
+  document.getElementById('branchModalNote').textContent = DASHBOARD_CONTEXT.isSuperadmin ? '' : 'Non-super-admin users can request a new branch. /shrey admin approval is required.';
 }
 
 function closeBranchModal() {
   document.getElementById('branchModal').classList.add('hidden');
   document.getElementById('branchName').value = '';
   document.getElementById('branchAddress').value = '';
+  document.getElementById('branchPhone').value = '';
+  document.getElementById('branchTarget').value = '';
 }
 
 function formatMoney(amount) {
@@ -427,6 +443,8 @@ async function loadBranches() {
   const wrap = document.getElementById('branchSwitcherWrap');
   if (!DASHBOARD_CONTEXT.isSuperadmin) {
     wrap.classList.add('hidden');
+    const addBranchBtn = document.getElementById('addBranchBtn');
+    if (addBranchBtn) addBranchBtn.classList.add('hidden');
     return;
   }
 
@@ -557,20 +575,22 @@ async function createBranch() {
   const payload = {
     name: document.getElementById('branchName').value.trim(),
     address: document.getElementById('branchAddress').value.trim(),
+    phone: document.getElementById('branchPhone').value.trim(),
   };
   if (!payload.name) {
     toast('Branch name is required', 'error');
     return;
   }
-  const result = await api('/api/branches', 'POST', payload);
+  const endpoint = DASHBOARD_CONTEXT.isSuperadmin ? '/api/branches' : '/api/branch-requests';
+  const result = await api(endpoint, 'POST', payload);
   if (result.error) {
     toast(result.error, 'error');
     return;
   }
   closeBranchModal();
-  toast('Branch created', 'success');
+  toast(DASHBOARD_CONTEXT.isSuperadmin ? 'Branch created' : 'Branch request submitted for approval', 'success');
   await loadBranches();
-  await loadBranchComparison();
+  if (DASHBOARD_CONTEXT.isSuperadmin) await loadBranchComparison();
 }
 
 function openAddInventoryModal() {

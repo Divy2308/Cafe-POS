@@ -12,6 +12,10 @@
     padding: 0;
   }
 
+  #pos-top-bar {
+    display: none !important;
+  }
+
   .table-card {
     transition: all .2s;
     cursor: pointer;
@@ -270,6 +274,40 @@
     backdrop-filter: blur(6px);
   }
 
+  /* Addon modal — above bottom nav & cart drawer */
+  #addon-modal {
+    z-index: 1100;
+  }
+
+  #addon-modal .addon-modal-panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    max-height: min(90vh, 640px);
+    width: 100%;
+  }
+
+  body.addon-modal-open {
+    overflow: hidden;
+  }
+
+  @media (max-width: 640px) {
+    #addon-modal {
+      align-items: flex-end;
+      padding: 0;
+    }
+
+    #addon-modal .addon-modal-panel {
+      border-radius: 20px 20px 0 0;
+      max-height: 85vh;
+      margin: 0;
+    }
+
+    #addon-modal .addon-option {
+      background: var(--card-2);
+      border-color: var(--border);
+    }
+  }
+
   .pay-method {
     cursor: pointer;
     transition: all .2s;
@@ -489,6 +527,28 @@
       height: calc(100vh - 70px) !important;
       overflow-y: auto;
       padding-bottom: 70px !important;
+    }
+
+    /* Compact top bar — bottom nav already shows the active view */
+    #pos-top-bar {
+      display: none !important;
+    }
+
+    #view-order-header {
+      padding: 8px 12px !important;
+    }
+
+    #view-order .px-4.pt-4.pb-2 {
+      padding: 8px 12px 6px !important;
+    }
+
+    #view-order #product-search {
+      padding: 10px 12px !important;
+      min-height: 40px;
+    }
+
+    #view-order .flex-1.overflow-auto.p-4 {
+      padding: 10px 12px 80px !important;
     }
 
     .mobile-menu-btn {
@@ -717,14 +777,14 @@
       padding: 12px !important;
     }
 
-    .card {
+    #view-payment .card {
       max-height: 60vh !important;
       overflow-y: auto !important;
     }
   }
 
   @media (max-width: 480px) {
-    .card {
+    #view-payment .card {
       max-height: 50vh !important;
       overflow-y: auto !important;
     }
@@ -735,15 +795,15 @@
     }
   }
 
-  /* Touch-friendly buttons */
+  /* Touch-friendly tap targets — don't flatten product cards */
   .table-card,
-  .product-btn,
   .pay-method,
   .cat-pill {
     min-height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  }
+
+  .product-btn {
+    min-height: 120px;
   }
 
   @media (max-width: 1024px) {
@@ -1238,27 +1298,21 @@
   <div class="flex-1 flex flex-col overflow-hidden" id="main-content">
 
     <!-- Top Bar -->
-    <div class="border-b border-border px-6 py-3 flex items-center justify-between" style="background:var(--bg)">
+    <div id="pos-top-bar" class="border-b border-border px-6 py-3 flex items-center justify-between" style="background:var(--bg)">
       <div class="flex items-center gap-3 flex-wrap">
         <div id="breadcrumb" class="text-sm text-gray-500">Floor View</div>
         <div id="printer-status-pill"
           class="flex items-center gap-1.5 text-[10px] text-gray-500 px-2 py-1 rounded-lg bg-white/5 border border-white/10"
           title="Printer status">
           <span id="printer-status-dot" class="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
-          <span id="printer-status-label">Print: browser</span>
-        </div>
+          </div>
       </div>
       <div class="flex items-center gap-2">
         <button data-theme-toggle onclick="toggleTheme()"
           class="btn-ghost px-3 py-1.5 rounded-lg text-xs flex items-center gap-2" type="button">
           Light Mode
         </button>
-        <button onclick="refreshBills()" class="btn-ghost px-3 py-1.5 rounded-lg text-xs flex items-center gap-2">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg> Reload
-        </button>
+        
       </div>
     </div>
 
@@ -1268,6 +1322,10 @@
         <div class="flex items-center justify-between">
           <h2 class="font-display text-xl font-700">Floor Plan</h2>
           <div class="flex gap-2">
+            <button data-theme-toggle onclick="toggleTheme()"
+              class="btn-ghost px-3 py-1.5 rounded-lg text-xs flex items-center gap-2" type="button">
+              Light Mode
+            </button>
             <button id="merge-mode-btn" onclick="toggleMergeMode()"
               class="btn-ghost px-3 py-1.5 rounded-lg text-xs border border-border flex items-center gap-2">
               🔗 Merge Tables
@@ -1291,7 +1349,7 @@
       <!-- Products Panel -->
       <div class="flex-1 flex flex-col overflow-hidden border-r border-border relative">
         <div id="view-order-header" class="p-4 border-b border-border flex items-center justify-between"
-          style="background:#0a0a0a">
+          style="background:var(--card)">
           <div class="flex items-center gap-3">
             <button onclick="showView('floor')" class="btn-ghost p-2 rounded-lg">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1313,11 +1371,11 @@
           </div>
         </div>
 
-        <div class="px-4 pt-4 pb-2 border-b border-border flex flex-col gap-3" style="background:#0a0a0a">
+        <div class="px-4 pt-4 pb-2 border-b border-border flex flex-col gap-3" style="background:var(--card)">
           <div class="flex gap-2">
             <input type="text" id="product-search" placeholder="🔍 Search products..." oninput="filterProducts()"
               class="flex-1 bg-card-2 border border-border rounded-xl px-4 py-3 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition font-500"
-              style="background:#1a1a1a;border:1px solid #2a2a2a;">
+              style="background:var(--input-bg);border:1px solid var(--input-border);color:var(--text);">
           </div>
           <div id="cat-pills-wrap" class="flex overflow-x-auto no-scrollbar pb-1">
             <div id="cat-pills" class="flex gap-2"></div>
@@ -1418,12 +1476,7 @@
           <h2 class="font-display text-xl font-700">Bills</h2>
           <p class="text-sm text-gray-500">Sent orders waiting for payment</p>
         </div>
-        <button onclick="reloadData()" class="btn-ghost px-3 py-1.5 rounded-lg text-xs flex items-center gap-2">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg> Reload
-        </button>
+        
       </div>
       <div id="bills-grid" class="grid gap-4"
         style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr));align-content:start"></div>
@@ -1624,27 +1677,28 @@
 </div>
 
 <!-- Addon Selection Modal -->
-<div id="addon-modal" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-[60]"
+<div id="addon-modal" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-[1100]"
   onclick="if(event.target===this)closeAddonModal()">
-  <div class="card p-6 w-full max-w-sm m-4 overflow-hidden flex flex-col" style="border-radius:24px; max-height: 85vh;">
-    <div class="flex justify-between items-start mb-4">
-      <div>
-        <h3 id="addon-product-name" class="font-display text-xl font-700">Customize Item</h3>
+  <div class="addon-modal-panel card p-5 sm:p-6 w-full max-w-sm sm:m-4 overflow-hidden flex flex-col"
+    style="border-radius:24px;" onclick="event.stopPropagation()">
+    <div class="flex justify-between items-start mb-3 sm:mb-4 gap-3">
+      <div class="min-w-0">
+        <h3 id="addon-product-name" class="font-display text-lg sm:text-xl font-700 text-heading truncate">Customize Item</h3>
         <p id="addon-product-price" class="text-sm text-brand-500 font-bold"></p>
       </div>
-      <button onclick="closeAddonModal()" class="text-gray-500 p-1">✕</button>
+      <button type="button" onclick="closeAddonModal()" class="text-gray-500 p-2 shrink-0" aria-label="Close">✕</button>
     </div>
 
-    <div id="addon-list" class="flex-1 overflow-y-auto space-y-3 py-2 pr-1">
+    <div id="addon-list" class="flex-1 overflow-y-auto space-y-2 sm:space-y-3 py-1 pr-1 min-h-0">
       <!-- Addons will be injected here -->
     </div>
 
-    <div class="mt-6 pt-4 border-t border-border">
-      <div class="flex justify-between items-center mb-4">
-        <span class="text-sm text-gray-400">Total Price</span>
-        <span id="addon-total-display" class="text-xl font-800 text-white">₹0</span>
+    <div class="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-border shrink-0">
+      <div class="flex justify-between items-center mb-3 sm:mb-4">
+        <span class="text-sm text-gray-500">Total Price</span>
+        <span id="addon-total-display" class="text-xl font-800 text-heading">₹0</span>
       </div>
-      <button id="addon-confirm-btn"
+      <button id="addon-confirm-btn" type="button"
         class="btn-primary w-full py-3.5 rounded-xl font-bold transition-all active:scale-95 shadow-lg shadow-brand-500/20">
         Add to Ticket
       </button>
@@ -2135,13 +2189,16 @@
         const catName = (c.name || '').toLowerCase();
         
         let imgPath = '';
-        if (catName.includes('pizza')) imgPath = '/static/img/categories/pizza.png';
+        if (catName.includes('tea') || catName.includes('coffee')) imgPath = '/static/img/categories/teaorcoffee.png';
+        else if (catName.includes('snack')) imgPath = '/static/img/categories/Snacks.png';
+        else if (catName.includes('sizzler')) imgPath = '/static/img/categories/sizzler.png';
+        else if (catName.includes('pizza')) imgPath = '/static/img/categories/pizza.png';
         else if (catName.includes('burger')) imgPath = '/static/img/categories/burger.png';
         else if (catName.includes('pasta')) imgPath = '/static/img/categories/pasta.png';
         else if (catName.includes('salad')) imgPath = '/static/img/categories/salads.png';
         else if (catName.includes('dessert')) imgPath = '/static/img/categories/Desserts.png';
         else if (catName.includes('mains')) imgPath = '/static/img/categories/mains.png';
-        else if (catName.includes('drink') || catName.includes('water') || catName.includes('beverage') || catName.includes('juice') || catName.includes('coffee') || catName.includes('tea')) {
+        else if (catName.includes('drink') || catName.includes('water') || catName.includes('beverage') || catName.includes('juice')) {
             imgPath = '/static/img/categories/Beverages.png';
         }
 
@@ -2179,13 +2236,14 @@
   }
 
   // ─── Cart ─────────────────────────────────────────────────
-  function addToCart(id, name, price, selectedAddons = []) {
-    // If not coming from modal, check if product has addons
-    if (selectedAddons.length === 0) {
+  function addToCart(id, name, price, selectedAddons = null) {
+    // First tap on product — open customization if addons exist
+    if (selectedAddons === null) {
       const p = findProductById(id);
       if (p && p.addons && p.addons.length > 0) {
         return showAddonModal(p);
       }
+      selectedAddons = [];
     }
 
     const itemPrice = price + selectedAddons.reduce((s, a) => s + a.price, 0);
@@ -2223,13 +2281,13 @@
     document.getElementById('addon-product-price').textContent = 'Base Price: ₹' + p.price;
     const list = document.getElementById('addon-list');
     list.innerHTML = p.addons.map(a => `
-      <label class="flex items-center justify-between p-3 rounded-xl border border-border bg-black/10 cursor-pointer hover:bg-brand-500/5 transition">
-        <div class="flex items-center gap-3">
-          <input type="checkbox" class="addon-checkbox w-5 h-5 rounded-lg border-border text-brand-500 focus:ring-brand-500" 
-                 data-id="${a.id}" data-name="${a.name}" data-price="${a.price}" onchange="updateAddonTotal(${p.price})">
-          <span class="text-sm font-medium text-white">${a.name}</span>
+      <label class="addon-option flex items-center justify-between p-3 rounded-xl border cursor-pointer hover:bg-brand-500/5 transition">
+        <div class="flex items-center gap-3 min-w-0">
+          <input type="checkbox" class="addon-checkbox w-5 h-5 rounded-lg border-border text-brand-500 focus:ring-brand-500 shrink-0" 
+                 data-id="${a.id}" data-name="${escapeHTML(a.name)}" data-price="${a.price}" onchange="updateAddonTotal(${p.price})">
+          <span class="text-sm font-medium text-heading truncate">${escapeHTML(a.name)}</span>
         </div>
-        <span class="text-xs font-bold text-brand-500">+₹${a.price}</span>
+        <span class="text-xs font-bold text-brand-500 shrink-0 ml-2">+₹${a.price}</span>
       </label>
     `).join('');
 
@@ -2247,6 +2305,7 @@
     };
 
     updateAddonTotal(p.price);
+    document.body.classList.add('addon-modal-open');
     document.getElementById('addon-modal').classList.remove('hidden');
   }
 
@@ -2260,6 +2319,7 @@
 
   function closeAddonModal() {
     document.getElementById('addon-modal').classList.add('hidden');
+    document.body.classList.remove('addon-modal-open');
   }
 
   function updateQty(idx, delta) {
@@ -2434,7 +2494,7 @@
       notes: i.notes || '',
       addons_json: JSON.stringify(i.addons || [])
     }));
-    if (currentOrder && currentOrder.status === 'draft') {
+    if (currentOrder && currentOrder.status === 'draft' && currentOrder.id) {
       currentOrder.items = items.map(i => ({ ...i }));
       return currentOrder;
     }
@@ -2448,14 +2508,22 @@
     };
     const r = await api('/api/orders', 'POST', payload);
     if (r.error) { toast(r.error, 'error'); return null; }
-    currentOrder = { id: r.id, order_number: r.order_number, status: 'draft', items: items.map(i => ({ ...i })) };
+    const orderId = r.id ?? r.order_id;
+    if (!orderId) {
+      toast('Order created but no order ID was returned', 'error');
+      return null;
+    }
+    currentOrder = { id: orderId, order_number: r.order_number, status: 'draft', items: items.map(i => ({ ...i })) };
     document.getElementById('cart-order-num').textContent = '#' + r.order_number;
     return currentOrder;
   }
 
   async function sendToKitchen() {
     const o = await createOrUpdateOrder();
-    if (!o) return;
+    if (!o || !o.id) {
+      toast('Could not prepare order for kitchen', 'error');
+      return;
+    }
     try {
       const r = await api('/api/orders/' + o.id + '/send-kitchen', 'POST');
       if (r.ok || r.message) {
@@ -3546,10 +3614,11 @@
       ].filter(line => line !== null && line !== undefined).join('\n');
 
       const rawPhone = (order.customer_phone || '').replace(/\D/g, '');
-      const phone = rawPhone.length === 10
-        ? '91' + rawPhone
-        : (rawPhone.length === 12 || rawPhone.length === 13)
-          ? rawPhone
+      const normalizedPhone = rawPhone.replace(/^0+/, '');
+      const phone = normalizedPhone.length === 10
+        ? '91' + normalizedPhone
+        : (normalizedPhone.length === 12 || normalizedPhone.length === 13)
+          ? normalizedPhone
           : '';
 
       const encodedMsg = encodeURIComponent(lines);
@@ -3668,6 +3737,10 @@
   refreshAttendanceStatus();
 
   init();
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') reloadData();
+  });
 </script>
 <script src="https://unpkg.com/html5-qrcode@2.3.7/minified/html5-qrcode.min.js"></script>
 
@@ -3697,6 +3770,15 @@
           <div class="text-[10px] text-gray-500 uppercase">Manage Products & Settings</div>
         </div>
       </a>
+
+      <button type="button" data-theme-toggle onclick="toggleTheme()"
+        class="w-full flex items-center gap-3 p-4 rounded-xl border border-border hover:bg-white/5 transition">
+        <span class="text-xl">🌓</span>
+        <div class="text-left">
+          <div class="font-700 text-sm">Switch Theme</div>
+          <div class="text-[10px] text-gray-500 uppercase">Light / dark mode</div>
+        </div>
+      </button>
 
       <button onclick="closeSession()"
         class="w-full flex items-center gap-3 p-4 rounded-xl border border-border hover:bg-white/5 transition">

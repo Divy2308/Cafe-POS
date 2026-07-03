@@ -122,17 +122,28 @@
     position:fixed;
     top:32px;
     right:32px;
+    left:auto;
+    bottom:auto;
     z-index:9999;
     background:var(--toast-bg);
     border:1px solid var(--border);
     border-radius:14px;
     padding:16px 24px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
     box-shadow:0 12px 40px rgba(0,0,0,0.3);
     transform:translateX(120%);
     transition:transform .4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    max-width: 380px;
+    width:max-content;
+    max-width:min(380px, calc(100vw - 64px));
+    min-height:48px;
+    box-sizing:border-box;
     word-break: break-word;
+    overflow-wrap:anywhere;
     font-weight: 500;
+    text-align:center;
+    pointer-events:none;
   }
   .toast.show { transform:translateX(0); }
   .toast.success { border-left:4px solid #22c55e; }

@@ -75,6 +75,17 @@
     background: linear-gradient(135deg, #f97316, #ea580c); color: #fff; border-color: transparent;
   }
 </style>
+{% if theme == 'light' %}
+<style>
+  body { background: #f7fafc; color: #111; }
+  .so-hero { background: linear-gradient(135deg, rgba(249,115,22,0.06), #fff); border-color: rgba(0,0,0,0.06); }
+  .menu-product { background: #fff; border-color: #e6e6e6; color:#111; }
+  .cart-panel { background: #fff; border-color: #e6e6e6; color:#111; }
+  input, .item-note-input { background: #fff; color: #111; border:1px solid #e6e6e6; }
+  .bill-card { background: #fff; border-color: #e6e6e6; color:#111; }
+  .so-badge { color: #f97316; }
+</style>
+{% endif %}
 {% endblock %}
 {% block body %}
 <div class="so-wrap">
@@ -104,8 +115,8 @@
           <span>Total</span>
           <span style="color:#fb923c;" id="cart-total-el">₹0</span>
         </div>
-        <p style="font-size:11px; color:#6b7280; margin:0 0 12px;">Optional — helps staff identify you</p>
-        <input type="text" id="cust-name" placeholder="Name (optional)" maxlength="100"
+        <p style="font-size:11px; color:#6b7280; margin:0 0 12px;">Name is required — helps staff identify you</p>
+        <input type="text" id="cust-name" placeholder="Name (required)" maxlength="100" required
           style="margin-bottom:8px; font-size:14px; border-radius:10px;" />
         <input type="tel" id="cust-phone" placeholder="Phone (optional)" maxlength="20"
           style="margin-bottom:14px; font-size:14px; border-radius:10px;" />
@@ -155,6 +166,7 @@
   const LS_TOKEN = 'pos_cafe_guest_token';
   const LS_CART = 'pos_cafe_self_cart_' + TABLE_ID;
   const LS_ORDERS = 'pos_cafe_guest_order_refs';
+  const QR_TOKEN = {{ qr_token|tojson }};
 
   function getGuestToken() {
     let t = localStorage.getItem(LS_TOKEN);
@@ -185,6 +197,14 @@
     const d = document.createElement('div');
     d.textContent = s;
     return d.innerHTML;
+  }
+
+  function getCategoryImage(categoryName) {
+    const name = (categoryName || '').toLowerCase();
+    if (name.includes('tea') || name.includes('coffee')) return '/static/img/categories/teaorcoffee.png';
+    if (name.includes('snack')) return '/static/img/categories/Snacks.png';
+    if (name.includes('sizzler')) return '/static/img/categories/sizzler.png';
+    return '';
   }
 
   function escapeAttr(s) {
@@ -307,9 +327,12 @@
   function renderMenuGrid(cats) {
     const grid = document.getElementById('menu-grid');
     const rows = cats.flatMap(c => (c.products || []).map(p => {
+      const categoryImage = getCategoryImage(c.name);
       const imgHtml = p.image_b64
         ? `<img src="${esc(p.image_b64)}" class="prod-img" alt="" loading="lazy" />`
-        : `<div style="font-size:32px; margin-bottom:8px;">${emojiMap[c.name] || '🛒'}</div>`;
+        : categoryImage
+          ? `<img src="${categoryImage}" class="prod-img" alt="${esc(c.name)}" loading="lazy" />`
+          : `<div style="font-size:32px; margin-bottom:8px;">${emojiMap[c.name] || '🛒'}</div>`;
       const addonBadge = p.addons && p.addons.length
         ? `<div style="font-size:10px; color:#fdba74; margin-top:5px;">Customize +${p.addons.length} addons</div>`
         : '';
@@ -324,14 +347,17 @@
     grid.innerHTML = rows.join('');
   }
 
-  function addToCart(id, selectedAddons = []) {
+  function addToCart(id, selectedAddons = null) {
     const p = findProductById(id);
     if (!p) return;
-    const addons = (selectedAddons || []).map(normalizeAddon);
-    if (!addons.length && Array.isArray(p.addons) && p.addons.length) {
-      showAddonModal(p);
-      return;
+    if (selectedAddons === null) {
+      if (Array.isArray(p.addons) && p.addons.length) {
+        showAddonModal(p);
+        return;
+      }
+      selectedAddons = [];
     }
+    const addons = selectedAddons.map(normalizeAddon);
     const price = Number(p.price || 0) + addons.reduce((sum, addon) => sum + addon.price, 0);
     const itemKey = id + '_' + JSON.stringify(addons.map(a => a.id).sort());
     const existing = cart.find(item => item.itemKey === itemKey);
@@ -353,7 +379,7 @@
   }
 
   window.addToCartById = function (id) {
-    addToCart(id, []);
+    addToCart(id);
   };
 
   function showAddonModal(product) {
@@ -496,7 +522,7 @@
     const res = await fetch('/api/push/subscribe/table', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-      body: JSON.stringify({ table_id: TABLE_ID, subscription })
+      body: JSON.stringify({ table_id: TABLE_ID, subscription, token: QR_TOKEN })
     });
     const data = await res.json().catch(() => ({}));
     guestPushRegistered = !!data.ok;
@@ -536,7 +562,16 @@
       el.innerHTML = '<div style="color:#6b7280;font-size:13px;">No orders yet. Add items and send to kitchen.</div>';
       return;
     }
-    el.innerHTML = orders.map(o => {
+    // Keep recently completed orders visible for 30 seconds before hiding
+    const visible = orders.filter(o => {
+      const st = billState[o.order_id] != null ? billState[o.order_id] : o.status;
+      const createdAtMs = Date.parse(o.created_at || '') || 0;
+      const ageMs = createdAtMs ? (Date.now() - createdAtMs) : 0;
+      if (st === 'completed' && ageMs > 30000) return false;
+      return true;
+    });
+
+    el.innerHTML = visible.map(o => {
       const st = billState[o.order_id] != null ? billState[o.order_id] : o.status;
       const pill = statusClass(st);
       const pc = progressClass(st);
@@ -592,8 +627,9 @@
     btn.textContent = 'Sending…';
     const body = {
       table_id: TABLE_ID,
+      token: QR_TOKEN,
       guest_token: guestToken,
-      customer_name: (document.getElementById('cust-name') && document.getElementById('cust-name').value) || '',
+      customer_name: (document.getElementById('cust-name') && document.getElementById('cust-name').value || '').trim(),
       customer_phone: (document.getElementById('cust-phone') && document.getElementById('cust-phone').value) || '',
       items: cart.map(i => ({
         product_id: i.product_id,
@@ -602,6 +638,8 @@
         addons: i.addons || []
       }))
     };
+    if (!body.customer_name) { toast('Please enter your name', 'error'); btn.disabled = false; btn.textContent = prev; return; }
+
     const res = await fetch('/api/self-order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },

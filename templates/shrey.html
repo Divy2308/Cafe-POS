@@ -142,6 +142,8 @@ tr:hover td{background:rgba(255,255,255,.015)}
 .act-btn.reject:hover{background:rgba(255,71,87,.15)}
 .act-btn.suspend{border-color:rgba(167,139,250,.25);color:var(--purple);background:var(--purple-bg)}
 .act-btn.view{border-color:rgba(0,212,255,.25);color:var(--cyan);background:var(--cyan-bg)}
+.act-btn.delete{border-color:rgba(255,71,87,.35);color:var(--red);background:rgba(255,71,87,.1)}
+.act-btn.delete:hover{background:rgba(255,71,87,.2);border-color:rgba(255,71,87,.6)}
 .rest-name{font-weight:600;color:var(--text);font-size:13px}
 .rest-meta{font-size:10px;color:var(--muted);margin-top:1px;font-family:'JetBrains Mono',monospace}
 
@@ -409,6 +411,23 @@ tr:hover td{background:rgba(255,255,255,.015)}
       <tbody id="req-tbody"></tbody>
     </table>
   </div>
+  <div class="table-card" style="margin-top:20px">
+    <div class="table-header">
+      <div class="table-title">Branch Requests</div>
+      <div class="table-actions">
+        <div class="search-box">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <input placeholder="Search branch request..." oninput="searchBranchRequests(this.value)">
+        </div>
+      </div>
+    </div>
+    <table>
+      <thead><tr>
+        <th>Branch</th><th>Tenant</th><th>Requester</th><th>Created</th><th>Status</th><th>Actions</th>
+      </tr></thead>
+      <tbody id="branch-req-tbody"></tbody>
+    </table>
+  </div>
 </div>
 
 <!-- ═══ RESTAURANTS ═══ -->
@@ -604,10 +623,12 @@ tr:hover td{background:rgba(255,255,255,.015)}
 const PASS = 'admin';
 let restaurants = [];
 let requests = [];
+let branchRequests = [];
 let logs = [];
 let bcHistory = [];
 let reqFilter = 'all';
 let reqSearch = '';
+let branchReqSearch = '';
 let restSearch = '';
 let currentAction = null;
 let appInitialized = false;
@@ -672,6 +693,7 @@ function initApp(){
   renderMiniCharts();
   renderOverviewRequests();
   renderRequests();
+  renderBranchRequests();
   renderRestaurants();
   renderBilling();
   renderActivityLog();
@@ -684,16 +706,25 @@ function initApp(){
 
 async function loadRealRequests(){
   try {
-    const res = await fetch('/api/shrey/requests');
-    const data = await res.json();
+    const fetchOpts = { credentials: 'same-origin' };
+  const [res, brRes] = await Promise.all([
+      fetch('/api/shrey/requests', fetchOpts),
+      fetch('/api/shrey/branch-requests', fetchOpts),
+    ]);
+    const data = await res.json().catch(() => ({}));
+    const branchData = await brRes.json().catch(() => ({}));
     if (res.ok && Array.isArray(data.requests)) {
       requests = data.requests;
-      updateStats();
-      renderOverviewRequests();
-      renderRequests();
-      renderRestaurants();
-      renderBilling();
     }
+    if (brRes.ok && Array.isArray(branchData.requests)) {
+      branchRequests = branchData.requests;
+    }
+    updateStats();
+    renderOverviewRequests();
+    renderRequests();
+    renderBranchRequests();
+    renderRestaurants();
+    renderBilling();
   } catch (e) {
     console.error('Failed to load real requests', e);
   }
@@ -716,9 +747,25 @@ function renderMiniCharts(){
 
 function renderOverviewRequests(){
   const el=document.getElementById('overview-requests');
-  const pending=requests.filter(r=>r.status==='pending').slice(0,3);
+  const pending = [
+    ...requests.filter(r=>r.status==='pending').map(r=>({type:'restaurant', request:r})),
+    ...branchRequests.filter(r=>r.status==='pending').map(r=>({type:'branch', request:r})),
+  ].slice(0,3);
   if(!pending.length){el.innerHTML='<div class="empty-state">No pending requests</div>';return;}
-  el.innerHTML=pending.map(r=>`
+  el.innerHTML=pending.map(item=>{
+    const r=item.request;
+    if(item.type==='branch'){
+      return `
+    <div class="log-item">
+      <div class="log-type" style="background:var(--amber)"></div>
+      <div class="log-msg"><strong>${r.branch_name}</strong> — tenant ${r.tenant_id} <span class="badge badge-pending" style="margin-left:6px">Branch</span></div>
+      <div style="display:flex;gap:4px">
+        <button class="act-btn approve" onclick="quickApproveBranchRequest(${r.id})">✓</button>
+        <button class="act-btn reject" onclick="quickRejectBranchRequest(${r.id})">✕</button>
+      </div>
+    </div>`;
+    }
+    return `
     <div class="log-item">
       <div class="log-type" style="background:var(--amber)"></div>
       <div class="log-msg"><strong>${r.name}</strong> — ${r.city} <span class="badge badge-pending" style="margin-left:6px">${r.plan}</span></div>
@@ -726,7 +773,8 @@ function renderOverviewRequests(){
         <button class="act-btn approve" onclick="quickApprove(${r.id})">✓</button>
         <button class="act-btn reject" onclick="quickReject(${r.id})">✕</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function renderRequests(){
@@ -748,7 +796,7 @@ function renderRequests(){
         ${r.status==='pending'?`<button class="act-btn approve" onclick="quickApprove(${r.id})">Approve</button><button class="act-btn reject" onclick="quickReject(${r.id})">Reject</button>`:''}
       </div></td>
     </tr>`).join('');
-  document.getElementById('req-badge').textContent=requests.filter(r=>r.status==='pending').length;
+  document.getElementById('req-badge').textContent=requests.filter(r=>r.status==='pending').length + branchRequests.filter(r=>r.status==='pending').length;
 }
 
 function filterReqs(f){
@@ -835,6 +883,52 @@ function viewRequest(id){
   document.getElementById('modal-detail').classList.add('open');
 }
 
+function renderBranchRequests(){
+  const el=document.getElementById('branch-req-tbody');
+  let data=branchRequests;
+  if(branchReqSearch) data=data.filter(r=>r.branch_name.toLowerCase().includes(branchReqSearch)||String(r.tenant_id).includes(branchReqSearch)||String(r.user_id).includes(branchReqSearch));
+  if(!data.length){ el.innerHTML='<tr><td colspan="6"><div class="empty-state">No branch requests found</div></td></tr>'; return; }
+  el.innerHTML=data.map(r=>`
+    <tr>
+      <td><div class="rest-name">${r.branch_name}</div><div class="rest-meta">${r.address || 'No address'}</div></td>
+      <td>${r.tenant_id}</td>
+      <td>${r.user_id || '—'}</td>
+      <td><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted)">${r.created_at || '—'}</span></td>
+      <td><span class="badge badge-${r.status}">${r.status}</span></td>
+      <td><div class="action-btns">
+        ${r.status==='pending'?`<button class="act-btn approve" onclick="quickApproveBranchRequest(${r.id})">Approve</button><button class="act-btn reject" onclick="quickRejectBranchRequest(${r.id})">Reject</button>`:`<button class="act-btn view" onclick="viewBranchRequest(${r.id})">View</button>`}
+      </div></td>
+    </tr>`).join('');
+}
+
+function viewBranchRequest(id){
+  const r = branchRequests.find(x=>x.id===id);
+  if(!r) return;
+  document.getElementById('modal-title').textContent = r.branch_name + ' — Branch Request';
+  document.getElementById('modal-body').innerHTML = `
+    <div class="field-row" style="margin-bottom:12px">
+      <div class="field-group"><label class="field-label">Status</label><div class="field-val"><span class="badge badge-${r.status}">${r.status}</span></div></div>
+      <div class="field-group"><label class="field-label">Requested</label><div class="field-val">${r.created_at || '—'}</div></div>
+    </div>
+    <div class="field-row" style="margin-bottom:12px">
+      <div class="field-group"><label class="field-label">Tenant ID</label><div class="field-val">${r.tenant_id}</div></div>
+      <div class="field-group"><label class="field-label">Requester ID</label><div class="field-val">${r.user_id || '—'}</div></div>
+    </div>
+    <div class="field-row" style="margin-bottom:12px">
+      <div class="field-group"><label class="field-label">Branch Name</label><div class="field-val">${r.branch_name}</div></div>
+      <div class="field-group"><label class="field-label">Phone</label><div class="field-val">${r.phone || '—'}</div></div>
+    </div>
+    <div class="field-group"><label class="field-label">Address</label><div class="field-val">${r.address || '—'}</div></div>
+  `;
+  const foot = document.getElementById('modal-foot');
+  foot.innerHTML = r.status === 'pending' ? `
+    <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+    <button class="btn-confirm red" onclick="quickRejectBranchRequest(${r.id});closeModal()">Reject</button>
+    <button class="btn-confirm green" onclick="quickApproveBranchRequest(${r.id});closeModal()">Approve</button>
+  ` : `<button class="btn-cancel" onclick="closeModal()">Close</button>`;
+  document.getElementById('modal-detail').classList.add('open');
+}
+
 function renderRestaurants(){
   const el=document.getElementById('rest-tbody');
   let data=getRestaurantRows();
@@ -850,10 +944,36 @@ function renderRestaurants(){
       <td><span class="badge badge-${r.status||'approved'}">${r.status||'approved'}</span></td>
       <td><div class="action-btns">
         <button class="act-btn view" onclick="viewRestaurant(${r.id})">Details</button>
+        <button class="act-btn delete" onclick="confirmDeleteRestaurant(${r.id})" title="Delete restaurant permanently">Delete</button>
       </div></td>
     </tr>`).join('');
 }
-function searchRests(v){ restSearch=v.toLowerCase(); renderRestaurants(); }
+function searchBranchRequests(v){ branchReqSearch=v.toLowerCase(); renderBranchRequests(); }
+
+async function quickApproveBranchRequest(id){
+  const r = branchRequests.find(x=>x.id===id);
+  if(!r) return;
+  const res = await fetch('/api/shrey/branch-requests/'+id+'/approve', { method:'POST', headers:{'Content-Type':'application/json'} });
+  const data = await res.json().catch(()=>({}));
+  if (!res.ok) { showToast(data.error||'Approval failed','red'); return; }
+  r.status='approved';
+  r.reviewed_at=new Date().toISOString();
+  addLog(r.branch_name,'branch request approved','green');
+  updateStats(); renderBranchRequests(); renderOverviewRequests(); renderRestaurants(); renderBilling();
+  showToast(r.branch_name+' branch approved!','green');
+}
+async function quickRejectBranchRequest(id){
+  const r = branchRequests.find(x=>x.id===id);
+  if(!r) return;
+  const res = await fetch('/api/shrey/branch-requests/'+id+'/reject', { method:'POST', headers:{'Content-Type':'application/json'} });
+  const data = await res.json().catch(()=>({}));
+  if (!res.ok) { showToast(data.error||'Rejection failed','red'); return; }
+  r.status='rejected';
+  r.reviewed_at=new Date().toISOString();
+  addLog(r.branch_name,'branch request rejected','red');
+  updateStats(); renderBranchRequests(); renderOverviewRequests(); renderRestaurants(); renderBilling();
+  showToast(r.branch_name+' branch request rejected','red');
+}
 
 function viewRestaurant(id){
   const r=getRestaurantRows().find(x=>x.id===id) || requests.find(x=>x.id===id);
@@ -943,6 +1063,44 @@ function suspendRest(id){
   addLog(r?.name,r?.status==='suspended'?'suspended':'reactivated','amber');
   renderRestaurants();
   showToast(r?.name+' '+(r?.status==='suspended'?'suspended':'reactivated'),'amber');
+}
+
+function confirmDeleteRestaurant(id){
+  const r = getRestaurantRows().find(x=>x.id===id) || requests.find(x=>x.id===id);
+  const name = r ? r.name : 'Restaurant';
+  document.getElementById('modal-title').innerHTML = '<span style="color:var(--red)">⚠ Delete Restaurant</span>';
+  document.getElementById('modal-body').innerHTML = `
+    <div style="text-align:center;padding:20px 0">
+      <div style="width:60px;height:60px;border-radius:50%;background:var(--red-bg);border:2px solid rgba(255,71,87,.3);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:24px">🗑</div>
+      <div style="font-size:15px;font-weight:600;margin-bottom:8px">Delete <span style="color:var(--red)">${name}</span>?</div>
+      <div style="font-size:12px;color:var(--muted);font-family:'JetBrains Mono',monospace;line-height:1.6">
+        This will <strong style="color:var(--red)">permanently delete</strong> the restaurant,<br>
+        all its branches, and branch requests.<br>
+        <span style="color:var(--amber)">This action cannot be undone.</span>
+      </div>
+    </div>
+  `;
+  document.getElementById('modal-foot').innerHTML = `
+    <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+    <button class="btn-confirm red" onclick="deleteRestaurant(${id}, '${name}')" style="letter-spacing:.04em">🗑 Delete Permanently</button>
+  `;
+  document.getElementById('modal-detail').classList.add('open');
+}
+
+async function deleteRestaurant(id, name){
+  closeModal();
+  const res = await fetch('/api/shrey/requests/'+id+'/delete', { method:'DELETE', credentials: 'same-origin' });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok){ showToast(data.error||'Delete failed','red'); return; }
+  // Remove from both restaurants and requests arrays
+  const rIdx = restaurants.findIndex(x=>x.id===id);
+  if(rIdx>=0) restaurants.splice(rIdx,1);
+  const qIdx = requests.findIndex(x=>x.id===id);
+  if(qIdx>=0) requests.splice(qIdx,1);
+  addLog(name,'was permanently deleted','red');
+  updateStats();
+  renderRestaurants(); renderRequests(); renderOverviewRequests(); renderBilling();
+  showToast(name+' deleted permanently','red');
 }
 
 function openAddRestModal(){
@@ -1048,8 +1206,8 @@ function changePassword(){
 function updateStats(){
   const restaurantRows=getRestaurantRows();
   const active=restaurantRows.filter(r=>r.status==='approved').length;
-  const pending=requests.filter(r=>r.status==='pending').length;
-  const total=requests.length;
+  const pending=requests.filter(r=>r.status==='pending').length + branchRequests.filter(r=>r.status==='pending').length;
+  const total=requests.length + branchRequests.length;
   ['ts-total','ov-total'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=total;});
   ['ts-active','ov-active'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=active;});
   ['ts-pending','ov-pending'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=pending;});

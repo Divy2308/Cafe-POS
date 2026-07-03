@@ -432,14 +432,6 @@
         </svg>
         Branches
       </button>
-      <button onclick="switchDashTab('settings')"
-        class="dash-nav-btn w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-        </svg>
-        Settings
-      </button>
       <div class="border-t border-border my-3"></div>
       <a href="/backend" class="dash-nav-btn flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -552,7 +544,6 @@
               <div class="font-display font-700">Customer Reviews</div>
               <div class="text-xs text-gray-500 mt-1">Latest feedback from customers</div>
             </div>
-            <button onclick="loadReviews()" class="btn-ghost px-3 py-1.5 rounded-lg text-xs">Reload</button>
           </div>
           <div id="review-stats" class="grid review-stats-grid gap-3 mb-4" style="grid-template-columns:repeat(3,1fr)">
           </div>
@@ -776,6 +767,9 @@
               <button onclick="saveBranchSettings()"
                 class="flex-1 btn-primary py-2.5 rounded-lg text-white font-semibold transition hover:opacity-90">💾
                 Save Branch</button>
+              <button onclick="deleteBranch(document.getElementById('settingsBranchSelector').value)"
+                class="flex-1 py-2.5 rounded-lg font-semibold transition hover:opacity-90" style="background:rgba(255,71,87,.15); color:#ff4757; border:1px solid rgba(255,71,87,.25);">🗑️
+                Delete</button>
               <button onclick="document.getElementById('branchSettingsForm').classList.add('hidden')"
                 class="flex-1 btn-ghost py-2.5 rounded-lg font-semibold">Cancel</button>
             </div>
@@ -809,13 +803,6 @@
           d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
       Attendance
-    </button>
-    <button class="bnav-btn" id="bnav-settings" onclick="switchDashTab('settings')">
-      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-          d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-      </svg>
-      Settings
     </button>
     <button class="bnav-btn" id="bnav-more" onclick="toggleMoreDrawer()">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -905,19 +892,17 @@
 <!-- Add Branch Modal -->
 <div id="branchModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
   <div class="card p-8 max-w-lg w-full mx-4">
-    <h2 class="text-2xl font-bold mb-6">Add Branch</h2>
+    <h2 class="text-2xl font-bold mb-6" id="branchModalTitle">Add Branch</h2>
     <div class="space-y-4">
       <div><label class="block text-sm text-gray-500 mb-2">Branch Name</label><input type="text" id="branchName"></div>
-      <div><label class="block text-sm text-gray-500 mb-2">Address</label><textarea id="branchAddress"
-          rows="3"></textarea></div>
+      <div><label class="block text-sm text-gray-500 mb-2">Address</label><textarea id="branchAddress" rows="3"></textarea></div>
       <div><label class="block text-sm text-gray-500 mb-2">Phone</label><input type="tel" id="branchPhone"></div>
-      <div><label class="block text-sm text-gray-500 mb-2">Monthly Target</label><input type="number" id="branchTarget"
-          min="0" step="1"></div>
+      <div><label class="block text-sm text-gray-500 mb-2">Monthly Target</label><input type="number" id="branchTarget" min="0" step="1"></div>
+      <p id="branchModalNote" class="text-sm text-gray-400"></p>
     </div>
     <div class="flex gap-3 mt-6">
       <button onclick="closeBranchModal()" class="flex-1 btn-ghost py-2 rounded-lg font-semibold">Cancel</button>
-      <button onclick="createBranch()" class="flex-1 btn-primary py-2 rounded-lg text-white font-semibold">Add
-        Branch</button>
+      <button id="branchSubmitBtn" onclick="createBranch()" class="flex-1 btn-primary py-2 rounded-lg text-white font-semibold">Add Branch</button>
     </div>
   </div>
 </div>
@@ -926,6 +911,7 @@
 <script>
   const DASHBOARD_CONTEXT = {
     isSuperadmin: {{ 'true' if is_superadmin else 'false' }},
+    canManageBranches: {{ 'true' if can_manage_branches else 'false' }},
     activeBranchId: {{ active_branch.id if active_branch else 'null' }}
   };
 
@@ -987,7 +973,10 @@
     if (tab === 'users') loadCustomers();
     if (tab === 'attendance') loadAttendanceReport();
     if (tab === 'compare') loadBranchComparison();
-    if (tab === 'settings') loadCafeSettings();
+    if (tab === 'settings') {
+      loadCafeSettings();
+      loadSelectedBranchSettings();
+    }
     
     // Plan Lock Check
     const lock = document.getElementById('dashboard-plan-lock');
@@ -1004,10 +993,13 @@
 
   async function loadCustomers() {
     try {
-      const r = await fetch('/api/customers');
-      const data = await r.json();
+      const data = await api('/api/customers');
       const tbody = document.getElementById('customers-list');
       if (!tbody) return;
+      if (data.error || !Array.isArray(data)) {
+        tbody.innerHTML = `<tr><td colspan="3" class="text-center py-10 text-red-400">${escHtml(data.error || 'Unable to load customers')}</td></tr>`;
+        return;
+      }
       if (Array.isArray(data)) {
         tbody.innerHTML = data.map(c => `
           <tr class="border-b border-border hover:bg-white/5 transition">
@@ -1161,7 +1153,14 @@
     });
   }
 
-  function openBranchModal() { document.getElementById('branchModal').classList.remove('hidden'); }
+  function openBranchModal() {
+    document.getElementById('branchModal').classList.remove('hidden');
+    const title = DASHBOARD_CONTEXT.isSuperadmin ? 'Add Branch' : 'Request New Branch';
+    const actionText = DASHBOARD_CONTEXT.isSuperadmin ? 'Add Branch' : 'Request Branch';
+    document.getElementById('branchModalTitle').textContent = title;
+    document.getElementById('branchSubmitBtn').textContent = actionText;
+    document.getElementById('branchModalNote').textContent = DASHBOARD_CONTEXT.isSuperadmin ? '' : 'Request a new branch.';
+  }
   function closeBranchModal() {
     document.getElementById('branchModal').classList.add('hidden');
     document.getElementById('branchName').value = '';
@@ -1172,23 +1171,32 @@
 
   async function loadBranches() {
     const wrap = document.getElementById('branchSwitcherWrap');
-    if (!DASHBOARD_CONTEXT.isSuperadmin) { wrap.classList.add('hidden'); return; }
     const response = await api('/api/branches');
+    if (response.error) {
+      toast(response.error, 'error');
+      if (wrap) wrap.classList.add('hidden');
+      return;
+    }
     branches = response.branches || [];
-    wrap.classList.remove('hidden');
+    if (wrap) wrap.classList.toggle('hidden', !DASHBOARD_CONTEXT.canManageBranches);
     const switcher = document.getElementById('branchSwitcher');
     const addUserBranch = document.getElementById('newUserBranch');
     const activeBranchId = response.active_branch_id || DASHBOARD_CONTEXT.activeBranchId;
-    switcher.innerHTML = branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
-    addUserBranch.innerHTML = switcher.innerHTML;
+    const branchOptions = branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+    if (switcher) switcher.innerHTML = branchOptions;
+    if (addUserBranch) addUserBranch.innerHTML = branchOptions;
     if (activeBranchId) {
-      switcher.value = String(activeBranchId);
-      addUserBranch.value = String(activeBranchId);
+      if (switcher) switcher.value = String(activeBranchId);
+      if (addUserBranch) addUserBranch.value = String(activeBranchId);
       const active = branches.find(b => b.id === activeBranchId);
       document.getElementById('activeBranchLabel').textContent = active ? active.name : 'Unknown branch';
     }
-    document.getElementById('newUserBranchWrap').classList.remove('hidden');
-    document.getElementById('addBranchBtn').classList.remove('hidden');
+    document.getElementById('newUserBranchWrap').classList.toggle('hidden', !DASHBOARD_CONTEXT.canManageBranches);
+    const addBranchBtn = document.getElementById('addBranchBtn');
+    if (addBranchBtn) {
+      addBranchBtn.classList.remove('hidden');
+      addBranchBtn.textContent = DASHBOARD_CONTEXT.isSuperadmin ? '+ Add Branch' : '+ Request Branch';
+    }
 
     // Populate Analytics Branch Switcher
     const anSwitcher = document.getElementById('analyticsBranchSwitcher');
@@ -1201,6 +1209,8 @@
     const setSwitcher = document.getElementById('settingsBranchSelector');
     if (setSwitcher) {
       setSwitcher.innerHTML = '<option value="">-- Select Branch --</option>' + branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+      if (activeBranchId) setSwitcher.value = String(activeBranchId);
+      if (currentTab === 'settings') loadSelectedBranchSettings();
     }
   }
 
@@ -1249,6 +1259,27 @@
     }
   }
 
+  async function deleteBranch(branchId) {
+    if (!branchId) return;
+    if (!confirm('Are you sure you want to delete this branch? This action cannot be undone.')) return;
+    const res = await api('/api/branches/' + branchId, 'DELETE');
+    if (!res.error) {
+      toast('Branch deleted successfully', 'success');
+      document.getElementById('branchSettingsForm').classList.add('hidden');
+      loadBranches();
+    } else {
+      toast(res.error || 'Failed to delete branch', 'error');
+    }
+  }
+
+  function openBranchSettings(branchId) {
+    switchDashTab('settings');
+    const selector = document.getElementById('settingsBranchSelector');
+    if (!selector) return;
+    selector.value = String(branchId);
+    loadSelectedBranchSettings();
+  }
+
   async function handleBranchSwitch() {
     const branchId = Number(document.getElementById('branchSwitcher').value);
     const result = await api('/api/branches/switch', 'POST', { branch_id: branchId });
@@ -1268,7 +1299,7 @@
       monthly_target: parseFloat(document.getElementById('newUserMonthlyTarget').value || '0')
     };
     const password = document.getElementById('newUserPassword').value;
-    if (DASHBOARD_CONTEXT.isSuperadmin) payload.branch_id = Number(document.getElementById('newUserBranch').value);
+    if (DASHBOARD_CONTEXT.canManageBranches) payload.branch_id = Number(document.getElementById('newUserBranch').value);
     if (!payload.name || !payload.email || (!editUserId && !password)) { toast('Name, email, and password are required', 'error'); return; }
     if (!editUserId) payload.password = password;
     const result = editUserId ? await api(`/api/users/${editUserId}`, 'PUT', payload) : await api('/api/users', 'POST', payload);
@@ -1313,7 +1344,7 @@
     document.getElementById('newUserRole').value = user.role;
     document.getElementById('newUserHourlyRate').value = user.hourly_rate;
     document.getElementById('newUserMonthlyTarget').value = user.monthly_target || 0;
-    if (DASHBOARD_CONTEXT.isSuperadmin && user.branch_id) document.getElementById('newUserBranch').value = user.branch_id;
+    if (DASHBOARD_CONTEXT.canManageBranches && user.branch_id) document.getElementById('newUserBranch').value = user.branch_id;
     document.getElementById('userModalTitle').textContent = 'Edit Staff Member';
     document.getElementById('userModalSaveBtn').textContent = 'Update Staff';
     document.getElementById('userPasswordHint').textContent = 'Leave blank to keep current password.';
@@ -1329,12 +1360,19 @@
   }
 
   async function createBranch() {
-    const payload = { name: document.getElementById('branchName').value.trim(), address: document.getElementById('branchAddress').value.trim() };
+    const payload = {
+      name: document.getElementById('branchName').value.trim(),
+      address: document.getElementById('branchAddress').value.trim(),
+      phone: document.getElementById('branchPhone').value.trim(),
+      monthly_target: parseFloat(document.getElementById('branchTarget').value || 0)
+    };
     if (!payload.name) { toast('Branch name is required', 'error'); return; }
-    const result = await api('/api/branches', 'POST', payload);
+    const result = await api('/api/branch-requests', 'POST', payload);
     if (result.error) { toast(result.error, 'error'); return; }
-    closeBranchModal(); toast('Branch created', 'success');
-    await loadBranches(); await loadBranchComparison();
+    closeBranchModal();
+    toast(DASHBOARD_CONTEXT.isSuperadmin ? 'Branch created' : 'Branch request submitted. Waiting for /shrey admin approval.', 'success');
+    await loadBranches();
+    if (DASHBOARD_CONTEXT.isSuperadmin) await loadBranchComparison();
   }
 
   /* ── Attendance ── */
@@ -1393,7 +1431,7 @@
     if (result.error) { grid.innerHTML = `<div class="card p-6 text-red-400">${result.error}</div>`; return; }
     if (!(result.branches || []).length) { grid.innerHTML = '<div class="card p-6 text-gray-500">No branch data available.</div>'; return; }
     grid.innerHTML = result.branches.map(branch => `
-      <div class="card p-6">
+      <div class="card p-6 cursor-pointer" onclick="openBranchSettings(${branch.branch_id})">
         <div class="flex items-start justify-between gap-4 mb-4">
           <div>
             <div class="text-xl font-bold">${branch.branch_name}</div>
