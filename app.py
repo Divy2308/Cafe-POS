@@ -123,6 +123,20 @@ RAZORPAY_CURRENCY = os.getenv('RAZORPAY_CURRENCY', 'INR').strip().upper() or 'IN
 RAZORPAY_MERCHANT_NAME = os.getenv('RAZORPAY_MERCHANT_NAME', 'POS Cafè').strip() or 'POS Cafè'
 PASSWORD_RESET_CODES = {}
 
+# ── Super-admin credentials (set in .env) ──────────────────
+SHREY_ADMIN_USER = os.getenv('SHREY_ADMIN_USER', '').strip()
+SHREY_ADMIN_PASS = os.getenv('SHREY_ADMIN_PASS', '').strip()
+if not SHREY_ADMIN_USER or not SHREY_ADMIN_PASS:
+    import sys as _sys
+    print('[SECURITY] WARNING: SHREY_ADMIN_USER / SHREY_ADMIN_PASS not set in .env — super-admin login disabled.', file=_sys.stderr)
+
+# ── Brute-force protection store ───────────────────────────
+# {ip: {'attempts': int, 'locked_until': datetime|None}}
+_login_attempts: dict = {}
+MAX_LOGIN_ATTEMPTS = 5
+LOCKOUT_MINUTES = 15
+SESSION_MAX_HOURS = 8
+
 db = SQLAlchemy(app)
 csrf = CSRFProtect(app)
 if IS_WINDOWS:
@@ -566,7 +580,46 @@ class WastageLog(db.Model):
     inventory_item = db.relationship('InventoryItem', backref='wastage_logs')
     user = db.relationship('User')
 
+class LoginLog(db.Model):
+    """Tracks every login, logout, and failed login for all user types."""
+    __tablename__ = 'login_log'
+    id          = db.Column(db.Integer, primary_key=True)
+    event       = db.Column(db.String(30), nullable=False)  # login_success, login_failed, logout, superadmin_login, superadmin_logout, superadmin_failed
+    user_id     = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)   # null for super-admin / guests
+    user_name   = db.Column(db.String(120), default='')   # cached at event time
+    user_role   = db.Column(db.String(30), default='')    # cashier, manager, restaurant, customer, superadmin
+    tenant_id   = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
+    tenant_name = db.Column(db.String(100), default='')   # cached
+    ip_address  = db.Column(db.String(45), default='')    # supports IPv6
+    user_agent  = db.Column(db.String(250), default='')   # browser/device info
+    timestamp   = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    user        = db.relationship('User', backref='login_logs')
+
 # ─── Auth Helpers ──────────────────────────────────────────
+
+def log_login(event, user=None, tenant=None):
+    """Write a login/logout/failed row to LoginLog. Never raises."""
+    try:
+        ip = (request.headers.get('X-Forwarded-For') or request.remote_addr or '')[:45]
+        ua = (request.headers.get('User-Agent') or '')[:250]
+        row = LoginLog(
+            event       = event,
+            user_id     = user.id if user else None,
+            user_name   = user.name if user else '',
+            user_role   = normalize_role(user.role) if user else ('superadmin' if 'superadmin' in event else ''),
+            tenant_id   = (tenant.id if tenant else (user.tenant_id if user else None)),
+            tenant_name = (tenant.name if tenant else (user.tenant.name if user and user.tenant else '')),
+            ip_address  = ip,
+            user_agent  = ua,
+        )
+        db.session.add(row)
+        db.session.commit()
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -1108,9 +1161,12 @@ def login():
         return jsonify({'error': 'Email and password are required'}), 400
     u = find_user_by_email(email)
     if not u or not check_password_hash(u.password, password):
+        # Log failed attempt (look up user for name even on failure)
+        log_login('login_failed', user=u)
         return jsonify({'error': 'Invalid credentials'}), 401
     blocked_message = get_tenant_access_block_message(u)
     if blocked_message:
+        log_login('login_failed', user=u)
         return jsonify({'error': blocked_message}), 403
     session['user_id'] = u.id
     session['user_name'] = u.name
@@ -1124,6 +1180,7 @@ def login():
             session['active_branch_id'] = default_branch.id
     else:
         session.pop('active_branch_id', None)
+    log_login('login_success', user=u)
     return jsonify({
         'ok': True,
         'name': u.name,
@@ -1135,6 +1192,11 @@ def login():
 
 @app.route('/api/logout', methods=['POST'])
 def logout():
+    # Capture before clearing session
+    uid = session.get('user_id')
+    if uid:
+        u = db.session.get(User, uid)
+        log_login('logout', user=u)
     session.clear()
     return jsonify({'ok': True})
 
@@ -1632,27 +1694,98 @@ def _serialize_shrey_request(tenant):
 @app.route('/shrey')
 def shrey_login_page():
     if session.get('shrey_admin'):
+        # Enforce session max age
+        login_at_str = session.get('shrey_login_at')
+        if login_at_str:
+            try:
+                login_at = datetime.fromisoformat(login_at_str)
+                if datetime.utcnow() - login_at > timedelta(hours=SESSION_MAX_HOURS):
+                    session.pop('shrey_admin', None)
+                    session.pop('shrey_login_at', None)
+                    return render_template('shrey_login.html')
+            except Exception:
+                pass
         return render_template('shrey.html')
     return render_template('shrey_login.html')
 
 @csrf.exempt
 @app.route('/shreyapi/login', methods=['POST'])
 def shrey_login_api():
+    ip = request.remote_addr or 'unknown'
+    now = datetime.utcnow()
+
+    # Check lockout
+    entry = _login_attempts.get(ip)
+    if entry and entry.get('locked_until') and now < entry['locked_until']:
+        remaining = int((entry['locked_until'] - now).total_seconds() // 60) + 1
+        return jsonify({'error': f'Too many attempts. Try again in {remaining} min.'}), 429
+
     d = request.json or {}
-    if d.get('username') == 'admin' and d.get('password') == 'admin':
+    username = (d.get('username') or '').strip()
+    password = (d.get('password') or '').strip()
+
+    # Validate against env credentials
+    creds_ok = (
+        SHREY_ADMIN_USER
+        and SHREY_ADMIN_PASS
+        and hmac.compare_digest(username, SHREY_ADMIN_USER)
+        and hmac.compare_digest(password, SHREY_ADMIN_PASS)
+    )
+
+    if creds_ok:
+        # Clear brute-force counter on success
+        _login_attempts.pop(ip, None)
         session['shrey_admin'] = True
+        session['shrey_login_at'] = now.isoformat()
+        log_login('superadmin_login')
         return jsonify({'ok': True})
-    return jsonify({'error': 'Invalid credentials'}), 401
+
+    # Record failed attempt
+    if ip not in _login_attempts:
+        _login_attempts[ip] = {'attempts': 0, 'locked_until': None}
+    _login_attempts[ip]['attempts'] += 1
+    if _login_attempts[ip]['attempts'] >= MAX_LOGIN_ATTEMPTS:
+        _login_attempts[ip]['locked_until'] = now + timedelta(minutes=LOCKOUT_MINUTES)
+        log_login('superadmin_failed')
+        return jsonify({'error': f'Too many failed attempts. Locked for {LOCKOUT_MINUTES} minutes.'}), 429
+
+    log_login('superadmin_failed')
+    remaining_attempts = MAX_LOGIN_ATTEMPTS - _login_attempts[ip]['attempts']
+    return jsonify({'error': f'Invalid credentials. {remaining_attempts} attempt(s) left.'}), 401
 
 @csrf.exempt
 @app.route('/shreyapi/logout', methods=['POST'])
 def shrey_logout_api():
+    log_login('superadmin_logout')
     session.pop('shrey_admin', None)
     return jsonify({'ok': True})
 
 @app.route('/shreyadmin')
 def shreyadmin_page():
     return redirect(url_for('shrey_login_page'))
+
+@app.route('/api/shrey/login-logs')
+def shrey_login_logs_api():
+    """Return login/logout history for the super-admin panel."""
+    if not session.get('shrey_admin'):
+        return jsonify({'error': 'unauthorized'}), 401
+    limit = min(int(request.args.get('limit', 200)), 1000)
+    logs = LoginLog.query.order_by(LoginLog.timestamp.desc()).limit(limit).all()
+    return jsonify([
+        {
+            'id':          l.id,
+            'event':       l.event,
+            'user_id':     l.user_id,
+            'user_name':   l.user_name,
+            'user_role':   l.user_role,
+            'tenant_id':   l.tenant_id,
+            'tenant_name': l.tenant_name,
+            'ip_address':  l.ip_address,
+            'user_agent':  l.user_agent,
+            'timestamp':   l.timestamp.strftime('%Y-%m-%d %H:%M:%S') if l.timestamp else '',
+        }
+        for l in logs
+    ])
 
 @app.route('/api/shrey/requests')
 def shrey_requests_api():
@@ -2558,6 +2691,24 @@ def lookup_customer():
     if c:
         return jsonify({'found': True, 'name': c.name, 'id': c.id})
     return jsonify({'found': False})
+
+@app.route('/api/customers', methods=['GET'])
+@staff_required
+def get_customers():
+    """List all customers for the current tenant (Dashboard > Customer Management)."""
+    tenant_id = get_current_tenant_id()
+    customers = Customer.query.filter_by(tenant_id=tenant_id).order_by(Customer.created_at.desc()).all()
+    return jsonify([
+        {
+            'id': c.id,
+            'name': c.name or '',
+            'phone': c.phone or '',
+            'email': c.email or '',
+            'loyalty_points': c.loyalty_points or 0,
+            'created_at': c.created_at.isoformat() if c.created_at else None,
+        }
+        for c in customers
+    ])
 
 # ─── API: Orders ───────────────────────────────────────────
 # ─── Inventory Deduction Helper ────────────────────────

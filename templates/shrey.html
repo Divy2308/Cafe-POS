@@ -256,7 +256,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
   </div>
   <button class="lock-btn" onclick="tryUnlock()">ACCESS SYSTEM</button>
   <div class="lock-err" id="lock-err"></div>
-  <div class="lock-hint">hint: admin</div>
+  <div class="lock-hint" id="lock-hint"></div>
 </div>
 
 <!-- APP -->
@@ -620,7 +620,6 @@ tr:hover td{background:rgba(255,255,255,.015)}
 </div>
 
 <script>
-const PASS = 'admin';
 let restaurants = [];
 let requests = [];
 let branchRequests = [];
@@ -661,17 +660,35 @@ function updateRequestRecord(nextRecord) {
   else requests.unshift(nextRecord);
 }
 
-function tryUnlock(){
-  const v=document.getElementById('lock-pass').value;
-  const err=document.getElementById('lock-err');
-  if(v===PASS){
-    document.getElementById('lock').classList.add('hidden');
-    document.getElementById('app').style.display='flex';
-    initApp();
-  } else {
-    err.textContent='// access denied — invalid credentials';
-    document.getElementById('lock-pass').style.borderColor='rgba(255,71,87,.5)';
-    setTimeout(()=>err.textContent='',2500);
+async function tryUnlock(){
+  const v = document.getElementById('lock-pass').value;
+  const err = document.getElementById('lock-err');
+  const btn = document.querySelector('.lock-btn');
+  if(!v){ err.textContent='// enter your password'; return; }
+  btn.disabled = true;
+  btn.textContent = 'VERIFYING...';
+  try {
+    const res = await fetch('/shreyapi/login', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({username:'shrey', password: v})
+    });
+    const data = await res.json().catch(()=>({}));
+    if(res.ok && data.ok){
+      document.getElementById('lock').classList.add('hidden');
+      document.getElementById('app').style.display='flex';
+      initApp();
+    } else {
+      err.textContent = '// ' + (data.error || 'access denied');
+      document.getElementById('lock-pass').style.borderColor='rgba(255,71,87,.5)';
+      document.getElementById('lock-pass').value = '';
+      setTimeout(()=>{ err.textContent=''; document.getElementById('lock-pass').style.borderColor=''; }, 3000);
+    }
+  } catch(e){
+    err.textContent = '// network error — try again';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'ACCESS SYSTEM';
   }
 }
 function togglePass(){

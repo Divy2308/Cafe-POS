@@ -3,6 +3,7 @@ flask-sqlalchemy
 flask-socketio
 flask-cors
 flask-wtf
+flask-limiter
 qrcode[pil]
 pillow
 werkzeug

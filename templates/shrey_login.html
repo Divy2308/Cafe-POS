@@ -2,48 +2,94 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>System Authentication</title>
+  <title>System Authentication — POS Cafè</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
-    body { font-family: 'Inter', sans-serif; background: #0f172a; color: white; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-    .glass-panel { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 1rem; padding: 2.5rem; width: 100%; max-width: 400px; }
+    :root{--bg:#080a0c;--s1:#0e1114;--s2:#141820;--border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.14);--text:#e8edf5;--muted:#5a6478;--cyan:#00d4ff;--cyan-d:#0099bb;--red:#ff4757;--red-bg:rgba(255,71,87,0.1);--amber:#ffb300;--amber-bg:rgba(255,179,0,0.1);}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%;background:var(--bg);display:flex;align-items:center;justify-content:center;font-family:'Sora',sans-serif;color:var(--text)}
+    .panel{background:var(--s1);border:1px solid var(--border2);border-radius:20px;padding:40px 36px;width:100%;max-width:380px;box-shadow:0 24px 64px rgba(0,0,0,.5)}
+    .brand{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.25em;color:var(--muted);text-transform:uppercase;text-align:center;margin-bottom:28px}
+    .icon{width:52px;height:52px;border-radius:14px;background:var(--s2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;margin:0 auto 20px}
+    .icon svg{width:22px;height:22px;color:var(--cyan)}
+    h1{font-size:17px;font-weight:600;text-align:center;margin-bottom:4px}
+    .sub{font-size:11px;color:var(--muted);text-align:center;font-family:'JetBrains Mono',monospace;margin-bottom:28px}
+    .field{margin-bottom:14px}
+    label{display:block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-bottom:6px}
+    input{width:100%;background:var(--s2);border:1px solid var(--border);border-radius:9px;padding:12px 14px;font-size:13px;color:var(--text);outline:none;font-family:'Sora',sans-serif;transition:border .18s}
+    input:focus{border-color:rgba(0,212,255,.4)}
+    .btn{width:100%;margin-top:6px;padding:13px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--cyan-d),var(--cyan));color:#000;font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;cursor:pointer;font-family:'Sora',sans-serif;transition:all .2s}
+    .btn:hover:not(:disabled){opacity:.9;transform:translateY(-1px)}
+    .btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+    .msg{font-size:11px;margin-top:12px;text-align:center;font-family:'JetBrains Mono',monospace;border-radius:7px;padding:9px 12px;display:none;line-height:1.5}
+    .msg.show{display:block}
+    .msg.error{color:var(--red);background:var(--red-bg);border:1px solid rgba(255,71,87,.2)}
+    .msg.lockout{color:var(--amber);background:var(--amber-bg);border:1px solid rgba(255,179,0,.2)}
   </style>
 </head>
 <body>
-  <div class="glass-panel">
-    <h1 class="text-2xl font-bold text-center mb-6">Restricted Access</h1>
-    <form id="shreyForm" onsubmit="login(event)">
-      <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-400 mb-2">Identifier</label>
-        <input type="text" id="username" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500" required>
+  <div class="panel">
+    <div class="brand">pos.cafe / system</div>
+    <div class="icon">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+      </svg>
+    </div>
+    <h1>Super Admin Access</h1>
+    <div class="sub">// restricted zone</div>
+
+    <form id="loginForm" onsubmit="doLogin(event)" autocomplete="on">
+      <div class="field">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" autocomplete="username" required placeholder="Enter username">
       </div>
-      <div class="mb-6">
-        <label class="block text-sm font-medium text-gray-400 mb-2">Passcode</label>
-        <input type="password" id="password" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500" required>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" autocomplete="current-password" required placeholder="••••••••••">
       </div>
-      <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
-        Authenticate
-      </button>
-      <div id="errorMsg" class="mt-4 text-red-500 text-sm text-center hidden">Invalid credentials</div>
+      <button class="btn" type="submit" id="submitBtn">ACCESS SYSTEM</button>
+      <div class="msg" id="msgBox"></div>
     </form>
   </div>
 
   <script>
-    async function login(e) {
+    async function doLogin(e) {
       e.preventDefault();
-      const user = document.getElementById('username').value;
+      const btn = document.getElementById('submitBtn');
+      const msg = document.getElementById('msgBox');
+      const user = document.getElementById('username').value.trim();
       const pass = document.getElementById('password').value;
-      const res = await fetch('/shreyapi/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: user, password: pass })
-      });
-      if (res.ok) {
-        window.location.href = '/shrey';
-      } else {
-        document.getElementById('errorMsg').classList.remove('hidden');
+
+      msg.className = 'msg';
+      btn.disabled = true;
+      btn.textContent = 'VERIFYING...';
+
+      try {
+        const res = await fetch('/shreyapi/login', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ username: user, password: pass })
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (res.ok && data.ok) {
+          btn.textContent = 'ACCESS GRANTED ✓';
+          window.location.href = '/shrey';
+          return;
+        }
+
+        const text = data.error || 'Invalid credentials';
+        msg.textContent = '// ' + text;
+        msg.className = res.status === 429 ? 'msg show lockout' : 'msg show error';
+        document.getElementById('password').value = '';
+
+      } catch (_) {
+        msg.textContent = '// Network error — try again';
+        msg.className = 'msg show error';
+      } finally {
+        btn.disabled = false;
+        if (btn.textContent === 'VERIFYING...') btn.textContent = 'ACCESS SYSTEM';
       }
     }
   </script>
