@@ -144,6 +144,10 @@ tr:hover td{background:rgba(0,0,0,.015)}
 .act-btn.view{border-color:rgba(0,212,255,.25);color:var(--cyan);background:var(--cyan-bg)}
 .act-btn.delete{border-color:rgba(255,71,87,.35);color:var(--red);background:rgba(255,71,87,.1)}
 .act-btn.delete:hover{background:rgba(255,71,87,.2);border-color:rgba(255,71,87,.6)}
+.act-btn.pause{border-color:rgba(180,83,9,.35);color:var(--amber);background:var(--amber-bg)}
+.act-btn.pause:hover{background:rgba(180,83,9,.15);border-color:rgba(180,83,9,.6)}
+.act-btn.resume{border-color:rgba(22,163,74,.35);color:var(--green);background:var(--green-bg)}
+.act-btn.resume:hover{background:rgba(22,163,74,.15);border-color:rgba(22,163,74,.6)}
 .rest-name{font-weight:600;color:var(--text);font-size:13px}
 .rest-meta{font-size:10px;color:var(--muted);margin-top:1px;font-family:'JetBrains Mono',monospace}
 
@@ -934,6 +938,10 @@ function renderRestaurants(){
       <td><span class="badge badge-${r.status||'approved'}">${r.status||'approved'}</span></td>
       <td><div class="action-btns">
         <button class="act-btn view" onclick="viewRestaurant(${r.id})">Details</button>
+        ${r.status==='suspended'
+          ? `<button class="act-btn resume" onclick="pauseRestaurant(${r.id})" title="Resume — re-enable access">▶ Resume</button>`
+          : `<button class="act-btn pause" onclick="pauseRestaurant(${r.id})" title="Pause — block all logins">⏸ Pause</button>`
+        }
         <button class="act-btn delete" onclick="confirmDeleteRestaurant(${r.id})" title="Delete restaurant permanently">Delete</button>
       </div></td>
     </tr>`).join('');
@@ -1047,12 +1055,32 @@ function savePlan(id){
   closeModal(); renderRestaurants(); renderBilling();
   showToast('Plan updated!','cyan');
 }
-function suspendRest(id){
-  const r=restaurants.find(x=>x.id===id);
-  if(r){ r.status=r.status==='suspended'?'active':'suspended'; }
-  addLog(r?.name,r?.status==='suspended'?'suspended':'reactivated','amber');
-  renderRestaurants();
-  showToast(r?.name+' '+(r?.status==='suspended'?'suspended':'reactivated'),'amber');
+function suspendRest(id){ pauseRestaurant(id); } // legacy alias
+async function pauseRestaurant(id){
+  const r = getRestaurantRows().find(x=>x.id===id) || requests.find(x=>x.id===id);
+  const isSuspended = r && r.status === 'suspended';
+  const label = isSuspended ? 'Resume' : 'Pause';
+  if(!confirm((isSuspended ? 'Resume' : 'Pause') + ' "' + (r?.name||'this restaurant') + '"?\n\n' +
+    (isSuspended
+      ? 'This will restore access for the restaurant and all its staff.'
+      : 'This will block login for the restaurant owner and ALL staff until resumed.'))) return;
+
+  const res = await fetch('/api/shrey/requests/'+id+'/pause', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'}
+  });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok){ showToast(data.error||label+' failed','red'); return; }
+
+  // Update local cache
+  const action = data.action; // 'suspended' or 'resumed'
+  [restaurants, requests].forEach(arr=>{
+    const item = arr.find(x=>x.id===id);
+    if(item){ item.status = action==='suspended'?'suspended':'approved'; item.is_active = action!=='suspended'; }
+  });
+  addLog(r?.name, action==='suspended'?'paused (logins blocked)':'resumed (access restored)', action==='suspended'?'amber':'green');
+  renderRestaurants(); renderRequests(); updateStats();
+  showToast((r?.name||'Restaurant')+' '+(action==='suspended'?'⏸ Paused — all logins blocked':'▶ Resumed — access restored'), action==='suspended'?'amber':'green');
 }
 
 function confirmDeleteRestaurant(id){

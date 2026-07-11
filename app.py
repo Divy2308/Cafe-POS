@@ -1825,6 +1825,28 @@ def reject_shrey_request(tenant_id):
     return jsonify({'ok': True, 'request': _serialize_shrey_request(tenant)})
 
 @csrf.exempt
+@app.route('/api/shrey/requests/<int:tenant_id>/pause', methods=['POST'])
+def pause_shrey_restaurant(tenant_id):
+    """Toggle pause/resume a restaurant. Paused = is_active False + status suspended.
+    All staff logins are blocked while paused via get_tenant_access_block_message."""
+    if not session.get('shrey_admin'):
+        return jsonify({'error': 'unauthorized'}), 401
+
+    tenant = Tenant.query.get_or_404(tenant_id)
+    if tenant.approval_status == 'suspended':
+        # Resume
+        tenant.is_active = True
+        tenant.approval_status = 'approved'
+        action = 'resumed'
+    else:
+        # Pause — keeps all data, just blocks access
+        tenant.is_active = False
+        tenant.approval_status = 'suspended'
+        action = 'suspended'
+    db.session.commit()
+    return jsonify({'ok': True, 'action': action, 'request': _serialize_shrey_request(tenant)})
+
+@csrf.exempt
 @app.route('/api/shrey/requests/<int:tenant_id>/delete', methods=['DELETE'])
 def delete_shrey_restaurant(tenant_id):
     if not session.get('shrey_admin'):
