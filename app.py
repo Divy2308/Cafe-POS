@@ -217,6 +217,30 @@ TENANT_FEATURE_DEFINITIONS = {
         'label': 'QR Self-Order',
         'description': 'Guest QR menu, ordering, and table self-order flow',
     },
+    'inventory': {
+        'label': 'Inventory',
+        'description': 'Stock tracking, low-stock alerts, and ingredient management',
+    },
+    'reports': {
+        'label': 'Reports',
+        'description': 'Sales reports, export CSV, and financial summaries',
+    },
+    'reviews': {
+        'label': 'Reviews',
+        'description': 'Customer feedback, ratings, and review management',
+    },
+    'staff': {
+        'label': 'Staff Management',
+        'description': 'Add/manage staff accounts (limit set by max_staff)',
+    },
+    'attendance': {
+        'label': 'Attendance',
+        'description': 'Staff clock-in/out tracking and shift records',
+    },
+    'branch': {
+        'label': 'Branch Management',
+        'description': 'Multi-branch setup, branch requests, and per-branch settings',
+    },
 }
 
 
@@ -256,6 +280,7 @@ class Tenant(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     approval_status = db.Column(db.String(20), default='approved')
     features_json = db.Column(db.Text, default='{}')
+    max_staff = db.Column(db.Integer, default=0)  # 0 = unlimited
     description = db.Column(db.Text, default='')
     address = db.Column(db.Text, default='')
     phone = db.Column(db.String(20), default='')
@@ -1689,6 +1714,7 @@ def _serialize_shrey_request(tenant):
         'tables': table_count,
         'ordersDay': orders_day,
         'feature_flags': get_tenant_feature_flags(tenant=tenant),
+        'max_staff': tenant.max_staff or 0,
     }
 
 @app.route('/shrey')
@@ -2000,6 +2026,24 @@ def update_shrey_tenant_feature(tenant_id, feature_key):
     set_tenant_feature_flag(tenant, feature_key, bool(enabled))
     db.session.commit()
     return jsonify({'ok': True, 'request': _serialize_shrey_request(tenant)})
+
+@csrf.exempt
+@app.route('/api/shrey/tenants/<int:tenant_id>/max-staff', methods=['POST'])
+def update_shrey_max_staff(tenant_id):
+    """Set the maximum number of staff accounts for a tenant. 0 = unlimited."""
+    if not session.get('shrey_admin'):
+        return jsonify({'error': 'unauthorized'}), 401
+    tenant = Tenant.query.get_or_404(tenant_id)
+    d = request.json or {}
+    try:
+        limit = int(d.get('max_staff', 0))
+        if limit < 0:
+            raise ValueError
+    except (TypeError, ValueError):
+        return jsonify({'error': 'max_staff must be a non-negative integer'}), 400
+    tenant.max_staff = limit
+    db.session.commit()
+    return jsonify({'ok': True, 'max_staff': limit, 'request': _serialize_shrey_request(tenant)})
 
 # ─── API: Products ─────────────────────────────────────────
 @app.route('/api/products', methods=['GET'])

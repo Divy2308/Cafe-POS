@@ -609,18 +609,15 @@ let restSearch = '';
 let currentAction = null;
 let appInitialized = false;
 const FEATURE_DEFINITIONS = {
-  dashboard: {
-    label: 'Dashboard',
-    description: 'Sales and analytics dashboard access',
-  },
-  kitchen: {
-    label: 'Kitchen Display',
-    description: 'Kitchen screen, ticket flow, and ready alerts',
-  },
-  self_order: {
-    label: 'QR Self-Order',
-    description: 'Guest QR menu and self-ordering for tables',
-  },
+  dashboard:   { label: 'Dashboard',          description: 'Sales and analytics dashboard access', icon: '📊' },
+  kitchen:     { label: 'Kitchen Display',     description: 'Kitchen screen, ticket flow, and ready alerts', icon: '🍳' },
+  self_order:  { label: 'QR Self-Order',       description: 'Guest QR menu and self-ordering for tables', icon: '📱' },
+  inventory:   { label: 'Inventory',           description: 'Stock tracking, low-stock alerts, ingredients', icon: '📦' },
+  reports:     { label: 'Reports',             description: 'Sales reports, CSV export, financial summaries', icon: '📈' },
+  reviews:     { label: 'Reviews',             description: 'Customer feedback, ratings, and review management', icon: '⭐' },
+  staff:       { label: 'Staff Management',    description: 'Add/manage staff accounts', icon: '👥', hasLimit: true },
+  attendance:  { label: 'Attendance',          description: 'Staff clock-in/out tracking and shift records', icon: '🕐' },
+  branch:      { label: 'Branch Management',   description: 'Multi-branch setup and per-branch settings', icon: '🏪' },
 };
 
 function getRestaurantRows() {
@@ -978,20 +975,34 @@ function viewRestaurant(id){
   if(!r) return;
   const isLiveTenant = requests.some(x => x.id === id);
   const featureRows = isLiveTenant
-    ? Object.entries(FEATURE_DEFINITIONS).map(([key, meta]) => {
-        const enabled = (r.feature_flags || {})[key] !== false;
-        return `
-          <div class="info-row" style="align-items:center;gap:16px">
-            <div style="flex:1">
-              <div class="info-val">${meta.label}</div>
-              <div style="font-size:10px;color:var(--muted);margin-top:4px;font-family:'JetBrains Mono',monospace">${meta.description}</div>
-            </div>
-            <button class="act-btn ${enabled ? 'reject' : 'approve'}" onclick="toggleRestaurantFeature(${r.id}, '${key}', ${enabled ? 'false' : 'true'})">
-              ${enabled ? 'Disable' : 'Enable'}
-            </button>
-          </div>
-        `;
-      }).join('')
+    ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        ${Object.entries(FEATURE_DEFINITIONS).map(([key, meta]) => {
+          const enabled = (r.feature_flags || {})[key] !== false;
+          const isStaff = key === 'staff';
+          const staffLimit = r.max_staff || 0;
+          return `
+            <div style="background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:12px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                <div style="font-size:13px;font-weight:600;">${meta.icon} ${meta.label}</div>
+                <button class="act-btn ${enabled ? 'reject' : 'approve'}" style="padding:3px 8px;font-size:10px;"
+                  onclick="toggleRestaurantFeature(${r.id}, '${key}', ${enabled ? 'false' : 'true'})">
+                  ${enabled ? 'Disable' : 'Enable'}
+                </button>
+              </div>
+              <div style="font-size:10px;color:var(--muted);margin-bottom:${isStaff ? '8px' : '0'};">${meta.description}</div>
+              ${isStaff ? `
+                <div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
+                  <span style="font-size:10px;color:var(--muted2);">Max staff:</span>
+                  <input type="number" min="0" max="999" value="${staffLimit}" id="staff-limit-${r.id}"
+                    style="width:60px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--s1);color:var(--text);outline:none;"
+                    placeholder="0">
+                  <button class="act-btn view" style="padding:3px 8px;font-size:10px;"
+                    onclick="updateStaffLimit(${r.id})">Set</button>
+                  <span style="font-size:9px;color:var(--muted);">0=unlimited</span>
+                </div>` : ''}
+            </div>`;
+        }).join('')}
+      </div>`
     : `<div style="font-size:11px;color:var(--muted2);font-family:'JetBrains Mono',monospace">Feature toggles are available for live tenant accounts only.</div>`;
   document.getElementById('modal-title').textContent=r.name;
   document.getElementById('modal-body').innerHTML=`
@@ -1046,6 +1057,24 @@ async function toggleRestaurantFeature(tenantId, featureKey, enabled){
   updateStats();
   addLog(data.request?.name || 'Restaurant', `${meta.label} ${enabled ? 'enabled' : 'disabled'}`, enabled ? 'green' : 'amber');
   showToast(`${meta.label} ${enabled ? 'enabled' : 'disabled'} for ${data.request?.name || 'restaurant'}`, enabled ? 'green' : 'amber');
+  viewRestaurant(tenantId);
+}
+async function updateStaffLimit(tenantId){
+  const input = document.getElementById('staff-limit-'+tenantId);
+  if(!input) return;
+  const limit = parseInt(input.value, 10);
+  if(isNaN(limit) || limit < 0){ showToast('Enter a valid number (0 = unlimited)','red'); return; }
+  const res = await fetch(`/api/shrey/tenants/${tenantId}/max-staff`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ max_staff: limit })
+  });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok){ showToast(data.error||'Failed to set staff limit','red'); return; }
+  updateRequestRecord(data.request);
+  renderRestaurants();
+  addLog(data.request?.name||'Restaurant', `staff limit set to ${limit===0?'unlimited':limit}`, 'cyan');
+  showToast(`Staff limit set to ${limit===0?'unlimited':limit} for ${data.request?.name||'restaurant'}`, 'cyan');
   viewRestaurant(tenantId);
 }
 function savePlan(id){
