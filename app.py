@@ -4845,6 +4845,7 @@ def get_users():
 
 @app.route('/api/users', methods=['POST'])
 @admin_required
+@tenant_feature_required('staff')
 def create_user():
     admin = get_current_user()
     if normalize_role(admin.role) not in ('restaurant', 'manager') and not admin.is_superadmin:
@@ -4859,6 +4860,17 @@ def create_user():
     monthly_target = float(d.get('monthly_target', 0) or 0)
     branch_id = d.get('branch_id') or get_active_branch_id(admin)
     tenant_id = get_current_tenant_id()
+    
+    tenant = db.session.get(Tenant, tenant_id)
+    if tenant and tenant.max_staff > 0:
+        current_staff_count = User.query.filter_by(tenant_id=tenant_id).count()
+        # Note: we might want to exclude the owner or superadmin, but for simplicity, we count all users in the tenant.
+        # Actually, let's exclude the owner if we want max_staff to represent only additional staff.
+        # But for now, we just enforce the total user count <= max_staff (if max_staff > 0).
+        # Actually, the user says "I set 1 staff but I add 2 more staff". Let's restrict it strictly.
+        if current_staff_count >= tenant.max_staff:
+            return jsonify({'error': f'Staff limit reached (max {tenant.max_staff}). Upgrade your plan to add more.'}), 400
+
     try:
         branch_id = int(branch_id) if branch_id else None
     except (TypeError, ValueError):
