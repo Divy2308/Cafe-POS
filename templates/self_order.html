@@ -201,9 +201,17 @@
 
   function getCategoryImage(categoryName) {
     const name = (categoryName || '').toLowerCase();
-    if (name.includes('tea') || name.includes('coffee')) return '/static/img/categories/teaorcoffee.png';
-    if (name.includes('snack')) return '/static/img/categories/Snacks.png';
-    if (name.includes('sizzler')) return '/static/img/categories/sizzler.png';
+    if (name.includes('tea') || name.includes('coffee'))  return '/static/img/categories/teaorcoffee.png';
+    if (name.includes('snack'))                           return '/static/img/categories/Snacks.png';
+    if (name.includes('sizzler'))                         return '/static/img/categories/sizzler.png';
+    if (name.includes('pizza'))                           return '/static/img/categories/pizza.png';
+    if (name.includes('burger'))                          return '/static/img/categories/burger.png';
+    if (name.includes('pasta'))                           return '/static/img/categories/pasta.png';
+    if (name.includes('salad'))                           return '/static/img/categories/salads.png';
+    if (name.includes('dessert') || name.includes('sweet')) return '/static/img/categories/Desserts.png';
+    if (name.includes('mains') || name.includes('main'))  return '/static/img/categories/mains.png';
+    if (name.includes('drink') || name.includes('water') || name.includes('beverage') || name.includes('juice'))
+                                                          return '/static/img/categories/Beverages.png';
     return '';
   }
 
@@ -328,11 +336,18 @@
     const grid = document.getElementById('menu-grid');
     const rows = cats.flatMap(c => (c.products || []).map(p => {
       const categoryImage = getCategoryImage(c.name);
-      const imgHtml = p.image_b64
-        ? `<img src="${esc(p.image_b64)}" class="prod-img" alt="" loading="lazy" />`
-        : categoryImage
-          ? `<img src="${categoryImage}" class="prod-img" alt="${esc(c.name)}" loading="lazy" />`
-          : `<div style="font-size:32px; margin-bottom:8px;">${emojiMap[c.name] || '🛒'}</div>`;
+      let imgHtml;
+      if (categoryImage) {
+        // Category image with label overlay — same style as POS
+        imgHtml = `<div style="position:relative;width:100%;height:96px;border-radius:10px;overflow:hidden;margin-bottom:8px;">
+          <img src="${categoryImage}" alt="${esc(c.name)}" style="width:100%;height:100%;object-fit:cover;" loading="lazy">
+          <span style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.45);color:#fff;font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;text-align:center;padding:3px 4px;">${esc(c.name)}</span>
+        </div>`;
+      } else if (p.image_b64) {
+        imgHtml = `<img src="${esc(p.image_b64)}" style="width:100%;height:96px;object-fit:cover;border-radius:10px;margin-bottom:8px;" alt="" loading="lazy">`;
+      } else {
+        imgHtml = `<div style="width:100%;height:96px;border-radius:10px;margin-bottom:8px;background:#1e1e24;display:flex;align-items:center;justify-content:center;font-size:32px;">${emojiMap[c.name] || '🛒'}</div>`;
+      }
       const addonBadge = p.addons && p.addons.length
         ? `<div style="font-size:10px; color:#fdba74; margin-top:5px;">Customize +${p.addons.length} addons</div>`
         : '';
@@ -585,9 +600,6 @@
         </div>`;
       }).join('');
       const receipt = '/receipt/' + o.order_id + '?guest_token=' + encodeURIComponent(guestToken);
-      const payButton = !o.is_paid
-        ? `<button type="button" class="bill-action-btn primary" onclick="payOrderOnline(${o.order_id})">Pay online</button>`
-        : '';
       return `
         <div class="bill-card" data-oid="${o.order_id}">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
@@ -604,7 +616,6 @@
           </details>
           <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
             <a href="${receipt}" target="_blank" rel="noopener" class="bill-action-btn">View receipt</a>
-            ${payButton}
           </div>
         </div>`;
     }).join('');

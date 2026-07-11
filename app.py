@@ -4020,6 +4020,7 @@ def self_order_page(table_id):
         tenant_id=t.tenant_id,
         branch_id=branch_id,
         cafe_name=cafe_name,
+        qr_token=None,
     )
 
 
