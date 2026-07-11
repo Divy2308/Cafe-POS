@@ -75,17 +75,37 @@
     background: linear-gradient(135deg, #f97316, #ea580c); color: #fff; border-color: transparent;
   }
 </style>
-{% if theme == 'light' %}
 <style>
-  body { background: #f7fafc; color: #111; }
-  .so-hero { background: linear-gradient(135deg, rgba(249,115,22,0.06), #fff); border-color: rgba(0,0,0,0.06); }
-  .menu-product { background: #fff; border-color: #e6e6e6; color:#111; }
-  .cart-panel { background: #fff; border-color: #e6e6e6; color:#111; }
-  input, .item-note-input { background: #fff; color: #111; border:1px solid #e6e6e6; }
-  .bill-card { background: #fff; border-color: #e6e6e6; color:#111; }
+  /* ── Always light theme ── */
+  body { background: #f4f6f9; color: #1a202c; }
+  .so-hero {
+    background: linear-gradient(135deg, rgba(249,115,22,0.08), #fff);
+    border-color: rgba(0,0,0,0.08);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+  }
+  .so-hero h1 { color: #1a202c; }
+  .so-hero .sub { color: #6b7280; }
   .so-badge { color: #f97316; }
+  .menu-product {
+    background: #ffffff; border-color: #e5e7eb; color: #1a202c;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .menu-product:hover { border-color: rgba(249,115,22,0.5); box-shadow: 0 8px 24px rgba(249,115,22,0.12); }
+  .cart-panel { background: #ffffff; border-color: #e5e7eb; color: #1a202c; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .cart-row { border-bottom-color: #f0f0f0; }
+  .qty-btn { background: #f4f6f9; border-color: #e5e7eb; color: #1a202c; }
+  .qty-btn:hover { background: #e9ecef; }
+  .item-note-input { background: #f9fafb; border-color: #e5e7eb; color: #1a202c; }
+  .bill-card { background: #ffffff; border-color: #e5e7eb; color: #1a202c; }
+  .bill-card:hover { border-color: rgba(249,115,22,0.4); }
+  .progress-wrap { background: rgba(0,0,0,0.07); }
+  .addon-modal-bg { background: rgba(0,0,0,0.5); }
+  .so-section-title { color: #1a202c; }
+  .st-to_cook { background: rgba(239,68,68,0.1); color: #dc2626; border-color: rgba(239,68,68,0.3); }
+  .st-preparing { background: rgba(249,115,22,0.1); color: #ea580c; border-color: rgba(249,115,22,0.3); }
+  .st-completed { background: rgba(22,163,74,0.1); color: #16a34a; border-color: rgba(22,163,74,0.3); }
+  .st-sent, .st-other { background: rgba(0,0,0,0.05); color: #6b7280; border-color: rgba(0,0,0,0.1); }
 </style>
-{% endif %}
 {% endblock %}
 {% block body %}
 <div class="so-wrap">
@@ -99,7 +119,7 @@
     <div>
       <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap;">
         <input type="text" id="menu-search" placeholder="Search menu…" oninput="filterMenuSearch()"
-          style="flex:1; min-width:200px; max-width:320px; background:#111; border:1px solid #2a2a2e; border-radius:12px; color:#fff; padding:10px 14px; font-size:14px;" />
+          style="flex:1; min-width:200px; max-width:320px; background:#fff; border:1px solid #e5e7eb; border-radius:12px; color:#1a202c; padding:10px 14px; font-size:14px; outline:none;" />
       </div>
       <div id="cat-pills" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;"></div>
       <div id="menu-grid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px;"></div>
@@ -163,6 +183,17 @@
   const TABLE_NUMBER = {{ table_number|tojson }};
   const TENANT_ID = {{ tenant_id|tojson }};
   const BRANCH_ID = {{ branch_id|tojson }};
+
+  // ── TABLE LOCK: prevent customers changing table via URL ──
+  const TABLE_LOCK_KEY = 'pos_cafe_table_lock_' + TENANT_ID;
+  const lockedTable = sessionStorage.getItem(TABLE_LOCK_KEY);
+  if (!lockedTable) {
+    // First visit — lock this tab to this table
+    sessionStorage.setItem(TABLE_LOCK_KEY, String(TABLE_ID));
+  } else if (parseInt(lockedTable, 10) !== TABLE_ID) {
+    // Someone edited the URL — redirect them back
+    window.location.replace('/table/' + lockedTable + '/order');
+  }
   const LS_TOKEN = 'pos_cafe_guest_token';
   const LS_CART = 'pos_cafe_self_cart_' + TABLE_ID;
   const LS_ORDERS = 'pos_cafe_guest_order_refs';

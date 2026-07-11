@@ -4614,6 +4614,7 @@ def update_branch_detail(bid):
 
 @app.route('/api/attendance/status', methods=['GET'])
 @staff_required
+@tenant_feature_required('attendance')
 def attendance_status():
     user = get_current_user()
     open_shift = get_current_shift_start(user.id)
@@ -4627,6 +4628,7 @@ def attendance_status():
 
 @app.route('/api/attendance/clock', methods=['POST'])
 @staff_required
+@tenant_feature_required('attendance')
 def toggle_attendance_clock():
     user = get_current_user()
     action = (request.json or {}).get('action', '').strip().lower()
@@ -4656,6 +4658,7 @@ def toggle_attendance_clock():
 
 @app.route('/api/admin/attendance-report', methods=['GET'])
 @admin_required
+@tenant_feature_required('attendance')
 def attendance_report():
     user = get_current_user()
     staff_id = request.args.get('staff_id', '').strip()
@@ -4702,6 +4705,7 @@ def attendance_report():
 
 @app.route('/api/admin/attendance/shifts/<int:clock_in_event_id>', methods=['PATCH'])
 @admin_required
+@tenant_feature_required('attendance')
 def update_attendance_shift(clock_in_event_id):
     clock_in_event = AttendanceEvent.query.filter_by(
         id=clock_in_event_id,
@@ -4958,6 +4962,7 @@ def delete_all_users():
 # ─── API: Inventory & Recipes ─────────────────────────
 @app.route('/api/inventory', methods=['GET'])
 @admin_required
+@tenant_feature_required('inventory')
 def get_inventory():
     tid = get_current_tenant_id()
     q = InventoryItem.query.filter_by(tenant_id=tid)
@@ -4976,6 +4981,7 @@ def get_inventory():
 
 @app.route('/api/inventory', methods=['POST'])
 @admin_required
+@tenant_feature_required('inventory')
 def add_inventory_item():
     try:
         tid = get_current_tenant_id()
@@ -5014,6 +5020,7 @@ def add_inventory_item():
 
 @app.route('/api/inventory/<int:iid>', methods=['PUT', 'DELETE'])
 @admin_required
+@tenant_feature_required('inventory')
 def manage_inventory_item(iid):
     try:
         tid = get_current_tenant_id()
