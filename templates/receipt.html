@@ -220,6 +220,12 @@
                 <br><small style="font-size:8px;">Addons: {{ addons|map(attribute='name')|join(', ') }}</small>
               {% endif %}
             {% endif %}
+            {% if item.is_thali and item.components_json %}
+              {% set comps = item.components_json|from_json %}
+              {% if comps %}
+                <br><small style="font-size:8px;font-style:italic;">Includes: {{ comps|join(', ') }}</small>
+              {% endif %}
+            {% endif %}
         </td>
         <td class="col-qty">{{ item.qty }}</td>
         <td class="col-rate">{{ "%.2f"|format(item.price) }}</td>

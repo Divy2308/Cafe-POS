@@ -56,7 +56,8 @@ LEGACY_DB_PATH = os.path.join(os.path.dirname(__file__), 'instance', 'pos.db')
 DB_DIR = os.path.join(tempfile.gettempdir(), 'pos-cafe')
 DB_PATH = os.path.join(DB_DIR, 'pos_runtime.db')
 os.makedirs(DB_DIR, exist_ok=True)
-if os.path.exists(DB_PATH):
+_temp_db_url = (os.getenv('DATABASE_URL') or '').strip()
+if os.path.exists(DB_PATH) and not _temp_db_url:
     def _db_is_writable(path):
         conn = None
         try:
@@ -271,6 +272,14 @@ def service_worker():
 
 
 # ─── Models ───────────────────────────────────────────────
+class FoodCourt(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    address = db.Column(db.Text)
+    owner_id = db.Column(db.Integer)
+    food_court_id = db.Column(db.Integer)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 class Tenant(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -288,6 +297,7 @@ class Tenant(db.Model):
     tags_json = db.Column(db.Text, default='[]')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     owner_id = db.Column(db.Integer, nullable=True)
+    food_court_id = db.Column(db.Integer, db.ForeignKey('food_court.id'), nullable=True)
 
 class Branch(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -324,6 +334,7 @@ class User(db.Model):
     is_platform_admin = db.Column(db.Boolean, default=False)
     tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
     branch_id = db.Column(db.Integer, db.ForeignKey('branch.id'), nullable=True)
+    food_court_id = db.Column(db.Integer, db.ForeignKey('food_court.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     tenant = db.relationship('Tenant', backref='users')
     branch = db.relationship('Branch', backref='users')
@@ -676,6 +687,10 @@ def page_login_required(allowed_roles=None, redirect_to=None):
         def decorated(*args, **kwargs):
             if 'user_id' not in session:
                 return redirect(url_for('auth'))
+            user = get_current_user()
+            if not user:
+                session.clear()
+                return redirect(url_for('auth'))
             role = normalize_role(session.get('user_role'))
             if allowed_roles is not None:
                 allowed = {normalize_role(r) for r in allowed_roles}
@@ -689,6 +704,10 @@ def staff_page_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if 'user_id' not in session:
+            return redirect(url_for('auth'))
+        user = get_current_user()
+        if not user:
+            session.clear()
             return redirect(url_for('auth'))
         role = normalize_role(session.get('user_role'))
         if role == 'customer':
@@ -1164,15 +1183,23 @@ def favicon():
     return '', 204
 
 @app.route('/')
-def index():
+def landing():
     if 'user_id' in session:
-        return redirect(role_home(session.get('user_role')))
+        user = get_current_user()
+        if user:
+            return redirect(role_home(session.get('user_role')))
+        else:
+            session.clear()
     return render_template('landing.html')
 
 @app.route('/auth')
 def auth():
     if 'user_id' in session:
-        return redirect(role_home(session.get('user_role')))
+        user = get_current_user()
+        if user:
+            return redirect(role_home(session.get('user_role')))
+        else:
+            session.clear()
     return render_template('auth.html')
 
 
@@ -1652,10 +1679,13 @@ def pos():
 @app.route('/backend')
 @page_login_required(allowed_roles=('restaurant',))
 def backend():
+    t_id = get_current_tenant_id()
+    t = Tenant.query.get(t_id) if t_id else None
     return render_template(
         'backend.html',
         user_name=session.get('user_name'),
         user_role=session.get('user_role'),
+        tenant=t,
     )
 
 @app.route('/admin')
@@ -1679,12 +1709,15 @@ def customer():
 @page_login_required(allowed_roles=('restaurant',))
 @tenant_feature_required('dashboard')
 def dashboard():
+    t_id = get_current_tenant_id()
+    t = Tenant.query.get(t_id) if t_id else None
     return render_template(
         'dashboard.html',
         user_name=session.get('user_name'),
         user_role=session.get('user_role'),
         active_branch=get_selected_branch(),
         is_superadmin=is_superadmin(),
+        tenant=t,
     )
 
 def _serialize_shrey_request(tenant):
@@ -4486,15 +4519,19 @@ def get_vapid_public_key():
 @staff_required
 @tenant_feature_required('dashboard')
 def dashboard_stats():
-    period = request.args.get('period','today')
+    start_date_str = request.args.get('start_date')
+    end_date_str = request.args.get('end_date')
     now = datetime.utcnow()
-    if period == 'today':
-        start = now.replace(hour=0,minute=0,second=0)
-    elif period == 'week':
-        start = now - timedelta(days=7)
-    else:
-        start = now - timedelta(days=30)
-    orders = apply_tenant_scope(apply_branch_scope(Order.query, Order.branch_id), Order).filter(Order.status=='paid', Order.created_at>=start).all()
+    
+    start_date = parse_report_date(start_date_str, now.date())
+    end_date = parse_report_date(end_date_str, now.date())
+    
+    # Convert dates to datetime bounds (UTC)
+    start = datetime(start_date.year, start_date.month, start_date.day)
+    end = datetime(end_date.year, end_date.month, end_date.day) + timedelta(days=1)
+    
+    query = apply_tenant_scope(apply_branch_scope(Order.query, Order.branch_id), Order)
+    orders = query.filter(Order.status=='paid', Order.created_at>=start, Order.created_at<end).all()
     total_sales = sum(o.total for o in orders)
     total_orders = len(orders)
     by_method = {}
@@ -5292,25 +5329,32 @@ import csv
 from io import StringIO
 from flask import Response
 
-@app.route('/api/export/orders')
+from io import BytesIO
+
+@app.route('/api/export/stats')
 @staff_required
-def export_orders_csv():
-    period = request.args.get('period', 'today')
+def export_stats():
+    start_date_str = request.args.get('start_date')
+    end_date_str = request.args.get('end_date')
+    export_format = request.args.get('format', 'csv').lower()
+    
     now = datetime.utcnow()
-    if period == 'week':
-        start = now - timedelta(days=7)
-    elif period == 'month':
-        start = now - timedelta(days=30)
-    else:
-        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    orders = apply_branch_scope(Order.query, Order.branch_id).filter(Order.status == 'paid', Order.created_at >= start).order_by(Order.created_at.desc()).all()
-    si = StringIO()
-    writer = csv.writer(si)
-    writer.writerow(['Date', 'Order #', 'Table', 'Customer', 'Items', 'Subtotal', 'Tip', 'Total', 'Payment Method'])
+    start_date = parse_report_date(start_date_str, now.date())
+    end_date = parse_report_date(end_date_str, now.date())
+    
+    start = datetime(start_date.year, start_date.month, start_date.day)
+    end = datetime(end_date.year, end_date.month, end_date.day) + timedelta(days=1)
+    
+    orders = apply_tenant_scope(apply_branch_scope(Order.query, Order.branch_id), Order).filter(
+        Order.status == 'paid', Order.created_at >= start, Order.created_at < end
+    ).order_by(Order.created_at.desc()).all()
+    
+    headers = ['Date', 'Order #', 'Table', 'Customer', 'Items', 'Subtotal', 'Tip', 'Total', 'Payment Method']
+    rows = []
     for o in orders:
         items_str = '; '.join(f'{i.product_name} x{i.qty}' for i in o.items)
         subtotal = sum(i.qty * i.price for i in o.items)
-        writer.writerow([
+        rows.append([
             o.created_at.strftime('%Y-%m-%d %H:%M'),
             o.order_number,
             o.table.number if o.table else 'Takeaway',
@@ -5321,12 +5365,67 @@ def export_orders_csv():
             round((o.tip or 0) + subtotal, 2),
             o.payment_method or '',
         ])
-    output = si.getvalue()
-    return Response(
-        output,
-        mimetype='text/csv',
-        headers={'Content-Disposition': f'attachment;filename=orders_{period}_{now.strftime("%Y%m%d")}.csv'}
-    )
+        
+    filename = f'stats_{start_date.strftime("%Y%m%d")}_to_{end_date.strftime("%Y%m%d")}'
+    
+    if export_format == 'excel':
+        import openpyxl
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Orders"
+        ws.append(headers)
+        for row in rows:
+            ws.append(row)
+        
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        return Response(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            headers={'Content-Disposition': f'attachment;filename={filename}.xlsx'}
+        )
+        
+    elif export_format == 'pdf':
+        from fpdf import FPDF
+        pdf = FPDF(orientation='L') # Landscape for wide table
+        pdf.add_page()
+        pdf.set_font("helvetica", size=10)
+        pdf.cell(0, 10, f"Order Stats ({start_date} to {end_date})", new_x="LMARGIN", new_y="NEXT", align="C")
+        
+        # Table Header
+        pdf.set_font("helvetica", style="B", size=8)
+        col_widths = [25, 20, 15, 25, 100, 15, 15, 20, 25]
+        for i, h in enumerate(headers):
+            pdf.cell(col_widths[i], 8, txt=str(h), border=1)
+        pdf.ln()
+        
+        # Table Rows
+        pdf.set_font("helvetica", size=8)
+        for row in rows:
+            for i, val in enumerate(row):
+                pdf.cell(col_widths[i], 8, txt=str(val)[:50], border=1) # truncate long items string
+            pdf.ln()
+            
+        output = pdf.output(dest='S')
+        return Response(
+            bytes(output),
+            mimetype='application/pdf',
+            headers={'Content-Disposition': f'attachment;filename={filename}.pdf'}
+        )
+        
+    else:
+        # Default to CSV
+        si = StringIO()
+        writer = csv.writer(si)
+        writer.writerow(headers)
+        writer.writerows(rows)
+        output = si.getvalue()
+        return Response(
+            output,
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment;filename={filename}.csv'}
+        )
 
 # ─── SocketIO ──────────────────────────────────────────────
 @socketio.on('connect')

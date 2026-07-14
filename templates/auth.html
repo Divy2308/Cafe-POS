@@ -1872,6 +1872,7 @@
       <div class="tab-bar">
         <button class="tab-btn active" id="tab-login" onclick="switchTab('login')">Login</button>
         <button class="tab-btn" id="tab-register" onclick="switchTab('register')">Start Business</button>
+        <button class="tab-btn" id="tab-foodcourt" onclick="switchTab('foodcourt')">Food Court</button>
         <button class="tab-btn" id="tab-customer" onclick="switchTab('customer')">Customer</button>
       </div>
 
@@ -1975,6 +1976,49 @@
             <button class="btn-primary" id="register-btn" data-label="Create Restaurant Account →"
               onclick="doRegisterRestaurant()" style="margin-top:8px">
               Create Restaurant Account →
+            </button>
+          </div>
+        </div>
+
+        <!-- ── REGISTER FOOD COURT ── -->
+        <div class="form-panel" id="form-foodcourt">
+          <div class="form-card-head">
+            <div class="form-eyebrow">Hub</div>
+            <div class="form-title">Food <em>Court.</em></div>
+            <div class="form-sub">Create your central Food Court hub to manage multiple outlets.</div>
+          </div>
+          <div class="form-card-body">
+            <div class="alert error" id="fc-register-alert">
+              <span>⚠</span><span id="fc-register-alert-msg">Please fill in all required fields.</span>
+            </div>
+
+            <div class="two-col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+              <div class="field" style="margin-bottom: 0;">
+                <label>Food Court Name</label>
+                <input type="text" id="fc-register-name" placeholder="Grand Mall Food Court" autocomplete="organization">
+              </div>
+              <div class="field" style="margin-bottom: 0;">
+                <label>Admin Name</label>
+                <input type="text" id="fc-register-admin" placeholder="Your name" autocomplete="name">
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Email Address</label>
+              <input type="email" id="fc-register-email" placeholder="admin@foodcourt.com" autocomplete="email">
+            </div>
+
+            <div class="field">
+              <label>Password</label>
+              <div class="pw-wrap">
+                <input type="password" id="fc-register-password" placeholder="Create a strong password" autocomplete="new-password">
+                <button type="button" class="pw-toggle" onclick="togglePassword('fc-register-password', this)">Show</button>
+              </div>
+            </div>
+
+            <button class="btn-primary" id="fc-register-btn" data-label="Create Food Court Account →"
+              onclick="doRegisterFoodcourt()" style="margin-top:8px">
+              Create Food Court Account →
             </button>
           </div>
         </div>
@@ -2146,10 +2190,10 @@
         <polyline class="success-tick" points="22,42 35,55 58,28" stroke="#22c55e" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
       </svg>
     </div>
-    <div class="success-badge">REQUEST SUBMITTED</div>
+    <div class="success-badge">ACCOUNT CREATED</div>
     <h2 class="success-heading">Welcome aboard,<br><span id="success-owner-name">Owner</span>!</h2>
     <p class="success-restaurant" id="success-restaurant-name"></p>
-    <p class="success-sub">Your restaurant request is waiting for admin approval.<br>Taking you to login…</p>
+    <p class="success-sub">Your account is ready.<br>Taking you to login…</p>
     <div class="success-countdown-wrap">
       <svg class="success-ring" viewBox="0 0 44 44">
         <circle cx="22" cy="22" r="19" fill="none" stroke="rgba(34,197,94,.15)" stroke-width="3"/>
@@ -2183,7 +2227,7 @@
      TAB SWITCHER
   ══════════════════════════════════ */
   function switchTab(tab) {
-    ['login', 'register', 'customer', 'reset'].forEach(t => {
+    ['login', 'register', 'foodcourt', 'customer', 'reset'].forEach(t => {
       const panel = document.getElementById('form-' + t);
       const btn = document.getElementById('tab-' + t);
       if (panel) panel.classList.toggle('active', t === tab);
@@ -2383,6 +2427,7 @@
   }
 
   function homeForRole(role) {
+    if (role === 'foodcourt_admin') return '/foodcourt-admin';
     if (role === 'restaurant') return '/backend';
     if (role === 'customer') return '/customer';
     return '/pos';
@@ -2402,6 +2447,33 @@
     if (r.error) return showAlert('login-alert', r.error);
     showAlert('login-alert', 'Welcome back, ' + r.name + '!', 'success');
     setTimeout(() => location.href = homeForRole(r.role), 700);
+  }
+
+  /* ══════════════════════════════════
+     REGISTER FOOD COURT
+  ══════════════════════════════════ */
+  function doRegisterFoodcourt() {
+    clearAlerts();
+    const name = document.getElementById('fc-register-name').value.trim();
+    const adminName = document.getElementById('fc-register-admin').value.trim();
+    const email = document.getElementById('fc-register-email').value.trim();
+    const pw = document.getElementById('fc-register-password').value;
+
+    if (!name || !adminName || !email || !pw)
+      return showAlert('fc-register-alert', 'Please fill in all required fields.', 'error', 'fc-register-alert-msg');
+
+    const payload = { name: name, admin_name: adminName, email, password: pw };
+    setLoading('fc-register-btn', true);
+    api('/api/register-foodcourt', 'POST', payload)
+      .then(r => {
+        setLoading('fc-register-btn', false);
+        if (r.error) return showAlert('fc-register-alert', r.error, 'error', 'fc-register-alert-msg');
+        showSuccessAndRedirect(adminName, name);
+      })
+      .catch(() => {
+        setLoading('fc-register-btn', false);
+        showAlert('fc-register-alert', 'Network error. Please try again.', 'error', 'fc-register-alert-msg');
+      });
   }
 
   /* ══════════════════════════════════

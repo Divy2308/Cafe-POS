@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Backend Config — POS Cafè{% endblock %}
 {% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 <style>
   .tab-btn {
     transition: all .2s;
@@ -357,12 +358,16 @@
     <!-- Tabs Bar (horizontal scrollable) -->
     <div class="tabs-bar px-2" style="position:sticky;top:0;z-index:10;">
       <button class="tab-btn active text-sm font-medium" onclick="switchTab('products',this)">Products</button>
+      {% if not (tenant and tenant.food_court_id) %}
       <button class="tab-btn text-sm font-medium text-gray-500" onclick="switchTab('floors',this)">Floors &amp;
         Tables</button>
+      {% endif %}
       <button class="tab-btn text-sm font-medium text-gray-500" onclick="switchTab('payments',this)">Payments</button>
+      {% if not (tenant and tenant.food_court_id) %}
       <button class="tab-btn text-sm font-medium text-gray-500" onclick="switchTab('inventory',this)">Inventory</button>
       <button class="tab-btn text-sm font-medium text-gray-500" onclick="switchTab('reports',this)">Reports</button>
       <button class="tab-btn text-sm font-medium text-gray-500" onclick="switchTab('reviews',this)">Reviews</button>
+      {% endif %}
       <button class="tab-btn text-sm font-medium text-gray-500" onclick="switchTab('coupons',this)">Coupons</button>
       <button class="tab-btn text-sm font-medium text-gray-500" onclick="switchTab('settings',this)">Settings</button>
     </div>
@@ -846,6 +851,18 @@
         <label class="toggle"><input type="checkbox" id="p-active" checked><span class="toggle-slider"></span></label>
         <span class="text-sm text-gray-400">Active</span>
       </div>
+      <div class="flex items-center gap-3">
+        <label class="toggle"><input type="checkbox" id="p-is-thali" onchange="toggleThaliSection()"><span class="toggle-slider"></span></label>
+        <span class="text-sm text-gray-400">Is Thali? (Combo Meal)</span>
+      </div>
+
+      <div id="thali-section" class="hidden mt-2 p-3 bg-brand-50 rounded-xl border border-brand-100">
+        <label class="text-xs text-brand-600 uppercase tracking-wider mb-2 font-bold block">Thali Components</label>
+        <div id="p-components-container" class="space-y-2 overflow-y-auto pr-1 mb-3" style="max-height: 150px;"></div>
+        <button type="button" onclick="addComponentRow()" class="w-full py-2 border-2 border-dashed border-brand-300 text-brand-500 rounded-xl text-xs font-bold hover:bg-brand-50 hover:border-brand-400 transition flex items-center justify-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4"></path></svg> Add Component (e.g. Rice)
+        </button>
+      </div>
       <div>
         <label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Multi-Tax Configuration</label>
         <input id="p-tax-config" placeholder="CGST:2.5, SGST:2.5" class="text-sm">
@@ -1121,7 +1138,7 @@
       else if (catName.includes('pasta')) imgPath = '/static/img/categories/pasta.png';
       else if (catName.includes('salad')) imgPath = '/static/img/categories/salads.png';
       else if (catName.includes('dessert')) imgPath = '/static/img/categories/Desserts.png';
-      else if (catName.includes('mains')) imgPath = '/static/img/categories/mains.png';
+      else if (catName.includes('main')) imgPath = '/static/img/categories/mains.png';
       else if (catName.includes('drink') || catName.includes('water') || catName.includes('beverage') || catName.includes('juice')) {
           imgPath = '/static/img/categories/Beverages.png';
       }
@@ -1325,11 +1342,30 @@
     container.appendChild(div);
   }
 
+  function addComponentRow(name = '') {
+    const container = document.getElementById('p-components-container');
+    const div = document.createElement('div');
+    div.className = 'component-row flex items-center gap-2 animate-fade-in';
+    div.innerHTML = `
+      <input type="text" class="flex-1 text-xs bg-white border-brand-200 focus:border-brand-400" placeholder="Component Name (e.g., Roti)" value="${escHtml(name)}">
+      <button type="button" onclick="this.parentElement.remove()" class="text-red-500 p-2 hover:bg-red-500/10 rounded-lg transition">✕</button>
+    `;
+    container.appendChild(div);
+  }
+
+  function toggleThaliSection() {
+    const isThali = document.getElementById('p-is-thali').checked;
+    document.getElementById('thali-section').classList.toggle('hidden', !isThali);
+  }
+
   function openProductModal() {
     document.getElementById('p-edit-id').value = '';
     ['p-name', 'p-price', 'p-tax', 'p-category', 'p-unit', 'p-desc', 'p-tax-config'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('p-addons-container').innerHTML = '';
+    document.getElementById('p-components-container').innerHTML = '';
     document.getElementById('p-active').checked = true;
+    document.getElementById('p-is-thali').checked = false;
+    toggleThaliSection();
     clearProductImage();
     document.getElementById('product-modal-title').textContent = 'Add Product';
     document.getElementById('product-save-btn').textContent = 'Save Product';
@@ -1416,6 +1452,13 @@
     if (p.addons && p.addons.length) {
       p.addons.forEach(a => addAddonRow(a.name, a.price));
     }
+    
+    document.getElementById('p-is-thali').checked = p.is_thali || false;
+    document.getElementById('p-components-container').innerHTML = '';
+    if (p.components && p.components.length) {
+      p.components.forEach(c => addComponentRow(c));
+    }
+    toggleThaliSection();
     let taxStr = '';
     try { const config = JSON.parse(p.tax_config_json || '{}'); taxStr = Object.entries(config).map(([k, v]) => `${k}:${v}`).join(', '); } catch (e) { }
     document.getElementById('p-tax-config').value = taxStr;
@@ -1440,6 +1483,8 @@
       active: document.getElementById('p-active').checked,
       image_b64: currentImageB64 || '',
       tax_config: {},
+      is_thali: document.getElementById('p-is-thali').checked,
+      components: [],
       addons: []
     };
 
@@ -1450,6 +1495,13 @@
       const price = inputs[1].value.trim();
       if (name) d.addons.push({ name, price: price || 0 });
     });
+
+    if (d.is_thali) {
+      document.querySelectorAll('.component-row').forEach(row => {
+        const name = row.querySelector('input').value.trim();
+        if (name) d.components.push(name);
+      });
+    }
 
     const taxStr = document.getElementById('p-tax-config').value.trim();
     if (taxStr) taxStr.split(',').forEach(part => { const [k, v] = part.split(':').map(s => s.trim()); if (k && v) d.tax_config[k] = parseFloat(v); });
@@ -1483,13 +1535,29 @@
       <div class="font-display font-700 mb-4">${escHtml(f.name)}</div>
       <div class="grid floor-tables-grid gap-3" style="grid-template-columns:repeat(auto-fill,minmax(120px,1fr))">
         ${f.tables.map(t => `
-          <div class="border border-border rounded-xl p-3 text-center">
+          <div data-id="${t.id}" class="border border-border rounded-xl p-3 text-center cursor-move hover:border-brand-500 transition-colors" style="background:var(--card)">
             <div class="font-display text-xl font-800">T${escHtml(t.number)}</div>
             <div class="text-xs text-gray-500">${t.seats} seats</div>
             <button onclick="deleteTable(${t.id})" class="text-xs text-red-500 mt-1">Remove</button>
           </div>`).join('')}
       </div>
     </div>`).join('');
+
+    document.querySelectorAll('.floor-tables-grid').forEach(el => {
+      Sortable.create(el, {
+        animation: 150,
+        ghostClass: 'opacity-50',
+        onEnd: async function () {
+          const orders = [];
+          el.querySelectorAll('[data-id]').forEach((item, index) => {
+            orders.push({ id: parseInt(item.getAttribute('data-id')), position: index });
+          });
+          const r = await api('/api/tables/reorder', 'POST', { orders });
+          if (r.ok) toast('Tables reordered');
+          else toast('Failed to reorder', 'error');
+        }
+      });
+    });
   }
 
   function openFloorModal() { document.getElementById('floor-modal').classList.remove('hidden'); }

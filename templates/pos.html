@@ -137,7 +137,6 @@
     border-color: var(--input-border);
     color: var(--text);
   }
-
   body[data-theme="light"] .table-card.free {
     background: rgba(255, 255, 255, 0.45);
   }
@@ -416,7 +415,8 @@
       position: fixed !important;
       right: 0;
       top: 0;
-      height: 100vh;
+      bottom: 0;
+      height: auto;
       width: 100% !important;
       min-width: 100% !important;
       z-index: 102;
@@ -785,7 +785,7 @@
 
   @media (max-width: 480px) {
     #view-payment .card {
-      max-height: 50vh !important;
+      max-height: 80vh !important;
       overflow-y: auto !important;
     }
 
@@ -1565,10 +1565,10 @@
     </div>
 
     <!-- ═══ PAYMENT VIEW ═══ -->
-    <div id="view-payment" class="hidden flex-1 flex items-center justify-center p-4 sm:p-8">
-      <div class="w-full max-w-sm sm:max-w-md">
+    <div id="view-payment" class="hidden flex-1 flex-col sm:flex-row sm:items-center sm:justify-center sm:p-8 bg-[var(--card)] sm:bg-transparent">
+      <div class="w-full flex-1 sm:flex-none sm:max-w-md flex flex-col">
 
-        <div class="card p-5 sm:p-6" style="border-radius:20px; max-height:calc(100vh - 7rem); overflow-y:auto;">
+        <div class="card flex-1 sm:flex-none p-5 sm:p-6 rounded-[20px] border border-border w-full overflow-y-auto" style="max-height: calc(100vh - 4rem);">
           <h2 class="font-display text-xl sm:text-2xl font-700 mb-2">Payment</h2>
           <div class="text-xs text-gray-500 uppercase tracking-wider mb-4">Bill <span id="pay-order-num"
               class="text-white normal-case ml-2"></span></div>
@@ -1628,8 +1628,8 @@
     </div>
 
     <!-- ═══ UPI QR VIEW ═══ -->
-    <div id="view-qr" class="hidden flex-1 flex items-center justify-center p-8">
-      <div class="card p-8 text-center max-w-sm w-full" style="border-radius:20px">
+    <div id="view-qr" class="hidden flex-1 flex-col sm:flex-row sm:items-center sm:justify-center sm:p-8 bg-[var(--card)] sm:bg-transparent">
+      <div class="card flex-1 sm:flex-none p-8 text-center max-w-sm w-full rounded-[20px] border border-border overflow-y-auto" style="max-height: calc(100vh - 4rem);">
         <div class="text-xs text-gray-500 uppercase tracking-wider mb-2">UPI / QR Payment</div>
         <div class="text-3xl font-display font-800 text-brand-500 mb-6" id="qr-amount"></div>
         <div class="flex justify-center mb-4">
@@ -2197,7 +2197,7 @@
         else if (catName.includes('pasta')) imgPath = '/static/img/categories/pasta.png';
         else if (catName.includes('salad')) imgPath = '/static/img/categories/salads.png';
         else if (catName.includes('dessert')) imgPath = '/static/img/categories/Desserts.png';
-        else if (catName.includes('mains')) imgPath = '/static/img/categories/mains.png';
+        else if (catName.includes('main')) imgPath = '/static/img/categories/mains.png';
         else if (catName.includes('drink') || catName.includes('water') || catName.includes('beverage') || catName.includes('juice')) {
             imgPath = '/static/img/categories/Beverages.png';
         }
@@ -2245,6 +2245,7 @@
       }
       selectedAddons = [];
     }
+    const p = findProductById(id);
 
     const itemPrice = price + selectedAddons.reduce((s, a) => s + a.price, 0);
     const itemKey = id + '_' + JSON.stringify(selectedAddons.map(a => a.id).sort());
@@ -2262,7 +2263,9 @@
         price: itemPrice,
         qty: 1,
         notes: '',
-        addons: selectedAddons
+        addons: selectedAddons,
+        is_thali: p ? p.is_thali : false,
+        components: p ? p.components || [] : []
       });
     }
     renderCart();
@@ -2340,9 +2343,10 @@
       <div class="cart-item">
         <div class="cart-item-header">
           <div>
-            <div class="cart-item-name">${escapeHTML(i.name)}</div>
+            <div class="cart-item-name">${escapeHTML(i.name)} ${i.is_thali ? '<span class="px-1 text-[10px] bg-brand-100 text-brand-600 rounded">THALI</span>' : ''}</div>
             <div class="cart-item-meta">₹${i.price} × ${i.qty}</div>
             ${i.addons && i.addons.length ? `<div class="text-[10px] text-brand-500 mt-1">${i.addons.map(a => '+' + escapeHTML(a.name)).join(', ')}</div>` : ''}
+            ${i.is_thali && i.components && i.components.length ? `<div class="text-[10px] text-gray-500 mt-1 italic">Includes: ${i.components.map(escapeHTML).join(', ')}</div>` : ''}
           </div>
           <div class="cart-item-price">₹${(i.price * i.qty).toFixed(0)}</div>
         </div>
@@ -2492,7 +2496,9 @@
       price: i.price,
       qty: i.qty,
       notes: i.notes || '',
-      addons_json: JSON.stringify(i.addons || [])
+      addons_json: JSON.stringify(i.addons || []),
+      is_thali: !!i.is_thali,
+      components: i.components || []
     }));
     if (currentOrder && currentOrder.status === 'draft' && currentOrder.id) {
       currentOrder.items = items.map(i => ({ ...i }));
@@ -3154,6 +3160,14 @@
     }
   }
 
+  function playWaiterBellPos() {
+    try { const au = new Audio('/static/audio/waiter-bell.mp3'); au.play(); } catch (e) { }
+  }
+
+  // Force Light Theme for POS
+  document.documentElement.setAttribute('data-theme', 'light');
+  localStorage.setItem('theme', 'light');
+
   async function closeSession() {
     if (!confirm('Close current session?')) return;
     await api('/api/sessions/close', 'POST');
@@ -3252,7 +3266,12 @@
   // Socket
   const socket = io();
   socket.on('order_paid', d => { toast('\u2713 Order ' + d.order_number + ' paid!'); reloadData(); });
+  socket.on('table_update', d => { reloadData(); });
+  socket.on('table_transfer', d => { reloadData(); });
+  socket.on('table_merged', d => { reloadData(); });
+  socket.on('table_unmerged', d => { reloadData(); });
   socket.on('order_update', d => {
+    reloadData(); // Refresh tables and orders immediately
     if (!d || d.status !== 'completed') return;
     playOrderReadyBellPos();
     const orderLabel = d.order_number || 'Unknown';
@@ -3265,7 +3284,6 @@
       timeoutMs: 15000,
     });
     toast(msg, 'success');
-    reloadData();
   });
 
   // Call Waiter alert
@@ -3771,14 +3789,14 @@
         </div>
       </a>
 
-      <button type="button" data-theme-toggle onclick="toggleTheme()"
+      <a href="/kitchen" target="_blank"
         class="w-full flex items-center gap-3 p-4 rounded-xl border border-border hover:bg-white/5 transition">
-        <span class="text-xl">🌓</span>
+        <span class="text-xl">🍳</span>
         <div class="text-left">
-          <div class="font-700 text-sm">Switch Theme</div>
-          <div class="text-[10px] text-gray-500 uppercase">Light / dark mode</div>
+          <div class="font-700 text-sm">Kitchen Display</div>
+          <div class="text-[10px] text-gray-500 uppercase">View active orders</div>
         </div>
-      </button>
+      </a>
 
       <button onclick="closeSession()"
         class="w-full flex items-center gap-3 p-4 rounded-xl border border-border hover:bg-white/5 transition">

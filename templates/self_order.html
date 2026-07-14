@@ -319,7 +319,9 @@
   }
 
   async function loadMenu() {
-    const res = await fetch('/api/self-order/menu?table_id=' + encodeURIComponent(TABLE_ID));
+    let url = '/api/self-order/menu?table_id=' + encodeURIComponent(TABLE_ID);
+    if (TENANT_ID) url += '&tenant_id=' + encodeURIComponent(TENANT_ID);
+    const res = await fetch(url);
     if (!res.ok) {
       toast('Could not load menu', 'error');
       return;
@@ -418,7 +420,9 @@
         price,
         qty: 1,
         notes: '',
-        addons
+        addons,
+        is_thali: !!p.is_thali,
+        components: p.components || []
       });
     }
     renderCart();
@@ -490,9 +494,10 @@
     el.innerHTML = cart.map((item, idx) => `
       <div class="cart-row" style="flex-wrap:wrap;">
         <div style="flex:1; min-width:0;">
-          <div style="font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(item.name)}</div>
+          <div style="font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(item.name)} ${item.is_thali ? '<span style="padding:1px 4px;font-size:10px;background:#10b981;color:#fff;border-radius:4px;">THALI</span>' : ''}</div>
           <div style="font-size:11px; color:#6b7280;">₹${formatMoney(item.price)} each</div>
           ${item.addons && item.addons.length ? `<div style="font-size:11px; color:#fdba74; margin-top:5px;">+ ${item.addons.map(a => esc(a.name)).join(', ')}</div>` : ''}
+          ${item.is_thali && item.components && item.components.length ? `<div style="font-size:10px; color:#9ca3af; margin-top:3px; font-style:italic;">Includes: ${item.components.map(esc).join(', ')}</div>` : ''}
           <input type="text" class="item-note-input" placeholder="Note for kitchen (e.g. no onion)" value="${escapeAttr(item.notes)}" oninput="updateNote(${idx}, this.value)" />
         </div>
         <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
@@ -627,6 +632,7 @@
           <span>
             ${esc(i.name)} ×${i.qty}
             ${addons.length ? `<div style="font-size:11px;color:#fdba74;margin-top:3px;">+ ${addons.map(a => esc(a.name)).join(', ')}</div>` : ''}
+            ${i.is_thali && i.components && i.components.length ? `<div style="font-size:10px;color:#9ca3af;margin-top:2px;font-style:italic;">Includes: ${i.components.map(esc).join(', ')}</div>` : ''}
           </span>
         </div>`;
       }).join('');
@@ -671,13 +677,16 @@
       table_id: TABLE_ID,
       token: QR_TOKEN,
       guest_token: guestToken,
+      tenant_id: TENANT_ID,
       customer_name: (document.getElementById('cust-name') && document.getElementById('cust-name').value || '').trim(),
       customer_phone: (document.getElementById('cust-phone') && document.getElementById('cust-phone').value) || '',
       items: cart.map(i => ({
         product_id: i.product_id,
         qty: i.qty,
-        notes: i.notes || '',
-        addons: i.addons || []
+        notes: (i.notes || '').trim(),
+        addons_json: JSON.stringify(Array.isArray(i.addons) ? i.addons : []),
+        is_thali: !!i.is_thali,
+        components: Array.isArray(i.components) ? i.components : []
       }))
     };
     if (!body.customer_name) { toast('Please enter your name', 'error'); btn.disabled = false; btn.textContent = prev; return; }

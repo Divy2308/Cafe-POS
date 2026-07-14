@@ -321,6 +321,7 @@ function renderTicket(t) {
       </div>
       ${i.notes ? `<div class="item-notes">📝 ${i.notes}</div>` : ''}
       <div class="addon-text" style="font-size:10px;color:#f97316;font-weight:700" data-json='${i.addons_json||"[]"}'></div>
+      ${i.is_thali && Array.isArray(i.components) && i.components.length ? `<div style="font-size:10px;color:#a1a1aa;margin-top:2px;font-style:italic">Includes: ${i.components.join(', ')}</div>` : ''}
     </div>`).join('');
 
   const cls = [

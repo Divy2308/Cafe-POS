@@ -408,6 +408,7 @@
         </svg>
         Staff
       </button>
+      {% if not (tenant and tenant.food_court_id) %}
       <button onclick="switchDashTab('users')"
         class="dash-nav-btn w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -424,6 +425,8 @@
         </svg>
         Attendance
       </button>
+      {% endif %}
+      {% if not (tenant and tenant.food_court_id) %}
       <button onclick="switchDashTab('compare')"
         class="dash-nav-btn w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -432,6 +435,7 @@
         </svg>
         Branches
       </button>
+      {% endif %}
       <div class="border-t border-border my-3"></div>
       <a href="/backend" class="dash-nav-btn flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -482,24 +486,40 @@
             class="dash-select min-w-[140px]">
             <option value="">All Branches</option>
           </select>
-          <button class="period-btn active border border-border rounded-lg text-sm"
-            onclick="setPeriod('today',this)">Today</button>
-          <button class="period-btn border border-border rounded-lg text-sm text-gray-500"
-            onclick="setPeriod('week',this)">Week</button>
-          <button class="period-btn border border-border rounded-lg text-sm text-gray-500"
-            onclick="setPeriod('month',this)">Month</button>
-          <button onclick="exportCSV()"
-            class="export-btn btn-ghost px-4 py-1.5 rounded-lg text-sm flex items-center gap-1.5" title="Export CSV">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Export
-          </button>
         </div>
       </div>
 
       <div class="tab-content-pad p-6 space-y-6">
+        <!-- Date Range & Export Card -->
+        <div class="card p-5" style="border-radius:16px;">
+          <h3 class="text-sm font-bold mb-4 uppercase tracking-wider text-gray-500">Analytics Range & Export</h3>
+          <div class="flex flex-wrap gap-4 items-end">
+            <div>
+              <label class="text-xs text-gray-500 uppercase tracking-wider block mb-1">Start Date</label>
+              <input type="date" id="analytics-start-date" class="dash-input bg-dark-50 text-white rounded px-3 py-2 text-sm">
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 uppercase tracking-wider block mb-1">End Date</label>
+              <input type="date" id="analytics-end-date" class="dash-input bg-dark-50 text-white rounded px-3 py-2 text-sm">
+            </div>
+            <button onclick="applyDateRange()" class="btn-primary px-4 py-2 rounded-lg text-sm font-bold">Apply</button>
+            <div class="flex-1"></div>
+            <div class="flex gap-2">
+              <button onclick="exportStats('csv')" class="btn-ghost border border-border px-4 py-2 rounded-lg text-sm flex items-center gap-2">
+                <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                CSV
+              </button>
+              <button onclick="exportStats('excel')" class="btn-ghost border border-border px-4 py-2 rounded-lg text-sm flex items-center gap-2">
+                <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                Excel
+              </button>
+              <button onclick="exportStats('pdf')" class="btn-ghost border border-border px-4 py-2 rounded-lg text-sm flex items-center gap-2">
+                <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                PDF
+              </button>
+            </div>
+          </div>
+        </div>
         <div class="grid stats-grid gap-4" style="grid-template-columns:repeat(3,1fr)">
           <div class="stat-card card p-5" style="border-radius:16px">
             <div class="text-xs text-gray-500 uppercase tracking-wider mb-3">Total Sales</div>
@@ -1028,8 +1048,10 @@
   }
 
   /* ── Analytics ── */
-  async function loadStats(period) {
-    const d = await api('/api/dashboard/stats?period=' + period);
+  async function loadStats() {
+    const s = document.getElementById('analytics-start-date').value;
+    const e = document.getElementById('analytics-end-date').value;
+    const d = await api(`/api/dashboard/stats?start_date=${s}&end_date=${e}`);
     if (d.error) return;
     document.getElementById('stat-sales').textContent = '₹' + d.total_sales.toLocaleString();
     document.getElementById('stat-orders').textContent = d.total_orders;
@@ -1126,14 +1148,15 @@
     renderReviews();
   }
 
-  function setPeriod(p, btn) {
-    currentPeriod = p;
-    document.querySelectorAll('.period-btn').forEach(b => { b.classList.remove('active'); b.classList.add('text-gray-500'); });
-    btn.classList.add('active'); btn.classList.remove('text-gray-500');
-    loadStats(p);
+  function applyDateRange() {
+    loadStats();
   }
 
-  function exportCSV() { window.open('/api/export/orders?period=' + currentPeriod); }
+  function exportStats(format) {
+    const s = document.getElementById('analytics-start-date').value;
+    const e = document.getElementById('analytics-end-date').value;
+    window.open(`/api/export/stats?start_date=${s}&end_date=${e}&format=${format}`);
+  }
 
   /* ── Staff ── */
   function openAddUserModal() {
@@ -1221,7 +1244,7 @@
     } else {
       await api('/api/branches/switch', 'POST', { branch_id: null }); // Wait, maybe null means all branches.
     }
-    loadStats(currentPeriod);
+    loadStats();
   }
 
   function loadSelectedBranchSettings() {
@@ -1610,7 +1633,10 @@
 
   document.addEventListener('DOMContentLoaded', async () => {
     await loadBranches();
-    loadStats('today');
+    const todayStr = new Date().toISOString().split('T')[0];
+    document.getElementById('analytics-start-date').value = todayStr;
+    document.getElementById('analytics-end-date').value = todayStr;
+    loadStats();
     loadReviews();
     loadReservations();
     loadCafeSettings();

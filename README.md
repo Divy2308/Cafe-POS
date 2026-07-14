@@ -51,6 +51,27 @@ POS Cafè is a high-performance, full-featured restaurant Point of Sale (POS) sy
    python app.py
    ```
 
+### PostgreSQL
+
+Set `DATABASE_URL` to use PostgreSQL instead of SQLite:
+
+```env
+DATABASE_URL=postgresql://username:password@localhost:5432/pos_cafe
+```
+
+### SQLite to PostgreSQL migration
+
+1. Create an empty PostgreSQL database.
+2. Set `DATABASE_URL` to that PostgreSQL database.
+3. Run:
+   ```bash
+   python migrate_sqlite_to_postgres.py --sqlite-path instance/pos.db
+   ```
+
+This recreates the PostgreSQL schema first, so the new PostgreSQL-native types and indexes are applied cleanly.
+
+Use `--keep-existing` only when you intentionally want to import into an existing PostgreSQL schema without recreating tables first.
+
 ## 🗺️ System Modules
 
 | Route | Module | Description |
