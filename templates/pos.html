@@ -2171,19 +2171,34 @@
     activeCat = catId;
     document.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
     event.target.classList.add('active');
-    const filtered = catId ? products.filter(c => c.id === catId) : products;
-    renderProductGrid(filtered);
+    applyVisualFilter();
   }
 
+  let filterTimeout = null;
   function filterProducts() {
+    if (filterTimeout) clearTimeout(filterTimeout);
+    filterTimeout = setTimeout(doFilterProducts, 200);
+  }
+
+  function doFilterProducts() {
+    applyVisualFilter();
+  }
+
+  function applyVisualFilter() {
     const q = document.getElementById('product-search').value.toLowerCase();
-    const filtered = products.map(c => ({ ...c, products: c.products.filter(p => p.name.toLowerCase().includes(q)) })).filter(c => c.products.length);
-    renderProductGrid(filtered);
+    document.querySelectorAll('.product-btn').forEach(el => {
+      const matchCat = activeCat === null || parseInt(el.dataset.catId) === activeCat;
+      const matchSearch = q === '' || el.dataset.name.includes(q);
+      el.style.display = (matchCat && matchSearch) ? '' : 'none';
+    });
   }
 
   function renderProductGrid(cats) {
     const grid = document.getElementById('products-grid');
-    let html = '';
+    grid.innerHTML = '';
+    const BATCH_SIZE = 40;
+    
+    const allHtml = [];
     cats.forEach(c => {
       c.products.forEach(p => {
         const catName = (c.name || '').toLowerCase();
@@ -2204,13 +2219,13 @@
 
         let imgHtml = '';
         if (imgPath) {
-          imgHtml = `<img src="${imgPath}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`;
+          imgHtml = `<img src="${imgPath}" alt="${escapeHTML(p.name)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`;
         } else if (p.image_b64) {
-          imgHtml = `<img src="${p.image_b64}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`;
+          imgHtml = `<img src="${p.image_b64}" alt="${escapeHTML(p.name)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`;
         } else {
           imgHtml = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px;opacity:0.6;">${getCatEmoji(c.name)}</div>`;
         }
-        html += `<div class="product-btn" role="button" tabindex="0" onclick="addToCart(${p.id},'${p.name.replace(/'/g, "\\'")}',${p.price})" onkeydown="handleProductCardKeydown(event, ${p.id}, '${p.name.replace(/'/g, "\\'")}', ${p.price})">
+        allHtml.push(`<div class="product-btn" role="button" tabindex="0" data-cat-id="${c.id}" data-name="${escapeHTML(p.name.toLowerCase())}" onclick="addToCart(${p.id},'${p.name.replace(/'/g, "\\'")}',${p.price})" onkeydown="handleProductCardKeydown(event, ${p.id}, '${p.name.replace(/'/g, "\\'")}', ${p.price})">
         <div class="product-image">${imgHtml}</div>
         <div class="product-name">${escapeHTML(p.name)}</div>
         <div class="product-category">${c.name}</div>
@@ -2218,10 +2233,21 @@
           <span class="product-price">₹${p.price}</span>
           &nbsp;&nbsp; <button class="add-btn" onclick="event.stopPropagation(); addToCart(${p.id},'${p.name.replace(/'/g, "\\'")}',${p.price})">+</button>
         </div>
-      </div>`;
+      </div>`);
       });
     });
-    grid.innerHTML = html;
+
+    grid.innerHTML = allHtml.slice(0, BATCH_SIZE).join('');
+    
+    if (allHtml.length > BATCH_SIZE) {
+      setTimeout(() => {
+        const frag = document.createElement('div');
+        frag.innerHTML = allHtml.slice(BATCH_SIZE).join('');
+        while(frag.firstChild) {
+          grid.appendChild(frag.firstChild);
+        }
+      }, 50);
+    }
   }
 
   function handleProductCardKeydown(event, id, name, price) {

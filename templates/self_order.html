@@ -155,16 +155,16 @@
 </div>
 
 <div id="addon-modal" class="hidden fixed inset-0 addon-modal-bg items-center justify-center z-[80]" onclick="if(event.target===this)closeAddonModal()">
-  <div style="width:min(92vw, 420px); max-height:min(80vh, 620px); overflow:hidden; border-radius:20px; border:1px solid rgba(249,115,22,0.25); background:#0b0b0f; box-shadow:0 32px 90px rgba(0,0,0,0.55); display:flex; flex-direction:column;">
-    <div style="padding:20px 20px 12px; border-bottom:1px solid rgba(255,255,255,0.05);">
-      <div id="addon-product-name" style="font-family:Syne,sans-serif; font-size:22px; font-weight:800;"></div>
-      <div id="addon-product-price" style="color:#9ca3af; font-size:13px; margin-top:4px;"></div>
+  <div style="width:min(92vw, 420px); max-height:min(80vh, 620px); overflow:hidden; border-radius:20px; border:1px solid rgba(249,115,22,0.25); background:#ffffff; box-shadow:0 32px 90px rgba(0,0,0,0.15); display:flex; flex-direction:column;">
+    <div style="padding:20px 20px 12px; border-bottom:1px solid rgba(0,0,0,0.05);">
+      <div id="addon-product-name" style="font-family:Syne,sans-serif; font-size:22px; font-weight:800; color:#111827;"></div>
+      <div id="addon-product-price" style="color:#4b5563; font-size:13px; margin-top:4px;"></div>
     </div>
     <div id="addon-list" style="padding:16px 20px; overflow-y:auto; display:flex; flex-direction:column; gap:10px;"></div>
-    <div style="padding:16px 20px 20px; border-top:1px solid rgba(255,255,255,0.05);">
+    <div style="padding:16px 20px 20px; border-top:1px solid rgba(0,0,0,0.05);">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-        <span style="font-size:13px; color:#9ca3af;">Item total</span>
-        <span id="addon-total-display" style="font-size:22px; font-weight:800; color:#fff;">₹0</span>
+        <span style="font-size:13px; color:#4b5563;">Item total</span>
+        <span id="addon-total-display" style="font-size:22px; font-weight:800; color:#111827;">₹0</span>
       </div>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
         <button type="button" onclick="closeAddonModal()" class="bill-action-btn" style="width:100%;">Cancel</button>
@@ -179,7 +179,7 @@
 {% block scripts %}
 <script>
 (function () {
-  const TABLE_ID = {{ table_id }};
+  const TABLE_ID = {{ table_id|tojson }};
   const TABLE_NUMBER = {{ table_number|tojson }};
   const TENANT_ID = {{ tenant_id|tojson }};
   const BRANCH_ID = {{ branch_id|tojson }};
@@ -190,7 +190,7 @@
   if (!lockedTable) {
     // First visit — lock this tab to this table
     sessionStorage.setItem(TABLE_LOCK_KEY, String(TABLE_ID));
-  } else if (parseInt(lockedTable, 10) !== TABLE_ID) {
+  } else if (lockedTable !== TABLE_ID) {
     // Someone edited the URL — redirect them back
     window.location.replace('/table/' + lockedTable + '/order');
   }
@@ -437,10 +437,10 @@
     document.getElementById('addon-product-name').textContent = product.name;
     document.getElementById('addon-product-price').textContent = 'Base price: ₹' + formatMoney(product.price);
     document.getElementById('addon-list').innerHTML = (product.addons || []).map(addon => `
-      <label style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; border:1px solid rgba(255,255,255,0.06); border-radius:14px; cursor:pointer; background:#111318;">
+      <label style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; border:1px solid rgba(0,0,0,0.08); border-radius:14px; cursor:pointer; background:#f9fafb;">
         <span style="display:flex; align-items:center; gap:10px; min-width:0;">
           <input type="checkbox" class="addon-checkbox addon-check" data-id="${addon.id}" data-name="${esc(addon.name)}" data-price="${addon.price}" onchange="updateAddonTotal()" />
-          <span style="font-size:13px; font-weight:700; color:#f3f4f6;">${esc(addon.name)}</span>
+          <span style="font-size:13px; font-weight:700; color:#374151;">${esc(addon.name)}</span>
         </span>
         <span style="font-size:12px; font-weight:800; color:#fb923c;">+₹${formatMoney(addon.price)}</span>
       </label>

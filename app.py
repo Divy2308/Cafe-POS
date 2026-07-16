@@ -15,6 +15,9 @@ from flask_cors import CORS
 from flask_wtf.csrf import CSRFProtect, generate_csrf
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import or_, func
+from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.exc import IntegrityError, ProgrammingError
+from itsdangerous import URLSafeSerializer, BadSignature
 import qrcode, io, base64, json
 import sqlite3
 import os
@@ -389,6 +392,7 @@ class Table(db.Model):
     active = db.Column(db.Boolean, default=True)
     status = db.Column(db.String(20), default='free')  # free, occupied
     merged_to_id = db.Column(db.Integer, db.ForeignKey('table.id'), nullable=True)
+    order_index = db.Column(db.Integer, default=0)
     tenant = db.relationship('Tenant', backref='tables')
     branch_id = db.Column(db.Integer, db.ForeignKey('branch.id'), nullable=True)
     branch = db.relationship('Branch', backref='tables')
@@ -1720,30 +1724,52 @@ def dashboard():
         tenant=t,
     )
 
-def _serialize_shrey_request(tenant):
-    owner = db.session.get(User, tenant.owner_id) if tenant.owner_id else User.query.filter_by(
-        tenant_id=tenant.id, role='restaurant'
-    ).order_by(User.id.asc()).first()
-    branch = Branch.query.filter_by(tenant_id=tenant.id).order_by(Branch.id.asc()).first()
+def _serialize_shrey_request(tenant, preload=None):
+    preload = preload or {}
+    owners_by_tenant = preload.get('owners_by_tenant') or {}
+    branches_by_tenant = preload.get('branches_by_tenant') or {}
+    food_courts_by_id = preload.get('food_courts_by_id') or {}
+    table_counts = preload.get('table_counts') or {}
+    orders_day_counts = preload.get('orders_day_counts') or {}
+
+    owner = owners_by_tenant.get(tenant.id)
+    if owner is None:
+        owner = db.session.get(User, tenant.owner_id) if tenant.owner_id else User.query.filter_by(
+            tenant_id=tenant.id, role='restaurant'
+        ).order_by(User.id.asc()).first()
+
+    branch = branches_by_tenant.get(tenant.id)
+    if branch is None:
+        branch = Branch.query.filter_by(tenant_id=tenant.id).order_by(Branch.id.asc()).first()
+
+    food_court = food_courts_by_id.get(tenant.food_court_id) if tenant.food_court_id else None
+    if tenant.food_court_id and food_court is None:
+        food_court = db.session.get(FoodCourt, tenant.food_court_id)
+
     status = (tenant.approval_status or ('approved' if tenant.is_active else 'pending')).strip().lower()
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    table_count = Table.query.filter_by(tenant_id=tenant.id, active=True).count()
-    orders_day = Order.query.filter(
-        Order.tenant_id == tenant.id,
-        Order.created_at >= today_start,
-    ).count()
+    table_count = table_counts.get(tenant.id)
+    if table_count is None:
+        table_count = Table.query.filter_by(tenant_id=tenant.id, active=True).count()
+
+    orders_day = orders_day_counts.get(tenant.id)
+    if orders_day is None:
+        orders_day = Order.query.filter(
+            Order.tenant_id == tenant.id,
+            Order.created_at >= today_start,
+        ).count()
     return {
         'id': tenant.id,
         'name': tenant.name,
         'owner': owner.name if owner else '—',
         'email': owner.email if owner else '',
-        'city': (branch.address or '').strip() or '—',
-        'phone': (branch.phone or '').strip() or '—',
+        'city': (branch.address or tenant.address or '').strip() or '—',
+        'phone': (branch.phone or tenant.phone or '').strip() or '—',
         'plan': tenant.plan or 'free',
         'applied': tenant.created_at.strftime('%Y-%m-%d') if tenant.created_at else '',
         'status': status,
-        'type': 'Restaurant',
-        'note': '',
+        'type': 'Food Court Shop' if tenant.food_court_id else 'Restaurant',
+        'note': food_court.name if food_court else '',
         'tables': table_count,
         'ordersDay': orders_day,
         'feature_flags': get_tenant_feature_flags(tenant=tenant),
@@ -1852,11 +1878,84 @@ def shrey_requests_api():
         return jsonify({'error': 'unauthorized'}), 401
 
     tenants = Tenant.query.order_by(Tenant.created_at.desc(), Tenant.id.desc()).all()
+    tenant_ids = [tenant.id for tenant in tenants if tenant.slug != 'default']
+    owner_ids = [tenant.owner_id for tenant in tenants if tenant.owner_id]
+    food_court_ids = [tenant.food_court_id for tenant in tenants if tenant.food_court_id]
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+
+    owners_by_tenant = {}
+    if owner_ids:
+        owner_records = User.query.filter(User.id.in_(owner_ids)).all()
+        owners_by_tenant.update({
+            user.tenant_id: user
+            for user in owner_records
+            if user.tenant_id is not None
+        })
+
+    if tenant_ids:
+        fallback_owners = (
+            User.query
+            .filter(User.tenant_id.in_(tenant_ids), User.role == 'restaurant')
+            .order_by(User.tenant_id.asc(), User.id.asc())
+            .all()
+        )
+        for user in fallback_owners:
+            owners_by_tenant.setdefault(user.tenant_id, user)
+
+        branches = (
+            Branch.query
+            .filter(Branch.tenant_id.in_(tenant_ids))
+            .order_by(Branch.tenant_id.asc(), Branch.id.asc())
+            .all()
+        )
+        branches_by_tenant = {}
+        for branch in branches:
+            branches_by_tenant.setdefault(branch.tenant_id, branch)
+
+        table_counts = {
+            tenant_id: count
+            for tenant_id, count in (
+                db.session.query(Table.tenant_id, func.count(Table.id))
+                .filter(Table.tenant_id.in_(tenant_ids), Table.active.is_(True))
+                .group_by(Table.tenant_id)
+                .all()
+            )
+        }
+
+        orders_day_counts = {
+            tenant_id: count
+            for tenant_id, count in (
+                db.session.query(Order.tenant_id, func.count(Order.id))
+                .filter(Order.tenant_id.in_(tenant_ids), Order.created_at >= today_start)
+                .group_by(Order.tenant_id)
+                .all()
+            )
+        }
+    else:
+        branches_by_tenant = {}
+        table_counts = {}
+        orders_day_counts = {}
+
+    food_courts_by_id = {}
+    if food_court_ids:
+        food_courts_by_id = {
+            food_court.id: food_court
+            for food_court in FoodCourt.query.filter(FoodCourt.id.in_(food_court_ids)).all()
+        }
+
+    preload = {
+        'owners_by_tenant': owners_by_tenant,
+        'branches_by_tenant': branches_by_tenant,
+        'food_courts_by_id': food_courts_by_id,
+        'table_counts': table_counts,
+        'orders_day_counts': orders_day_counts,
+    }
+
     requests = []
     for tenant in tenants:
-        if tenant.slug == 'default' or not tenant.owner_id:
+        if tenant.slug == 'default':
             continue
-        requests.append(_serialize_shrey_request(tenant))
+        requests.append(_serialize_shrey_request(tenant, preload=preload))
     return jsonify({'requests': requests})
 
 @csrf.exempt
@@ -2082,7 +2181,16 @@ def update_shrey_max_staff(tenant_id):
 @app.route('/api/products', methods=['GET'])
 def get_products():
     branch_id = get_active_branch_id()
-    products = apply_tenant_scope(apply_branch_scope(Product.query.filter_by(active=True), Product.branch_id), Product).all()
+    products = (
+        apply_tenant_scope(
+            apply_branch_scope(
+                Product.query.options(selectinload(Product.addons)).filter_by(active=True),
+                Product.branch_id
+            ),
+            Product
+        )
+        .all()
+    )
     products_by_category = {}
     for product in products:
         products_by_category.setdefault(product.category_id, []).append(product)
@@ -2107,86 +2215,19 @@ def get_products():
 @app.route('/api/products/all', methods=['GET'])
 @staff_required
 def get_all_products():
-    products = apply_tenant_scope(apply_branch_scope(Product.query, Product.branch_id), Product).all()
+    products = (
+        apply_tenant_scope(
+            apply_branch_scope(Product.query.options(selectinload(Product.addons)), Product.branch_id),
+            Product
+        )
+        .all()
+    )
     cats = apply_tenant_scope(Category.query, Category).all()
     return jsonify({
         'products': [{'id':p.id,'name':p.name,'price':p.price,'category_id':p.category_id,'description':p.description,'tax':p.tax,'unit':p.unit,'active':p.active,'image_b64':p.image_b64 or '', 'branch_id': p.branch_id, 'addons': [{'id': a.id, 'name': a.name, 'price': a.price} for a in p.addons]} for p in products],
         'categories': [{'id':c.id,'name':c.name} for c in cats]
     })
 
-@app.route('/api/products', methods=['POST'])
-@staff_required
-def add_product():
-    d = request.json
-    tid = get_current_tenant_id()
-    cat = apply_tenant_scope(Category.query.filter_by(name=d.get('category','')), Category).first()
-    if not cat:
-        cat = Category(name=d.get('category','General'), tenant_id=tid)
-        db.session.add(cat)
-        db.session.flush()
-    p = Product(name=d['name'], price=float(d['price']), category_id=cat.id,
-                description=d.get('description',''), 
-                tax=float(d.get('tax',0)), 
-                tax_config_json=json.dumps(d.get('tax_config', {})),
-                unit=d.get('unit','pcs'),
-                branch_id=get_active_branch_id(), tenant_id=tid)
-    db.session.add(p)
-    db.session.flush()
-
-    if 'addons' in d:
-        for a_data in d['addons']:
-            db.session.add(Addon(product_id=p.id, name=a_data['name'], price=float(a_data['price']), tenant_id=tid))
-
-    db.session.commit()
-    return jsonify({'ok':True,'id':p.id})
-
-@app.route('/api/products/<int:pid>', methods=['PUT'])
-@staff_required
-def update_product(pid):
-    tid = get_current_tenant_id()
-    p = Product.query.filter_by(id=pid, tenant_id=tid).first_or_404()
-    access_error = require_branch_access_or_403(p.branch_id)
-    if access_error:
-        return access_error
-    d = request.json
-    p.name = d.get('name', p.name)
-    p.price = float(d.get('price', p.price))
-    p.description = d.get('description', p.description)
-    p.tax = float(d.get('tax', p.tax))
-    if 'tax_config' in d:
-        p.tax_config_json = json.dumps(d['tax_config'])
-    p.unit = d.get('unit', p.unit)
-    p.active = d.get('active', p.active)
-    if 'image_b64' in d:
-        p.image_b64 = d['image_b64'] or ''
-    if 'category' in d and d['category']:
-        cat = apply_tenant_scope(Category.query.filter_by(name=d['category']), Category).first()
-        if not cat:
-            cat = Category(name=d['category'], tenant_id=tid)
-            db.session.add(cat)
-            db.session.flush()
-        p.category_id = cat.id
-    
-    if 'addons' in d:
-        # Clear existing and add new
-        Addon.query.filter_by(product_id=p.id).delete()
-        for a_data in d['addons']:
-            db.session.add(Addon(product_id=p.id, name=a_data['name'], price=float(a_data['price']), tenant_id=tid))
-
-    db.session.commit()
-    return jsonify({'ok':True})
-
-@app.route('/api/products/<int:pid>', methods=['DELETE'])
-@staff_required
-def delete_product(pid):
-    tid = get_current_tenant_id()
-    p = Product.query.filter_by(id=pid, tenant_id=tid).first_or_404()
-    access_error = require_branch_access_or_403(p.branch_id)
-    if access_error:
-        return access_error
-    db.session.delete(p)
-    db.session.commit()
-    return jsonify({'ok':True})
 
 # ─── API: Floors & Tables ──────────────────────────────────
 @app.route('/api/floors', methods=['GET'])
@@ -2195,9 +2236,10 @@ def get_floors():
     bid = get_active_branch_id()
     if bid is not None:
         q = q.filter(or_(Floor.branch_id == bid, Floor.branch_id.is_(None)))
-    floors = q.all()
+    floors = q.options(selectinload(Floor.tables)).all()
     result = []
     for f in floors:
+        sorted_tables = sorted(f.tables, key=lambda t: t.order_index or 0)
         tables = [
             {
                 'id': t.id,
@@ -2207,7 +2249,7 @@ def get_floors():
                 'active': t.active,
                 'merged_to_id': t.merged_to_id,
             }
-            for t in f.tables
+            for t in sorted_tables
             if t.active and (bid is None or t.branch_id in (None, bid))
         ]
         result.append({'id':f.id,'name':f.name,'tables':tables})
@@ -3296,6 +3338,7 @@ def _repair_open_self_orders_for_tenant(tenant_id):
         .filter(
             Order.tenant_id == tenant_id,
             Order.status == 'sent',
+            Order.branch_id.is_(None),
             Order.table_id.isnot(None),
             Order.razorpay_order_id.like('GUEST:%'),
         )
@@ -3376,7 +3419,13 @@ def get_bills():
     _repair_open_self_orders_for_tenant(get_current_tenant_id())
     orders = (
         apply_branch_scope(
-            apply_tenant_scope(Order.query.filter_by(status='sent'), Order),
+            apply_tenant_scope(
+                Order.query.options(
+                    selectinload(Order.items),
+                    joinedload(Order.table),
+                ).filter_by(status='sent'),
+                Order
+            ),
             Order.branch_id,
         )
         .order_by(Order.created_at.desc())
@@ -3397,7 +3446,10 @@ def get_all_orders():
 def get_bill_for_table(tid):
     _repair_open_self_orders_for_tenant(get_current_tenant_id())
     order = (
-        Order.query
+        Order.query.options(
+            selectinload(Order.items),
+            joinedload(Order.table),
+        )
         .filter_by(table_id=tid, status='sent', branch_id=get_active_branch_id(), tenant_id=get_current_tenant_id())
         .order_by(Order.created_at.desc())
         .first()
@@ -4104,9 +4156,15 @@ def _guest_token_from_order(o):
     return None
 
 
-@app.route('/table/<int:table_id>/order')
-def self_order_page(table_id):
-    """Table QR landing page – no login required for customers."""
+@app.route('/table/<token>/order')
+def self_order_page(token):
+    """Table QR landing page – no login required for customers. Uses a secure token."""
+    signer = URLSafeSerializer(app.secret_key, salt='qr-table')
+    try:
+        table_id = signer.loads(token)
+    except BadSignature:
+        return "Invalid or tampered QR code.", 403
+
     t = Table.query.get_or_404(table_id)
     tenant = db.session.get(Tenant, t.tenant_id)
     if not tenant_feature_enabled('self_order', tenant=tenant):
@@ -4114,7 +4172,7 @@ def self_order_page(table_id):
     cafe_name = tenant.name if tenant else 'POS Cafè'
     branch_id = _resolve_self_order_branch_id(t, tenant_id=t.tenant_id)
     return render_template('self_order.html',
-        table_id=table_id,
+        table_id=token,
         table_number=t.number,
         tenant_id=t.tenant_id,
         branch_id=branch_id,
@@ -4188,14 +4246,20 @@ def create_self_order():
     Tenant is resolved from the table record, not the Flask session.
     """
     d = request.json or {}
-    table_id       = d.get('table_id')
+    token          = d.get('table_id')
     items          = d.get('items', [])
     guest_token    = (d.get('guest_token') or '').strip()
     customer_name  = (d.get('customer_name') or '').strip()[:100]
     customer_phone = (d.get('customer_phone') or '').strip()[:20]
 
-    if not table_id:     return jsonify({'error': 'Table ID required'}), 400
+    if not token:        return jsonify({'error': 'Table ID (token) required'}), 400
     if not guest_token:  return jsonify({'error': 'Guest token missing'}), 400
+
+    signer = URLSafeSerializer(app.secret_key, salt='qr-table')
+    try:
+        table_id = signer.loads(token)
+    except BadSignature:
+        return jsonify({'error': 'Invalid or tampered QR code.'}), 403
 
     t   = Table.query.get_or_404(table_id)
     tid = t.tenant_id   # always from table, never Flask session
@@ -4399,9 +4463,16 @@ def guest_order_list(guest_token):
 @app.route('/api/self-order/menu', methods=['GET'])
 def self_order_menu():
     """Public menu for QR self-order — scoped to the table's tenant (no login session)."""
-    table_id = request.args.get('table_id', type=int)
-    if not table_id:
-        return jsonify({'error': 'table_id required'}), 400
+    token = request.args.get('table_id')
+    if not token:
+        return jsonify({'error': 'table_id token required'}), 400
+
+    signer = URLSafeSerializer(app.secret_key, salt='qr-table')
+    try:
+        table_id = signer.loads(token)
+    except BadSignature:
+        return jsonify({'error': 'Invalid token'}), 403
+
     tbl = Table.query.get_or_404(table_id)
     tid = tbl.tenant_id
     if not tid:
@@ -4459,7 +4530,9 @@ def table_qr_code(table_id):
     """Generate a QR code for the table's self-order URL."""
     t = Table.query.get_or_404(table_id)
     base_url = get_public_url_root()
-    url = base_url + f'/table/{table_id}/order'
+    signer = URLSafeSerializer(app.secret_key, salt='qr-table')
+    token = signer.dumps(table_id)
+    url = base_url + f'/table/{token}/order'
     qr = qrcode.QRCode(box_size=8, border=2)
     qr.add_data(url)
     qr.make(fit=True)
@@ -4493,9 +4566,16 @@ def push_subscribe_table():
     """Guest push subscription for a specific table (QR self-order)."""
     d = request.json or {}
     sub = d.get('subscription')
-    table_id = d.get('table_id')
-    if not sub or not table_id:
+    token = d.get('table_id')
+    if not sub or not token:
         return jsonify({'error': 'Missing data'}), 400
+
+    signer = URLSafeSerializer(app.secret_key, salt='qr-table')
+    try:
+        table_id = signer.loads(token)
+    except BadSignature:
+        return jsonify({'error': 'Invalid token'}), 403
+
     table = Table.query.get_or_404(table_id)
     if not tenant_feature_enabled('self_order', tenant_id=table.tenant_id):
         return tenant_feature_block_response('self_order', is_api=True)
@@ -4530,25 +4610,56 @@ def dashboard_stats():
     start = datetime(start_date.year, start_date.month, start_date.day)
     end = datetime(end_date.year, end_date.month, end_date.day) + timedelta(days=1)
     
-    query = apply_tenant_scope(apply_branch_scope(Order.query, Order.branch_id), Order)
-    orders = query.filter(Order.status=='paid', Order.created_at>=start, Order.created_at<end).all()
-    total_sales = sum(o.total for o in orders)
-    total_orders = len(orders)
-    by_method = {}
-    for o in orders:
-        by_method[o.payment_method] = by_method.get(o.payment_method, 0) + o.total
-    # Top products
-    item_counts = {}
-    for o in orders:
-        for i in o.items:
-            item_counts[i.product_name] = item_counts.get(i.product_name, 0) + i.qty
-    top_products = sorted(item_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+    base_query = apply_tenant_scope(apply_branch_scope(Order.query, Order.branch_id), Order).filter(
+        Order.status == 'paid',
+        Order.created_at >= start,
+        Order.created_at < end,
+    )
+    total_orders = base_query.count()
+    total_sales = float(
+        base_query.with_entities(func.coalesce(func.sum(Order.total), 0.0)).scalar() or 0
+    )
+    by_method_rows = (
+        base_query.with_entities(
+            Order.payment_method,
+            func.coalesce(func.sum(Order.total), 0.0)
+        )
+        .group_by(Order.payment_method)
+        .all()
+    )
+    by_method = {
+        (payment_method or 'Unknown'): float(total or 0)
+        for payment_method, total in by_method_rows
+    }
+    top_product_rows = (
+        db.session.query(
+            OrderItem.product_name,
+            func.coalesce(func.sum(OrderItem.qty), 0).label('qty'),
+        )
+        .join(Order, Order.id == OrderItem.order_id)
+        .filter(
+            Order.tenant_id == get_current_tenant_id(),
+            Order.status == 'paid',
+            Order.created_at >= start,
+            Order.created_at < end,
+        )
+    )
+    active_branch_id = get_active_branch_id()
+    if active_branch_id is not None:
+        top_product_rows = top_product_rows.filter(Order.branch_id == active_branch_id)
+    top_product_rows = (
+        top_product_rows
+        .group_by(OrderItem.product_name)
+        .order_by(func.sum(OrderItem.qty).desc(), OrderItem.product_name.asc())
+        .limit(5)
+        .all()
+    )
     return jsonify({
         'total_sales': round(total_sales, 2),
         'total_orders': total_orders,
         'avg_order': round(total_sales/total_orders, 2) if total_orders else 0,
         'by_method': by_method,
-        'top_products': [{'name':n,'qty':q} for n,q in top_products]
+        'top_products': [{'name': name, 'qty': int(qty or 0)} for name, qty in top_product_rows]
     })
 
 def parse_report_date(value, default=None):
@@ -4707,10 +4818,18 @@ def attendance_report():
     start_date = parse_report_date(request.args.get('start_date'))
     end_date = parse_report_date(request.args.get('end_date'))
     attendance_query = apply_tenant_scope(apply_branch_scope(
-        AttendanceEvent.query.join(User, User.id == AttendanceEvent.staff_id),
+        AttendanceEvent.query.options(joinedload(AttendanceEvent.staff)).join(User, User.id == AttendanceEvent.staff_id),
         AttendanceEvent.branch_id,
         include_all_for_superadmin=False,
     ), AttendanceEvent)
+    if start_date:
+        attendance_query = attendance_query.filter(
+            AttendanceEvent.timestamp >= datetime.combine(start_date - timedelta(days=1), datetime.min.time())
+        )
+    if end_date:
+        attendance_query = attendance_query.filter(
+            AttendanceEvent.timestamp <= datetime.combine(end_date + timedelta(days=1), datetime.max.time())
+        )
     if staff_id:
         attendance_query = attendance_query.filter(AttendanceEvent.staff_id == staff_id)
     events = attendance_query.order_by(AttendanceEvent.timestamp.asc(), AttendanceEvent.id.asc()).all()
@@ -4812,32 +4931,60 @@ def compare_branches():
         branch_query = branch_query.filter(Branch.id == user.branch_id)
     branches = branch_query.all()
 
-    cards = []
-    for branch in branches:
-        order_query = Order.query.filter(
-            Order.branch_id == branch.id,
+    branch_ids = [branch.id for branch in branches]
+    totals_map = {}
+    top_items_map = {}
+    if branch_ids:
+        totals_query = db.session.query(
+            Order.branch_id,
+            func.count(Order.id).label('total_orders'),
+            func.coalesce(func.sum(Order.total), 0.0).label('total_revenue'),
+        ).filter(
+            Order.branch_id.in_(branch_ids),
             Order.status == 'paid',
         )
         if start_dt:
-            order_query = order_query.filter(Order.created_at >= start_dt)
+            totals_query = totals_query.filter(Order.created_at >= start_dt)
         if end_dt:
-            order_query = order_query.filter(Order.created_at <= end_dt)
-        orders = order_query.all()
-        total_orders = len(orders)
-        total_revenue = round(sum(float(order.total or 0) for order in orders), 2)
-        item_totals = {}
-        for order in orders:
-            for item in order.items:
-                item_totals[item.product_name] = item_totals.get(item.product_name, 0) + item.qty
-        top_item_name, top_item_qty = ('-', 0)
-        if item_totals:
-            top_item_name, top_item_qty = max(item_totals.items(), key=lambda entry: entry[1])
+            totals_query = totals_query.filter(Order.created_at <= end_dt)
+        totals_map = {
+            branch_id: {
+                'total_orders': int(total_orders or 0),
+                'total_revenue': round(float(total_revenue or 0), 2),
+            }
+            for branch_id, total_orders, total_revenue in totals_query.group_by(Order.branch_id).all()
+        }
+
+        top_item_query = db.session.query(
+            Order.branch_id,
+            OrderItem.product_name,
+            func.coalesce(func.sum(OrderItem.qty), 0).label('qty'),
+        ).join(OrderItem, Order.id == OrderItem.order_id).filter(
+            Order.branch_id.in_(branch_ids),
+            Order.status == 'paid',
+        )
+        if start_dt:
+            top_item_query = top_item_query.filter(Order.created_at >= start_dt)
+        if end_dt:
+            top_item_query = top_item_query.filter(Order.created_at <= end_dt)
+        for branch_id, product_name, qty in (
+            top_item_query
+            .group_by(Order.branch_id, OrderItem.product_name)
+            .order_by(Order.branch_id.asc(), func.sum(OrderItem.qty).desc(), OrderItem.product_name.asc())
+            .all()
+        ):
+            top_items_map.setdefault(branch_id, (product_name, int(qty or 0)))
+
+    cards = []
+    for branch in branches:
+        totals = totals_map.get(branch.id, {})
+        top_item_name, top_item_qty = top_items_map.get(branch.id, ('-', 0))
         cards.append({
             'branch_id': branch.id,
             'branch_name': branch.name,
             'address': branch.address,
-            'total_orders': total_orders,
-            'total_revenue': total_revenue,
+            'total_orders': totals.get('total_orders', 0),
+            'total_revenue': totals.get('total_revenue', 0.0),
             'top_selling_item': top_item_name,
             'top_selling_qty': top_item_qty,
         })
@@ -4851,7 +4998,14 @@ def get_users():
     if not user or (normalize_role(user.role) != 'restaurant' and not user.is_superadmin):
         return jsonify({'error': 'unauthorized'}), 403
 
-    users = apply_tenant_scope(apply_branch_scope(User.query, User.branch_id), User).filter(User.id != session['user_id']).all()
+    users = (
+        apply_tenant_scope(
+            apply_branch_scope(User.query.options(joinedload(User.branch)), User.branch_id),
+            User
+        )
+        .filter(User.id != session['user_id'])
+        .all()
+    )
     user_ids = [u.id for u in users]
     stats_map = {}
     if user_ids:
@@ -4879,6 +5033,26 @@ def get_users():
         'total_orders': stats_map.get(u.id, {}).get('total_orders', 0),
         'total_sales': stats_map.get(u.id, {}).get('total_sales', 0.0),
     } for u in users])
+
+@app.route('/api/tables/reorder', methods=['POST'])
+@staff_required
+def reorder_tables():
+    orders = (request.json or {}).get('orders') or []
+    if not isinstance(orders, list):
+        return jsonify({'error': 'orders must be a list'}), 400
+
+    tenant_id = get_current_tenant_id()
+    for row in orders:
+        try:
+            table_id = int((row or {}).get('id'))
+            position = int((row or {}).get('position', 0))
+        except (TypeError, ValueError):
+            return jsonify({'error': 'Invalid table id or position in orders'}), 400
+        t = Table.query.filter_by(id=table_id, tenant_id=tenant_id, active=True).first_or_404()
+        t.order_index = position
+
+    db.session.commit()
+    return jsonify({'ok': True})
 
 @app.route('/api/users', methods=['POST'])
 @admin_required
@@ -5453,11 +5627,13 @@ def on_join_scope(data):
                 tenant_id = int(raw_tenant_id)
             except (TypeError, ValueError):
                 tenant_id = None
-    table_id = data.get('table_id')
-    if table_id and not tenant_id:
+    token = data.get('table_id')
+    if token and not tenant_id:
+        signer = URLSafeSerializer(app.secret_key, salt='qr-table')
         try:
-            tbl = db.session.get(Table, int(table_id))
-        except (TypeError, ValueError):
+            table_id = signer.loads(token)
+            tbl = db.session.get(Table, table_id)
+        except BadSignature:
             tbl = None
         if tbl:
             tenant_id = tbl.tenant_id
@@ -5490,8 +5666,14 @@ def on_call_waiter(data):
                 tid = int(raw_tid)
             except (TypeError, ValueError):
                 tid = None
-    if not tid and data.get('table_id'):
-        tbl = db.session.get(Table, data['table_id'])
+    token = data.get('table_id')
+    if not tid and token:
+        signer = URLSafeSerializer(app.secret_key, salt='qr-table')
+        try:
+            table_id = signer.loads(token)
+            tbl = db.session.get(Table, table_id)
+        except BadSignature:
+            tbl = None
         if tbl:
             tid = tbl.tenant_id
     if tid and bid is None:
@@ -5757,6 +5939,32 @@ def ensure_branch_schema():
         changed = True
     if changed:
         db.session.commit()
+
+def ensure_query_indexes():
+    statements = [
+        'CREATE INDEX IF NOT EXISTS ix_product_tenant_active_branch ON product (tenant_id, active, branch_id)',
+        'CREATE INDEX IF NOT EXISTS ix_product_tenant_category ON product (tenant_id, category_id)',
+        'CREATE INDEX IF NOT EXISTS ix_category_tenant_name ON category (tenant_id, name)',
+        'CREATE INDEX IF NOT EXISTS ix_floor_tenant_branch ON floor (tenant_id, branch_id)',
+        'CREATE INDEX IF NOT EXISTS ix_table_tenant_active_branch ON "table" (tenant_id, active, branch_id)',
+        'CREATE INDEX IF NOT EXISTS ix_table_floor_active ON "table" (floor_id, active)',
+        'CREATE INDEX IF NOT EXISTS ix_order_tenant_created_at ON "order" (tenant_id, created_at)',
+        'CREATE INDEX IF NOT EXISTS ix_order_branch_created_at ON "order" (branch_id, created_at)',
+        'CREATE INDEX IF NOT EXISTS ix_branch_tenant_name ON branch (tenant_id, name)',
+        'CREATE INDEX IF NOT EXISTS ix_user_tenant_role ON "user" (tenant_id, role)',
+        'CREATE INDEX IF NOT EXISTS ix_addon_product_id ON addon (product_id)',
+        'CREATE INDEX IF NOT EXISTS ix_reservation_tenant_status ON reservation (tenant_id, status)',
+        'CREATE INDEX IF NOT EXISTS ix_inventory_item_tenant_branch ON inventory_item (tenant_id, branch_id)',
+    ]
+    with db.engine.begin() as conn:
+        for statement in statements:
+            try:
+                conn.exec_driver_sql(statement)
+            except (IntegrityError, ProgrammingError) as exc:
+                message = str(exc).lower()
+                if 'already exists' in message or 'duplicate key value violates unique constraint "pg_class_relname_nsp_index"' in message:
+                    continue
+                raise
 
 def ensure_demo_catalog():
     # Get Default Tenant
@@ -6320,6 +6528,7 @@ def initialize_app_data():
         ensure_payment_methods()
         ensure_order_table_schema()
         ensure_branch_schema()
+        ensure_query_indexes()
         ensure_default_accounts()
         # ensure_demo_catalog()
         # ensure_demo_floors_and_tables()

@@ -320,7 +320,7 @@ function renderTicket(t) {
         </div>
       </div>
       ${i.notes ? `<div class="item-notes">📝 ${i.notes}</div>` : ''}
-      <div class="addon-text" style="font-size:10px;color:#f97316;font-weight:700" data-json='${i.addons_json||"[]"}'></div>
+      ${(i.addons && i.addons.length) ? `<div class="addon-text" style="font-size:10px;color:#f97316;font-weight:700;margin-top:2px;">➕ ${i.addons.map(a => a.name).join(', ')}</div>` : ''}
       ${i.is_thali && Array.isArray(i.components) && i.components.length ? `<div style="font-size:10px;color:#a1a1aa;margin-top:2px;font-style:italic">Includes: ${i.components.join(', ')}</div>` : ''}
     </div>`).join('');
 
@@ -375,13 +375,6 @@ function render() {
     document.getElementById('col-' + stage).innerHTML = stg.map(t => renderTicket(t)).join('');
   });
   
-  // Fill addon texts
-  document.querySelectorAll('.addon-text').forEach(el => {
-    try {
-      const addons = JSON.parse(el.dataset.json || '[]');
-      if (addons.length) el.textContent = '➕ ' + addons.map(a => a.name).join(', ');
-    } catch(e) {}
-  });
 }
 
 // ── Advance ticket ─────────────────────────────────────────────────────
