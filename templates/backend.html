@@ -1506,11 +1506,23 @@
     const taxStr = document.getElementById('p-tax-config').value.trim();
     if (taxStr) taxStr.split(',').forEach(part => { const [k, v] = part.split(':').map(s => s.trim()); if (k && v) d.tax_config[k] = parseFloat(v); });
     if (!d.name || !d.price) return toast('Name and price are required', 'error');
-    let r;
-    if (editId) { r = await api('/api/products/' + editId, 'PUT', d); if (r.ok) toast('Product updated!'); }
-    else { r = await api('/api/products', 'POST', d); if (r.ok) toast('Product added!'); }
-    if (r.ok) { closeProductModal(); const pd = await api('/api/products/all'); allProducts = pd.products || []; allCats = pd.categories || []; renderProductsTable(); }
-    else if (r.error) toast(r.error, 'error');
+
+    const btn = document.getElementById('product-save-btn');
+    if (btn.disabled) return;
+    btn.disabled = true;
+    const originalText = btn.textContent;
+    btn.textContent = 'Saving...';
+
+    try {
+      let r;
+      if (editId) { r = await api('/api/products/' + editId, 'PUT', d); if (r.ok) toast('Product updated!'); }
+      else { r = await api('/api/products', 'POST', d); if (r.ok) toast('Product added!'); }
+      if (r.ok) { closeProductModal(); const pd = await api('/api/products/all'); allProducts = pd.products || []; allCats = pd.categories || []; renderProductsTable(); }
+      else if (r.error) toast(r.error, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
   }
 
   let pendingDeleteId = null;
@@ -1524,9 +1536,19 @@
 
   document.getElementById('delete-confirm-btn').addEventListener('click', async function () {
     if (!pendingDeleteId) return;
-    const r = await api('/api/products/' + pendingDeleteId, 'DELETE');
-    if (r.ok) { toast('Product deleted!'); closeDeleteModal(); const pd = await api('/api/products/all'); allProducts = pd.products; allCats = pd.categories; renderProductsTable(); }
-    else toast(r.error || 'Failed to delete', 'error');
+    const btn = this;
+    if (btn.disabled) return;
+    btn.disabled = true;
+    const originalText = btn.textContent;
+    btn.textContent = 'Deleting...';
+    try {
+      const r = await api('/api/products/' + pendingDeleteId, 'DELETE');
+      if (r.ok) { toast('Product deleted!'); closeDeleteModal(); const pd = await api('/api/products/all'); allProducts = pd.products; allCats = pd.categories; renderProductsTable(); }
+      else toast(r.error || 'Failed to delete', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
   });
 
   function renderFloors() {
