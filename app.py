@@ -2229,6 +2229,81 @@ def get_all_products():
     })
 
 
+@app.route('/api/products', methods=['POST'])
+@staff_required
+def add_product():
+    d = request.json
+    tid = get_current_tenant_id()
+    cat = apply_tenant_scope(Category.query.filter_by(name=d.get('category','')), Category).first()
+    if not cat:
+        cat = Category(name=d.get('category','General'), tenant_id=tid)
+        db.session.add(cat)
+        db.session.flush()
+    p = Product(name=d['name'], price=float(d['price']), category_id=cat.id,
+                description=d.get('description',''), 
+                tax=float(d.get('tax',0)), 
+                tax_config_json=json.dumps(d.get('tax_config', {})),
+                unit=d.get('unit','pcs'),
+                branch_id=get_active_branch_id(), tenant_id=tid)
+    db.session.add(p)
+    db.session.flush()
+
+    if 'addons' in d:
+        for a_data in d['addons']:
+            db.session.add(Addon(product_id=p.id, name=a_data['name'], price=float(a_data['price']), tenant_id=tid))
+
+    db.session.commit()
+    return jsonify({'ok':True,'id':p.id})
+
+@app.route('/api/products/<int:pid>', methods=['PUT'])
+@staff_required
+def update_product(pid):
+    tid = get_current_tenant_id()
+    p = Product.query.filter_by(id=pid, tenant_id=tid).first_or_404()
+    access_error = require_branch_access_or_403(p.branch_id)
+    if access_error:
+        return access_error
+    d = request.json
+    p.name = d.get('name', p.name)
+    p.price = float(d.get('price', p.price))
+    p.description = d.get('description', p.description)
+    p.tax = float(d.get('tax', p.tax))
+    if 'tax_config' in d:
+        p.tax_config_json = json.dumps(d['tax_config'])
+    p.unit = d.get('unit', p.unit)
+    p.active = d.get('active', p.active)
+    if 'image_b64' in d:
+        p.image_b64 = d['image_b64'] or ''
+    if 'category' in d and d['category']:
+        cat = apply_tenant_scope(Category.query.filter_by(name=d['category']), Category).first()
+        if not cat:
+            cat = Category(name=d['category'], tenant_id=tid)
+            db.session.add(cat)
+            db.session.flush()
+        p.category_id = cat.id
+    
+    if 'addons' in d:
+        # Clear existing and add new
+        Addon.query.filter_by(product_id=p.id).delete()
+        for a_data in d['addons']:
+            db.session.add(Addon(product_id=p.id, name=a_data['name'], price=float(a_data['price']), tenant_id=tid))
+
+    db.session.commit()
+    return jsonify({'ok':True})
+
+@app.route('/api/products/<int:pid>', methods=['DELETE'])
+@staff_required
+def delete_product(pid):
+    tid = get_current_tenant_id()
+    p = Product.query.filter_by(id=pid, tenant_id=tid).first_or_404()
+    access_error = require_branch_access_or_403(p.branch_id)
+    if access_error:
+        return access_error
+    db.session.delete(p)
+    db.session.commit()
+    return jsonify({'ok':True})
+
+
 # ─── API: Floors & Tables ──────────────────────────────────
 @app.route('/api/floors', methods=['GET'])
 def get_floors():
