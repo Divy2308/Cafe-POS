@@ -2273,7 +2273,14 @@
       }
     }
 
+    window._pendingApiReqs = window._pendingApiReqs || new Set();
     async function api(url, method = 'GET', body = null) {
+      const reqKey = `${method}:${url}`;
+      if (method !== 'GET') {
+        if (window._pendingApiReqs.has(reqKey)) throw new Error('Request in progress');
+        window._pendingApiReqs.add(reqKey);
+      }
+      try {
       const options = {
         method,
         headers: {
@@ -2297,6 +2304,9 @@
         throw new Error(message);
       }
       return payload;
+      } finally {
+        if (method !== 'GET') window._pendingApiReqs.delete(reqKey);
+      }
     }
 
     async function syncRestaurantContext(tenantId) {

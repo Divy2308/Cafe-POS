@@ -149,12 +149,14 @@
     bottom: 60px;
     left: 0;
     right: 0;
-    background: #1a1a1a;
-    border-top: 1px solid #2a2a2a;
+    background: #ffffff;
+    border-top: 1px solid #e5e7eb;
     border-radius: 16px 16px 0 0;
     z-index: 49;
     padding: 12px 0 8px;
-    animation: slideUp .2s ease;
+    color: #1f2937;
+    box-shadow: 0 -4px 12px rgba(0,0,0,0.05);
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
   .more-drawer.open {
@@ -162,37 +164,31 @@
   }
 
   @keyframes slideUp {
-    from {
-      transform: translateY(100%);
-    }
-
-    to {
-      transform: translateY(0);
-    }
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
   }
 
   .drawer-item {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 14px 20px;
-    font-size: 14px;
-    color: #ccc;
-    background: none;
-    border: none;
+    padding: 12px 20px;
+    color: #374151;
+    font-size: 15px;
+    font-weight: 500;
     width: 100%;
+    background: transparent;
+    border: none;
     text-align: left;
-    cursor: pointer;
     text-decoration: none;
     -webkit-tap-highlight-color: transparent;
   }
 
   .drawer-item:active {
-    background: rgba(255, 255, 255, .05);
+    background: #f3f4f6;
   }
 
   .drawer-item svg {
-    width: 18px;
     height: 18px;
     color: #888;
     flex-shrink: 0;
@@ -400,6 +396,27 @@
         </svg>
         Analytics
       </button>
+
+      {% if food_court %}
+      <button onclick="switchDashTab('shops')"
+        class="dash-nav-btn w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+        </svg>
+        Restaurants
+      </button>
+
+      <button onclick="switchDashTab('floors')"
+        class="dash-nav-btn w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+        </svg>
+        Floors & Tables
+      </button>
+      {% endif %}
+
       <button onclick="switchDashTab('staff')"
         class="dash-nav-btn w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -408,7 +425,7 @@
         </svg>
         Staff
       </button>
-      {% if not (tenant and tenant.food_court_id) %}
+      {% if not (tenant and tenant.food_court_id) and not food_court %}
       <button onclick="switchDashTab('users')"
         class="dash-nav-btn w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -426,7 +443,7 @@
         Attendance
       </button>
       {% endif %}
-      {% if not (tenant and tenant.food_court_id) %}
+      {% if not (tenant and tenant.food_court_id) and not food_court %}
       <button onclick="switchDashTab('compare')"
         class="dash-nav-btn w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -437,6 +454,7 @@
       </button>
       {% endif %}
       <div class="border-t border-border my-3"></div>
+      {% if not (tenant and tenant.food_court_id) and not food_court %}
       <a href="/backend" class="dash-nav-btn flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -451,6 +469,7 @@
         </svg>
         Go to POS
       </a>
+      {% endif %}
     </nav>
     <div class="border-t border-border p-3">
       <button onclick="logout()"
@@ -622,6 +641,48 @@
         </div>
       </div>
     </div>
+
+    <!-- Shops Tab (Food Court Admin only) -->
+    {% if food_court %}
+    <div id="tab-shops" class="tab-panel hidden">
+      <div class="flex items-center justify-between mb-6 gap-3">
+        <div>
+          <h2 class="font-display text-2xl font-800 tracking-tight text-white">Restaurants</h2>
+          <p class="text-sm text-gray-400 mt-1">Manage all restaurants in your food court</p>
+        </div>
+        <button onclick="openShopModal()" class="btn-primary px-5 py-2.5 rounded-xl text-white text-sm font-bold shadow-lg shadow-brand-500/20 hover:shadow-brand-500/40 transition-all">
+          + Add Restaurant
+        </button>
+      </div>
+      <div id="shops-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <!-- populated by JS -->
+      </div>
+    </div>
+
+    <!-- Floors & Tables Tab (Food Court Admin only) -->
+    <div id="tab-floors" class="tab-panel hidden">
+      <div class="flex items-center justify-between mb-6 gap-3 flex-wrap">
+        <div>
+          <h2 class="font-display text-2xl font-800 tracking-tight text-white">Floors &amp; Tables</h2>
+          <p class="text-sm text-gray-400 mt-1">Manage shared seating for your food court</p>
+        </div>
+        <div class="flex gap-2 flex-wrap">
+          <button onclick="openFloorModal()" class="btn-ghost px-4 py-2 rounded-xl text-sm border border-gray-700/50 hover:bg-gray-800">+ Add Floor</button>
+          <button onclick="openTableModal()" class="btn-primary px-4 py-2 rounded-xl text-white text-sm font-medium shadow-lg shadow-brand-500/20 hover:shadow-brand-500/40">+ Add Table</button>
+        </div>
+      </div>
+      <div class="card p-5 mb-6 border border-brand-500/15 bg-gradient-to-br from-brand-500/5 to-transparent" style="border-radius:16px">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div class="font-display font-800 text-sm text-white">Table QR print hub</div>
+            <p class="text-xs text-gray-500 mt-1 max-w-md">Open a print-ready sheet of QR codes — one per table — linking to the food court order page.</p>
+          </div>
+          <button type="button" onclick="printAllTableQRs()" class="btn-primary px-4 py-2.5 rounded-xl text-white text-xs font-bold whitespace-nowrap">Print all QR codes</button>
+        </div>
+      </div>
+      <div id="floors-list" class="space-y-4"></div>
+    </div>
+    {% endif %}
 
     <!-- Staff Tab -->
     <div id="tab-staff" class="tab-panel hidden">
@@ -817,6 +878,7 @@
       </svg>
       Staff
     </button>
+    {% if not (tenant and tenant.food_court_id) and not food_court %}
     <button class="bnav-btn" id="bnav-attendance" onclick="switchDashTab('attendance')">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -824,6 +886,7 @@
       </svg>
       Attendance
     </button>
+    {% endif %}
     <button class="bnav-btn" id="bnav-more" onclick="toggleMoreDrawer()">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -837,6 +900,7 @@
 <!-- More Drawer -->
 <div class="drawer-overlay" id="drawerOverlay" onclick="closeMoreDrawer()"></div>
 <div class="more-drawer" id="moreDrawer">
+  {% if not (tenant and tenant.food_court_id) and not food_court %}
   <button class="drawer-item" onclick="switchDashTab('compare');closeMoreDrawer()">
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -844,6 +908,8 @@
     </svg>
     Branches
   </button>
+  {% endif %}
+  {% if not (tenant and tenant.food_court_id) and not food_court %}
   <a href="/backend" class="drawer-item">
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -858,6 +924,7 @@
     </svg>
     Go to POS
   </a>
+  {% endif %}
   <div style="border-top:1px solid #222;margin:8px 0"></div>
   <button class="drawer-item" onclick="logout()" style="color:#ef4444;">
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -867,6 +934,46 @@
     Logout
   </button>
 </div>
+
+{% if food_court %}
+<!-- Floor Modal -->
+<div id="floor-modal" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-50"
+  onclick="if(event.target===this)this.classList.add('hidden')">
+  <div class="card p-8 w-full max-w-sm" style="border-radius:20px">
+    <h3 class="font-display text-xl font-700 mb-6">Add Floor</h3>
+    <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Floor Name</label><input id="f-name"
+        placeholder="Ground Floor"></div>
+    <div class="flex gap-3 mt-6">
+      <button onclick="document.getElementById('floor-modal').classList.add('hidden')"
+        class="btn-ghost flex-1 py-2.5 rounded-xl text-sm">Cancel</button>
+      <button onclick="saveFloor()" class="btn-primary flex-1 py-2.5 rounded-xl text-white text-sm font-medium">Add
+        Floor</button>
+    </div>
+  </div>
+</div>
+
+<!-- Table Modal -->
+<div id="table-modal" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-50"
+  onclick="if(event.target===this)this.classList.add('hidden')">
+  <div class="card p-8 w-full max-w-sm" style="border-radius:20px">
+    <h3 class="font-display text-xl font-700 mb-6">Add Table</h3>
+    <div class="space-y-4">
+      <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Table Number</label><input
+          id="t-number" placeholder="7"></div>
+      <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Seats</label><input id="t-seats"
+          type="number" placeholder="4"></div>
+      <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Floor</label><select
+          id="t-floor"></select></div>
+    </div>
+    <div class="flex gap-3 mt-6">
+      <button onclick="document.getElementById('table-modal').classList.add('hidden')"
+        class="btn-ghost flex-1 py-2.5 rounded-xl text-sm">Cancel</button>
+      <button onclick="saveTable()" class="btn-primary flex-1 py-2.5 rounded-xl text-white text-sm font-medium">Add
+        Table</button>
+    </div>
+  </div>
+</div>
+{% endif %}
 
 <!-- Add Staff Modal -->
 <div id="addUserModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
@@ -931,8 +1038,10 @@
 <script>
   const DASHBOARD_CONTEXT = {
     isSuperadmin: {{ 'true' if is_superadmin else 'false' }},
+    isFoodCourtAdmin: {{ 'true' if food_court else 'false' }},
     canManageBranches: {{ 'true' if can_manage_branches else 'false' }},
-    activeBranchId: {{ active_branch.id if active_branch else 'null' }}
+    activeBranchId: {{ active_branch.id if active_branch else 'null' }},
+    maxStaff: {{ tenant.max_staff if tenant and tenant.max_staff else 0 }}
   };
 
   let methodChart = null;
@@ -1160,6 +1269,10 @@
 
   /* ── Staff ── */
   function openAddUserModal() {
+    if (DASHBOARD_CONTEXT.maxStaff > 0 && staffUsers.length >= DASHBOARD_CONTEXT.maxStaff) {
+      toast(`Staff limit reached (max ${DASHBOARD_CONTEXT.maxStaff}). Upgrade your plan to add more.`, 'error');
+      return;
+    }
     document.getElementById('editUserId').value = '';
     document.getElementById('newUserEmail').disabled = false;
     document.getElementById('userModalTitle').textContent = 'Add Staff Member';
@@ -1338,6 +1451,8 @@
     if (users.error) { tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-red-400">${users.error}</td></tr>`; return; }
     if (!users.length) { staffUsers = []; tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-gray-500">No staff found for this branch.</td></tr>'; return; }
     staffUsers = users;
+    const staffCountText = document.getElementById('staffCountText');
+    if (staffCountText) staffCountText.textContent = users.length;
     tbody.innerHTML = users.map(user => `
       <tr class="border-b border-border">
         <td class="py-4 px-4 font-semibold">${user.name}</td>
@@ -1631,8 +1746,138 @@
 
 
 
+  {% if food_court %}
+  let allFloors = [];
+  function renderFloors() {
+    document.getElementById('floors-list').innerHTML = allFloors.map(f => `
+    <div class="card p-5" style="border-radius:16px">
+      <div class="flex items-center justify-between mb-4">
+        <div class="font-display font-700 text-white">${escHtml(f.name)}</div>
+        <button onclick="deleteFloor(${f.id})" class="text-xs text-red-500 hover:underline">Delete Floor</button>
+      </div>
+      <div class="grid floor-tables-grid gap-3" style="grid-template-columns:repeat(auto-fill,minmax(120px,1fr))">
+        ${f.tables.map(t => `
+          <div data-id="${t.id}" class="border border-border rounded-xl p-3 text-center transition-colors" style="background:var(--card)">
+            <div class="font-display text-xl font-800 text-white">T${escHtml(t.number)}</div>
+            <div class="text-xs text-gray-500">${t.seats} seats</div>
+            <button onclick="deleteTable(${t.id})" class="text-xs text-red-500 mt-1">Remove</button>
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+  }
+
+  function openFloorModal() { document.getElementById('floor-modal').classList.remove('hidden'); }
+  let isSavingFloor = false;
+  async function saveFloor() {
+    if (isSavingFloor) return;
+    const name = document.getElementById('f-name').value;
+    if (!name) return toast('Enter floor name', 'error');
+    isSavingFloor = true;
+    try {
+      const r = await api('/api/floors', 'POST', { name });
+      if (!r || !r.ok) return;
+      document.getElementById('floor-modal').classList.add('hidden');
+      document.getElementById('f-name').value = '';
+      const data = await api('/api/floors'); allFloors = data || []; renderFloors(); toast('Floor added!');
+    } finally {
+      isSavingFloor = false;
+    }
+  }
+  function openTableModal() {
+    document.getElementById('t-floor').innerHTML = allFloors.map(f => `<option value="${f.id}">${escHtml(f.name)}</option>`).join('');
+    document.getElementById('table-modal').classList.remove('hidden');
+  }
+  let isSavingTable = false;
+  async function saveTable() {
+    if (isSavingTable) return;
+    const d = { number: document.getElementById('t-number').value, seats: document.getElementById('t-seats').value, floor_id: document.getElementById('t-floor').value };
+    if (!d.number) return toast('Enter table number', 'error');
+    isSavingTable = true;
+    try {
+      const r = await api('/api/tables', 'POST', d);
+      if (!r || !r.ok) return;
+      document.getElementById('table-modal').classList.add('hidden');
+      document.getElementById('t-number').value = '';
+      const data = await api('/api/floors'); allFloors = data || []; renderFloors(); toast('Table added!');
+    } finally {
+      isSavingTable = false;
+    }
+  }
+  async function deleteTable(id) {
+    if (!confirm('Remove this table?')) return;
+    const r = await api('/api/tables/' + id, 'DELETE');
+    if (!r || !r.ok) return;
+    const data = await api('/api/floors'); allFloors = data || []; renderFloors(); toast('Table removed');
+  }
+  
+  async function deleteFloor(id) {
+    if (!confirm('Delete this floor and all its tables?')) return;
+    const r = await api('/api/floors/' + id, 'DELETE');
+    if (!r || !r.ok) return;
+    const data = await api('/api/floors'); allFloors = data || []; renderFloors(); toast('Floor deleted');
+  }
+
+  async function printAllTableQRs() {
+    if (!allFloors || !allFloors.length) {
+      toast('Add floors and tables first', 'error');
+      return;
+    }
+    const tables = [];
+    allFloors.forEach(f => (f.tables || []).forEach(t => {
+      tables.push({ id: t.id, number: t.number, floor: f.name });
+    }));
+    if (!tables.length) {
+      toast('No tables to print', 'error');
+      return;
+    }
+    toast('Preparing QR sheet...', 'info');
+    const rows = [];
+    for (const t of tables) {
+      try {
+        const r = await fetch('/api/qr/table/' + t.id);
+        const d = await r.json();
+        rows.push({ ...t, qr: d.qr, url: d.url });
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    if (!rows.length) {
+      toast('Could not load QR codes', 'error');
+      return;
+    }
+    const cards = rows.map(t => `
+    <div class="qr-card">
+      <div class="qr-meta">${escHtml(t.floor)} · Table ${escHtml(String(t.number))}</div>
+      <img src="${t.qr}" alt="" crossorigin="anonymous" />
+      <div class="qr-url">${escHtml(t.url)}</div>
+    </div>`).join('');
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Table QR codes</title>
+    <style>
+      @page { margin: 12mm; }
+      body { font-family: system-ui, sans-serif; background: #fff; color: #111; margin: 0; padding: 16px; }
+      h1 { font-size: 18px; margin: 0 0 16px; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 20px; }
+      .qr-card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; text-align: center; break-inside: avoid; }
+      .qr-meta { font-size: 11px; font-weight: 700; margin-bottom: 8px; color: #374151; }
+      .qr-card img { width: 140px; height: 140px; display: block; margin: 0 auto; }
+      .qr-url { font-size: 8px; word-break: break-all; color: #6b7280; margin-top: 8px; }
+    </style></head><body>
+      <h1>Table QR Codes</h1>
+      <div class="grid">${cards}</div>
+      <script>window.onload=()=>{setTimeout(()=>{window.print();},500);};<\/script>
+    </body></html>`;
+    const w = window.open('', '_blank');
+    w.document.open(); w.document.write(html); w.document.close();
+  }
+  {% endif %}
+
   document.addEventListener('DOMContentLoaded', async () => {
     await loadBranches();
+    {% if food_court %}
+    const floorData = await api('/api/floors');
+    allFloors = floorData || [];
+    renderFloors();
+    {% endif %}
     const todayStr = new Date().toISOString().split('T')[0];
     document.getElementById('analytics-start-date').value = todayStr;
     document.getElementById('analytics-end-date').value = todayStr;

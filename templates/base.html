@@ -227,7 +227,13 @@ function toast(msg, type='success') {
   }, 3000);
 }
 
+window._pendingApiReqs = window._pendingApiReqs || new Set();
 async function api(url, method='GET', data=null) {
+  const reqKey = `${method}:${url}`;
+  if (method !== 'GET') {
+    if (window._pendingApiReqs.has(reqKey)) return { ok: false, error: 'Request in progress' };
+    window._pendingApiReqs.add(reqKey);
+  }
   try {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
     const opts = {
@@ -257,6 +263,8 @@ async function api(url, method='GET', data=null) {
     console.error('Network Error:', e);
     toast('Network error. Check connection.', 'error');
     return { error: 'network_error' };
+  } finally {
+    if (method !== 'GET') window._pendingApiReqs.delete(reqKey);
   }
 }
 

@@ -2413,7 +2413,13 @@
   /* ══════════════════════════════════
      API HELPER (from base.html)
   ══════════════════════════════════ */
+  window._pendingApiReqs = window._pendingApiReqs || new Set();
   async function api(url, method = 'GET', body = null) {
+    const reqKey = `${method}:${url}`;
+    if (method !== 'GET') {
+      if (window._pendingApiReqs.has(reqKey)) return { error: 'Request in progress' };
+      window._pendingApiReqs.add(reqKey);
+    }
     try {
       const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
       const opts = {
@@ -2424,6 +2430,9 @@
       const res = await fetch(url, opts);
       return await res.json();
     } catch (e) { return { error: 'Network error. Please try again.' }; }
+    finally {
+      if (method !== 'GET') window._pendingApiReqs.delete(reqKey);
+    }
   }
 
   function homeForRole(role) {

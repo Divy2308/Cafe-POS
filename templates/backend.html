@@ -1554,7 +1554,10 @@
   function renderFloors() {
     document.getElementById('floors-list').innerHTML = allFloors.map(f => `
     <div class="card p-5" style="border-radius:16px">
-      <div class="font-display font-700 mb-4">${escHtml(f.name)}</div>
+      <div class="flex items-center justify-between mb-4">
+        <div class="font-display font-700">${escHtml(f.name)}</div>
+        <button onclick="deleteFloor(${f.id})" class="text-xs text-red-500 hover:underline">Delete Floor</button>
+      </div>
       <div class="grid floor-tables-grid gap-3" style="grid-template-columns:repeat(auto-fill,minmax(120px,1fr))">
         ${f.tables.map(t => `
           <div data-id="${t.id}" class="border border-border rounded-xl p-3 text-center cursor-move hover:border-brand-500 transition-colors" style="background:var(--card)">
@@ -1583,31 +1586,52 @@
   }
 
   function openFloorModal() { document.getElementById('floor-modal').classList.remove('hidden'); }
+  let isSavingFloor = false;
   async function saveFloor() {
+    if (isSavingFloor) return;
     const name = document.getElementById('f-name').value;
     if (!name) return toast('Enter floor name', 'error');
-    const r = await api('/api/floors', 'POST', { name });
-    if (!r || !r.ok) return;
-    document.getElementById('floor-modal').classList.add('hidden');
-    allFloors = await api('/api/floors'); renderFloors(); toast('Floor added!');
+    isSavingFloor = true;
+    try {
+      const r = await api('/api/floors', 'POST', { name });
+      if (!r || !r.ok) return;
+      document.getElementById('floor-modal').classList.add('hidden');
+      allFloors = await api('/api/floors'); renderFloors(); toast('Floor added!');
+    } finally {
+      isSavingFloor = false;
+    }
   }
   function openTableModal() {
     document.getElementById('t-floor').innerHTML = allFloors.map(f => `<option value="${f.id}">${escHtml(f.name)}</option>`).join('');
     document.getElementById('table-modal').classList.remove('hidden');
   }
+  let isSavingTable = false;
   async function saveTable() {
+    if (isSavingTable) return;
     const d = { number: document.getElementById('t-number').value, seats: document.getElementById('t-seats').value, floor_id: document.getElementById('t-floor').value };
     if (!d.number) return toast('Enter table number', 'error');
-    const r = await api('/api/tables', 'POST', d);
-    if (!r || !r.ok) return;
-    document.getElementById('table-modal').classList.add('hidden');
-    allFloors = await api('/api/floors'); renderFloors(); toast('Table added!');
+    isSavingTable = true;
+    try {
+      const r = await api('/api/tables', 'POST', d);
+      if (!r || !r.ok) return;
+      document.getElementById('table-modal').classList.add('hidden');
+      allFloors = await api('/api/floors'); renderFloors(); toast('Table added!');
+    } finally {
+      isSavingTable = false;
+    }
   }
   async function deleteTable(id) {
     if (!confirm('Remove this table?')) return;
     const r = await api('/api/tables/' + id, 'DELETE');
     if (!r || !r.ok) return;
     allFloors = await api('/api/floors'); renderFloors(); toast('Table removed');
+  }
+  
+  async function deleteFloor(id) {
+    if (!confirm('Delete this floor and all its tables?')) return;
+    const r = await api('/api/floors/' + id, 'DELETE');
+    if (!r || !r.ok) return;
+    allFloors = await api('/api/floors'); renderFloors(); toast('Floor deleted');
   }
 
   async function printAllTableQRs() {

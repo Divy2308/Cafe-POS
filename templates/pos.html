@@ -2,6 +2,22 @@
 {% block title %}POS Terminal{% endblock %}
 {% block extra_head %}
 <style>
+  @keyframes scan {
+    0% { top: 0%; opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+  }
+  .animate-scan {
+    animation: scan 2.5s infinite ease-in-out;
+  }
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .animate-fade-in-up {
+    animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
   /* Ensure fixed positioning works correctly for mobile nav */
   html,
   body {
@@ -1627,22 +1643,44 @@
       </div>
     </div>
 
-    <!-- ═══ UPI QR VIEW ═══ -->
-    <div id="view-qr" class="hidden flex-1 flex-col sm:flex-row sm:items-center sm:justify-center sm:p-8 bg-[var(--card)] sm:bg-transparent">
-      <div class="card flex-1 sm:flex-none p-8 text-center max-w-sm w-full rounded-[20px] border border-border overflow-y-auto" style="max-height: calc(100vh - 4rem);">
-        <div class="text-xs text-gray-500 uppercase tracking-wider mb-2">UPI / QR Payment</div>
-        <div class="text-3xl font-display font-800 text-brand-500 mb-6" id="qr-amount"></div>
-        <div class="flex justify-center mb-4">
-          <div class="p-3 bg-white rounded-2xl">
-            <img id="qr-img" src="{{ url_for('qr_image') }}" alt="QR code for payment" class="w-48 h-48 object-contain">
+    <!-- 💰 UPI QR VIEW 💰 -->
+    <div id="view-qr" class="hidden flex-1 flex items-center justify-center p-4 sm:p-8 bg-black/80 backdrop-blur-sm z-[100] fixed inset-0">
+      <div class="card flex-none p-8 text-center max-w-sm w-full rounded-[28px] border border-white/10 shadow-2xl overflow-hidden relative bg-[#111] animate-fade-in-up">
+        
+        <!-- Decorative background glow -->
+        <div class="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-brand-500/20 rounded-full blur-[80px] pointer-events-none"></div>
+
+        <div class="relative z-10">
+          <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-brand-500/10 text-brand-500 mb-3 border border-brand-500/20">
+            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+            </svg>
           </div>
-        </div>
-        <div class="text-xs text-gray-500 mb-1">Scan to pay</div>
-        <div id="qr-upi-id" class="text-sm text-white font-medium mb-8"></div>
-        <div class="flex gap-3">
-          <button onclick="showView('payment')" class="btn-ghost flex-1 py-3 rounded-xl text-sm">Cancel</button>
-          <button onclick="confirmUPI()"
-            class="btn-primary flex-1 py-3 rounded-xl text-white text-sm font-medium">Confirmed ✓</button>
+          
+          <div class="text-xs font-semibold text-gray-400 tracking-widest uppercase mb-1">Scan to Pay</div>
+          <div class="text-5xl font-display font-900 text-white mb-6 tracking-tight" id="qr-amount"></div>
+          
+          <div class="flex justify-center mb-6 relative">
+            <div class="p-4 bg-white rounded-3xl shadow-xl border-4 border-gray-100 relative overflow-hidden group">
+              <img id="qr-img" src="" alt="QR code for payment" class="w-56 h-56 object-contain relative z-10 transition-transform duration-300 group-hover:scale-105">
+              <!-- Scanner animation line -->
+              <div class="absolute inset-0 w-full h-full pointer-events-none z-20 overflow-hidden rounded-2xl">
+                <div class="w-full h-1.5 shadow-[0_0_15px_rgba(249,115,22,0.8)] bg-[#f97316] absolute top-0 left-0 animate-scan"></div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="flex items-center justify-center gap-2 mb-8 bg-gray-800/50 py-2.5 px-4 rounded-full border border-gray-700/50 inline-flex mx-auto">
+            <svg class="w-4 h-4 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            <div id="qr-upi-id" class="text-sm text-gray-300 font-medium font-mono"></div>
+          </div>
+          
+          <div class="flex gap-3">
+            <button onclick="showView('payment')" class="flex-1 py-3.5 rounded-xl text-gray-400 font-medium bg-gray-800/50 hover:text-white hover:bg-gray-800 transition-all border border-transparent hover:border-gray-700">Cancel</button>
+            <button onclick="confirmUPI()" class="btn-primary flex-1 py-3.5 rounded-xl text-white font-bold transition-all shadow-[0_4px_15px_rgba(249,115,22,0.4)] hover:shadow-[0_6px_20px_rgba(249,115,22,0.6)]">Confirmed ✓</button>
+          </div>
         </div>
       </div>
     </div>
@@ -2668,6 +2706,9 @@
   }
 
   function getPayableSubtotal(order) {
+    if (order.subtotal !== undefined) {
+      return order.subtotal;
+    }
     const itemsTotal = (order.items || []).reduce((s, i) => s + (i.price * i.qty), 0);
     const sentToKitchen = Boolean(order.sent_to_kitchen_at || order.status === 'sent');
     return sentToKitchen ? itemsTotal : 0;
@@ -2906,7 +2947,7 @@
       if (selectedMethod.qr_b64 && selectedMethod.qr_b64.length > 50) {
         document.getElementById('qr-img').src = selectedMethod.qr_b64;
       } else {
-        document.getElementById('qr-img').src = "/api/qr-img/" + (selectedMethod.upiId || 'cafe@ybl') + "/" + selectedMethod.amount;
+        document.getElementById('qr-img').src = "/api/qr-img/" + (selectedMethod.upiId || 'cafe@ybl') + "/" + selectedMethod.amount.toFixed(2);
       }
       showView('qr');
       return;
@@ -2916,14 +2957,18 @@
 
   async function confirmUPI() { await completePayment(selectedMethod?.type || 'upi'); }
 
+  let isProcessingPayment = false;
   async function completePayment(method) {
-    const paidOrder = currentOrder ? { id: currentOrder.id, order_number: currentOrder.order_number, table: currentTable ? currentTable.number : (currentOrder.table || 'Takeaway') } : null;
-    const customerPhone = (document.getElementById('customer-phone')?.value || '').trim();
-    
-    const discount = Math.max(0, parseFloat(document.getElementById('pay-discount')?.value || 0) || 0);
-    const coupon = document.getElementById('pay-coupon')?.value || '';
-    currentDiscountAmount = discount;
-    const total = getPaymentTotal();
+    if (isProcessingPayment) return;
+    isProcessingPayment = true;
+    try {
+      const paidOrder = currentOrder ? { id: currentOrder.id, order_number: currentOrder.order_number, table: currentTable ? currentTable.number : (currentOrder.table || 'Takeaway') } : null;
+      const customerPhone = (document.getElementById('customer-phone')?.value || '').trim();
+      
+      const discount = Math.max(0, parseFloat(document.getElementById('pay-discount')?.value || 0) || 0);
+      const coupon = document.getElementById('pay-coupon')?.value || '';
+      currentDiscountAmount = discount;
+      const total = getPaymentTotal();
 
     const r = await api('/api/orders/' + currentOrder.id + '/pay', 'POST', { 
       method, 
@@ -2970,6 +3015,9 @@
           }
         }
       } catch (pe) { console.warn('Auto print:', pe); }
+    }
+    } finally {
+      isProcessingPayment = false;
     }
   }
 
@@ -3159,7 +3207,14 @@
   }
 
   async function payBill(orderId) {
-    await openBillForPayment(orderId);
+    if (isProcessingPayment) return;
+    isProcessingPayment = true;
+    try {
+      await openBillForPayment(orderId);
+      showView('payment');
+    } finally {
+      isProcessingPayment = false;
+    }
   }
 
   async function deleteBill(orderId) {
@@ -3790,52 +3845,56 @@
 
 <!-- ═══ MORE ACTIONS MODAL ═══ -->
 <div id="more-actions-modal"
-  class="hidden fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-4 modal-bg">
-  <div class="modal-content w-full max-w-sm bg-card border border-border rounded-2xl shadow-2xl overflow-hidden">
-    <div class="p-4 border-b border-border flex items-center justify-between">
-      <h3 class="font-700">More Actions</h3>
-      <button onclick="closeMoreActions()" class="p-2 text-gray-500">&times;</button>
+  class="hidden fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+  <div class="modal-content w-full max-w-sm bg-white border border-gray-200 rounded-3xl shadow-2xl overflow-hidden text-gray-900">
+    <div class="p-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+      <h3 class="font-800 text-lg">More Actions</h3>
+      <button onclick="closeMoreActions()" class="p-2 text-gray-400 hover:text-gray-900 transition-colors rounded-full hover:bg-gray-200/50">&times;</button>
     </div>
-    <div class="p-4 space-y-3">
+    <div class="p-5 space-y-3">
       <button id="attendance-btn" onclick="handleAttendance()"
-        class="w-full flex items-center gap-3 p-4 rounded-xl border border-border hover:bg-white/5 transition">
-        <span class="text-xl">📅</span>
-        <div class="text-left">
-          <div id="attendance-label" class="font-700 text-sm">Clock In</div>
-          <div id="attendance-meta" class="text-[10px] text-gray-500 uppercase">Tap to start staff duty</div>
+        class="w-full flex items-center gap-4 p-4 rounded-2xl border border-gray-200 bg-white hover:bg-brand-50 hover:border-brand-200 transition-all shadow-sm">
+        <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-xl">📅</div>
+        <div class="text-left flex-1">
+          <div id="attendance-label" class="font-800 text-sm text-gray-900">Clock In</div>
+          <div id="attendance-meta" class="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mt-0.5">Tap to start staff duty</div>
         </div>
+        <div class="text-gray-300">→</div>
       </button>
 
       <a href="/backend"
-        class="w-full flex items-center gap-3 p-4 rounded-xl border border-border hover:bg-white/5 transition">
-        <span class="text-xl">🟧</span>
-        <div class="text-left">
-          <div class="font-700 text-sm">Open Backend</div>
-          <div class="text-[10px] text-gray-500 uppercase">Manage Products & Settings</div>
+        class="w-full flex items-center gap-4 p-4 rounded-2xl border border-gray-200 bg-white hover:bg-brand-50 hover:border-brand-200 transition-all shadow-sm">
+        <div class="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-xl">🟧</div>
+        <div class="text-left flex-1">
+          <div class="font-800 text-sm text-gray-900">Open Backend</div>
+          <div class="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mt-0.5">Manage Products & Settings</div>
         </div>
+        <div class="text-gray-300">→</div>
       </a>
 
       <a href="/kitchen" target="_blank"
-        class="w-full flex items-center gap-3 p-4 rounded-xl border border-border hover:bg-white/5 transition">
-        <span class="text-xl">🍳</span>
-        <div class="text-left">
-          <div class="font-700 text-sm">Kitchen Display</div>
-          <div class="text-[10px] text-gray-500 uppercase">View active orders</div>
+        class="w-full flex items-center gap-4 p-4 rounded-2xl border border-gray-200 bg-white hover:bg-brand-50 hover:border-brand-200 transition-all shadow-sm">
+        <div class="w-10 h-10 rounded-full bg-yellow-50 flex items-center justify-center text-xl">🍳</div>
+        <div class="text-left flex-1">
+          <div class="font-800 text-sm text-gray-900">Kitchen Display</div>
+          <div class="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mt-0.5">View active orders</div>
         </div>
+        <div class="text-gray-300">→</div>
       </a>
 
       <button onclick="closeSession()"
-        class="w-full flex items-center gap-3 p-4 rounded-xl border border-border hover:bg-white/5 transition">
-        <span class="text-xl">💰</span>
-        <div class="text-left">
-          <div class="font-700 text-sm">Close Register</div>
-          <div class="text-[10px] text-gray-500 uppercase">Finalize Today's Session</div>
+        class="w-full flex items-center gap-4 p-4 rounded-2xl border border-gray-200 bg-white hover:bg-brand-50 hover:border-brand-200 transition-all shadow-sm">
+        <div class="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center text-xl">💰</div>
+        <div class="text-left flex-1">
+          <div class="font-800 text-sm text-gray-900">Close Register</div>
+          <div class="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mt-0.5">Finalize Today's Session</div>
         </div>
+        <div class="text-gray-300">→</div>
       </button>
 
-      <div class="pt-4 border-t border-border">
+      <div class="pt-4 mt-2 border-t border-gray-100">
         <button onclick="logout()"
-          class="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-red-500/10 text-red-500 font-700 text-sm border border-red-500/20 hover:bg-red-500/20 transition">
+          class="w-full flex items-center justify-center gap-2 p-3.5 rounded-xl bg-red-50 text-red-600 font-700 text-sm border border-red-100 hover:bg-red-100 transition-all">
           ↩ Logout Account
         </button>
       </div>

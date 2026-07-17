@@ -751,8 +751,8 @@ function renderOverviewRequests(){
       <div class="log-type" style="background:var(--amber)"></div>
       <div class="log-msg"><strong>${r.branch_name}</strong> — tenant ${r.tenant_id} <span class="badge badge-pending" style="margin-left:6px">Branch</span></div>
       <div style="display:flex;gap:4px">
-        <button class="act-btn approve" onclick="quickApproveBranchRequest(${r.id})">✓</button>
-        <button class="act-btn reject" onclick="quickRejectBranchRequest(${r.id})">✕</button>
+        <button class="act-btn approve" onclick="quickApproveBranchRequest('${r.id}')">✓</button>
+        <button class="act-btn reject" onclick="quickRejectBranchRequest('${r.id}')">✕</button>
       </div>
     </div>`;
     }
@@ -761,8 +761,8 @@ function renderOverviewRequests(){
       <div class="log-type" style="background:var(--amber)"></div>
       <div class="log-msg"><strong>${r.name}</strong> — ${r.city} <span class="badge badge-pending" style="margin-left:6px">${r.plan}</span></div>
       <div style="display:flex;gap:4px">
-        <button class="act-btn approve" onclick="quickApprove(${r.id})">✓</button>
-        <button class="act-btn reject" onclick="quickReject(${r.id})">✕</button>
+        <button class="act-btn approve" onclick="quickApprove('${r.id}')">✓</button>
+        <button class="act-btn reject" onclick="quickReject('${r.id}')">✕</button>
       </div>
     </div>`;
   }).join('');
@@ -783,8 +783,8 @@ function renderRequests(){
       <td><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted)">${r.applied}</span></td>
       <td><span class="badge badge-${r.status}">${r.status}</span></td>
       <td><div class="action-btns">
-        <button class="act-btn view" onclick="viewRequest(${r.id})">View</button>
-        ${r.status==='pending'?`<button class="act-btn approve" onclick="quickApprove(${r.id})">Approve</button><button class="act-btn reject" onclick="quickReject(${r.id})">Reject</button>`:''}
+        <button class="act-btn view" onclick="viewRequest('${r.id}')">View</button>
+        ${r.status==='pending'?`<button class="act-btn approve" onclick="quickApprove('${r.id}')">Approve</button><button class="act-btn reject" onclick="quickReject('${r.id}')">Reject</button>`:''}
       </div></td>
     </tr>`).join('');
   document.getElementById('req-badge').textContent=requests.filter(r=>r.status==='pending').length + branchRequests.filter(r=>r.status==='pending').length;
@@ -802,7 +802,7 @@ function filterReqs(f){
 function searchReqs(v){ reqSearch=v.toLowerCase(); renderRequests(); }
 
 async function quickApprove(id){
-  const r=requests.find(x=>x.id===id)||restaurants.find(x=>x.id===id);
+  const r=requests.find(x=>String(x.id)===String(id))||restaurants.find(x=>String(x.id)===String(id));
   if(!r) return;
   if (requests.includes(r)) {
     const res = await fetch('/api/shrey/requests/'+id+'/approve', { method:'POST', headers:{'Content-Type':'application/json'} });
@@ -817,7 +817,7 @@ async function quickApprove(id){
   showToast(r.name+' approved!','green');
 }
 async function quickReject(id){
-  const r=requests.find(x=>x.id===id);
+  const r=requests.find(x=>String(x.id)===String(id));
   if(!r) return;
   const res = await fetch('/api/shrey/requests/'+id+'/reject', { method:'POST', headers:{'Content-Type':'application/json'} });
   const data = await res.json().catch(()=>({}));
@@ -830,7 +830,7 @@ async function quickReject(id){
   showToast(r.name+' rejected','red');
 }
 function suspendReq(id){
-  const r=requests.find(x=>x.id===id)||restaurants.find(x=>x.id===id);
+  const r=requests.find(x=>String(x.id)===String(id))||restaurants.find(x=>String(x.id)===String(id));
   if(r) r.status='suspended';
   addLog(r?.name||'Restaurant','was suspended','amber');
   renderRequests(); renderRestaurants();
@@ -838,7 +838,7 @@ function suspendReq(id){
 }
 
 function viewRequest(id){
-  const r=requests.find(x=>x.id===id);
+  const r=requests.find(x=>String(x.id)===String(id));
   if(!r) return;
   document.getElementById('modal-title').textContent=r.name+' — Application';
   document.getElementById('modal-body').innerHTML=`
@@ -865,8 +865,8 @@ function viewRequest(id){
   if(r.status==='pending'){
     foot.innerHTML=`
       <button class="btn-cancel" onclick="closeModal()">Cancel</button>
-      <button class="btn-confirm red" onclick="quickReject(${r.id});closeModal()">Reject</button>
-      <button class="btn-confirm green" onclick="quickApprove(${r.id});closeModal()">Approve</button>
+      <button class="btn-confirm red" onclick="quickReject('${r.id}');closeModal()">Reject</button>
+      <button class="btn-confirm green" onclick="quickApprove('${r.id}');closeModal()">Approve</button>
     `;
   } else {
     foot.innerHTML=`<button class="btn-cancel" onclick="closeModal()">Close</button>`;
@@ -887,13 +887,13 @@ function renderBranchRequests(){
       <td><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted)">${r.created_at || '—'}</span></td>
       <td><span class="badge badge-${r.status}">${r.status}</span></td>
       <td><div class="action-btns">
-        ${r.status==='pending'?`<button class="act-btn approve" onclick="quickApproveBranchRequest(${r.id})">Approve</button><button class="act-btn reject" onclick="quickRejectBranchRequest(${r.id})">Reject</button>`:`<button class="act-btn view" onclick="viewBranchRequest(${r.id})">View</button>`}
+        ${r.status==='pending'?`<button class="act-btn approve" onclick="quickApproveBranchRequest('${r.id}')">Approve</button><button class="act-btn reject" onclick="quickRejectBranchRequest('${r.id}')">Reject</button>`:`<button class="act-btn view" onclick="viewBranchRequest('${r.id}')">View</button>`}
       </div></td>
     </tr>`).join('');
 }
 
 function viewBranchRequest(id){
-  const r = branchRequests.find(x=>x.id===id);
+  const r = branchRequests.find(x=>String(x.id)===String(id));
   if(!r) return;
   document.getElementById('modal-title').textContent = r.branch_name + ' — Branch Request';
   document.getElementById('modal-body').innerHTML = `
@@ -914,8 +914,8 @@ function viewBranchRequest(id){
   const foot = document.getElementById('modal-foot');
   foot.innerHTML = r.status === 'pending' ? `
     <button class="btn-cancel" onclick="closeModal()">Cancel</button>
-    <button class="btn-confirm red" onclick="quickRejectBranchRequest(${r.id});closeModal()">Reject</button>
-    <button class="btn-confirm green" onclick="quickApproveBranchRequest(${r.id});closeModal()">Approve</button>
+    <button class="btn-confirm red" onclick="quickRejectBranchRequest('${r.id}');closeModal()">Reject</button>
+    <button class="btn-confirm green" onclick="quickApproveBranchRequest('${r.id}');closeModal()">Approve</button>
   ` : `<button class="btn-cancel" onclick="closeModal()">Close</button>`;
   document.getElementById('modal-detail').classList.add('open');
 }
@@ -934,19 +934,19 @@ function renderRestaurants(){
       <td style="font-family:'JetBrains Mono',monospace">${r.ordersDay ?? '—'}</td>
       <td><span class="badge badge-${r.status||'approved'}">${r.status||'approved'}</span></td>
       <td><div class="action-btns">
-        <button class="act-btn view" onclick="viewRestaurant(${r.id})">Details</button>
+        <button class="act-btn view" onclick="viewRestaurant('${r.id}')">Details</button>
         ${r.status==='suspended'
-          ? `<button class="act-btn resume" onclick="pauseRestaurant(${r.id})" title="Resume — re-enable access">▶ Resume</button>`
-          : `<button class="act-btn pause" onclick="pauseRestaurant(${r.id})" title="Pause — block all logins">⏸ Pause</button>`
+          ? `<button class="act-btn resume" onclick="pauseRestaurant('${r.id}')" title="Resume — re-enable access">▶ Resume</button>`
+          : `<button class="act-btn pause" onclick="pauseRestaurant('${r.id}')" title="Pause — block all logins">⏸ Pause</button>`
         }
-        <button class="act-btn delete" onclick="confirmDeleteRestaurant(${r.id})" title="Delete restaurant permanently">Delete</button>
+        <button class="act-btn delete" onclick="confirmDeleteRestaurant('${r.id}')" title="Delete restaurant permanently">Delete</button>
       </div></td>
     </tr>`).join('');
 }
 function searchBranchRequests(v){ branchReqSearch=v.toLowerCase(); renderBranchRequests(); }
 
 async function quickApproveBranchRequest(id){
-  const r = branchRequests.find(x=>x.id===id);
+  const r = branchRequests.find(x=>String(x.id)===String(id));
   if(!r) return;
   const res = await fetch('/api/shrey/branch-requests/'+id+'/approve', { method:'POST', headers:{'Content-Type':'application/json'} });
   const data = await res.json().catch(()=>({}));
@@ -958,7 +958,7 @@ async function quickApproveBranchRequest(id){
   showToast(r.branch_name+' branch approved!','green');
 }
 async function quickRejectBranchRequest(id){
-  const r = branchRequests.find(x=>x.id===id);
+  const r = branchRequests.find(x=>String(x.id)===String(id));
   if(!r) return;
   const res = await fetch('/api/shrey/branch-requests/'+id+'/reject', { method:'POST', headers:{'Content-Type':'application/json'} });
   const data = await res.json().catch(()=>({}));
@@ -971,9 +971,9 @@ async function quickRejectBranchRequest(id){
 }
 
 function viewRestaurant(id){
-  const r=getRestaurantRows().find(x=>x.id===id) || requests.find(x=>x.id===id);
+  const r=getRestaurantRows().find(x=>String(x.id)===String(id)) || requests.find(x=>String(x.id)===String(id));
   if(!r) return;
-  const isLiveTenant = requests.some(x => x.id === id);
+  const isLiveTenant = requests.some(x=>String(x.id)===String(id));
   const featureRows = isLiveTenant
     ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
         ${Object.entries(FEATURE_DEFINITIONS).map(([key, meta]) => {
@@ -997,7 +997,7 @@ function viewRestaurant(id){
                     style="width:60px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--s1);color:var(--text);outline:none;"
                     placeholder="0">
                   <button class="act-btn view" style="padding:3px 8px;font-size:10px;"
-                    onclick="updateStaffLimit(${r.id})">Set</button>
+                    onclick="updateStaffLimit('${r.id}')">Set</button>
                   <span style="font-size:9px;color:var(--muted);">0=unlimited</span>
                 </div>` : ''}
             </div>`;
@@ -1078,7 +1078,7 @@ async function updateStaffLimit(tenantId){
   viewRestaurant(tenantId);
 }
 function savePlan(id){
-  const r=restaurants.find(x=>x.id===id);
+  const r=restaurants.find(x=>String(x.id)===String(id));
   if(r){ r.plan=document.getElementById('change-plan').value; }
   addLog(r?.name,'plan updated to '+r?.plan,'cyan');
   closeModal(); renderRestaurants(); renderBilling();
@@ -1086,7 +1086,7 @@ function savePlan(id){
 }
 function suspendRest(id){ pauseRestaurant(id); } // legacy alias
 async function pauseRestaurant(id){
-  const r = getRestaurantRows().find(x=>x.id===id) || requests.find(x=>x.id===id);
+  const r = getRestaurantRows().find(x=>String(x.id)===String(id)) || requests.find(x=>String(x.id)===String(id));
   const isSuspended = r && r.status === 'suspended';
   const label = isSuspended ? 'Resume' : 'Pause';
   if(!confirm((isSuspended ? 'Resume' : 'Pause') + ' "' + (r?.name||'this restaurant') + '"?\n\n' +
@@ -1104,7 +1104,7 @@ async function pauseRestaurant(id){
   // Update local cache
   const action = data.action; // 'suspended' or 'resumed'
   [restaurants, requests].forEach(arr=>{
-    const item = arr.find(x=>x.id===id);
+    const item = arr.find(x=>String(x.id)===String(id));
     if(item){ item.status = action==='suspended'?'suspended':'approved'; item.is_active = action!=='suspended'; }
   });
   addLog(r?.name, action==='suspended'?'paused (logins blocked)':'resumed (access restored)', action==='suspended'?'amber':'green');
@@ -1113,7 +1113,7 @@ async function pauseRestaurant(id){
 }
 
 function confirmDeleteRestaurant(id){
-  const r = getRestaurantRows().find(x=>x.id===id) || requests.find(x=>x.id===id);
+  const r = getRestaurantRows().find(x=>String(x.id)===String(id)) || requests.find(x=>String(x.id)===String(id));
   const name = r ? r.name : 'Restaurant';
   document.getElementById('modal-title').innerHTML = '<span style="color:var(--red)">⚠ Delete Restaurant</span>';
   document.getElementById('modal-body').innerHTML = `
@@ -1140,9 +1140,9 @@ async function deleteRestaurant(id, name){
   const data = await res.json().catch(()=>({}));
   if(!res.ok){ showToast(data.error||'Delete failed','red'); return; }
   // Remove from both restaurants and requests arrays
-  const rIdx = restaurants.findIndex(x=>x.id===id);
+  const rIdx = restaurants.findIndex(x=>String(x.id)===String(id));
   if(rIdx>=0) restaurants.splice(rIdx,1);
-  const qIdx = requests.findIndex(x=>x.id===id);
+  const qIdx = requests.findIndex(x=>String(x.id)===String(id));
   if(qIdx>=0) requests.splice(qIdx,1);
   addLog(name,'was permanently deleted','red');
   updateStats();

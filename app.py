@@ -1,4 +1,7 @@
 import sys
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
 IS_WINDOWS = sys.platform == "win32"
 
@@ -282,6 +285,8 @@ class FoodCourt(db.Model):
     owner_id = db.Column(db.Integer)
     food_court_id = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_active = db.Column(db.Boolean, default=False)
+    approval_status = db.Column(db.String(20), default='pending')
 
 class Tenant(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -378,6 +383,7 @@ class Floor(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
+    food_court_id = db.Column(db.Integer, db.ForeignKey('food_court.id'), nullable=True)
     tables = db.relationship('Table', backref='floor', lazy=True)
     tenant = db.relationship('Tenant', backref='floors')
     branch_id = db.Column(db.Integer, db.ForeignKey('branch.id'), nullable=True)
@@ -389,6 +395,7 @@ class Table(db.Model):
     seats = db.Column(db.Integer, default=4)
     floor_id = db.Column(db.Integer, db.ForeignKey('floor.id'))
     tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
+    food_court_id = db.Column(db.Integer, db.ForeignKey('food_court.id'), nullable=True)
     active = db.Column(db.Boolean, default=True)
     status = db.Column(db.String(20), default='free')  # free, occupied
     merged_to_id = db.Column(db.Integer, db.ForeignKey('table.id'), nullable=True)
@@ -767,21 +774,34 @@ def find_user_by_email(email):
     return User.query.filter(db.func.lower(User.email) == email.lower()).first()
 
 def get_tenant_access_block_message(user):
-    if not user or not user.tenant_id or getattr(user, 'is_platform_admin', False):
+    if not user or getattr(user, 'is_platform_admin', False):
         return None
-    tenant = db.session.get(Tenant, user.tenant_id)
-    if not tenant:
+        
+    if user.tenant_id:
+        tenant = db.session.get(Tenant, user.tenant_id)
+        if not tenant:
+            return None
+        status = (tenant.approval_status or ('approved' if tenant.is_active else 'pending')).strip().lower()
+        type_name = 'restaurant'
+        is_active = tenant.is_active
+    elif user.food_court_id:
+        fc = db.session.get(FoodCourt, user.food_court_id)
+        if not fc:
+            return None
+        status = (fc.approval_status or ('approved' if fc.is_active else 'pending')).strip().lower()
+        type_name = 'food court'
+        is_active = fc.is_active
+    else:
         return None
 
-    status = (tenant.approval_status or ('approved' if tenant.is_active else 'pending')).strip().lower()
     if status == 'pending':
-        return 'Your restaurant request is pending admin approval.'
+        return f'Your {type_name} request is pending admin approval.'
     if status == 'rejected':
-        return 'Your restaurant request was rejected. Contact admin for review.'
+        return f'Your {type_name} request was rejected. Contact admin for review.'
     if status == 'suspended':
-        return 'This restaurant account is suspended.'
-    if not tenant.is_active:
-        return 'This restaurant account is not active.'
+        return f'This {type_name} account is suspended.'
+    if not is_active:
+        return f'This {type_name} account is not active.'
     return None
 
 def make_slug(name):
@@ -899,8 +919,12 @@ def apply_tenant_scope(query, model_class):
     if user and getattr(user, 'is_platform_admin', False):
         return query  # Platform admins see everything
     tid = get_current_tenant_id()
+    
     if tid and hasattr(model_class, 'tenant_id'):
         return query.filter(model_class.tenant_id == tid)
+    elif user and user.food_court_id and hasattr(model_class, 'food_court_id'):
+        return query.filter(model_class.food_court_id == user.food_court_id)
+        
     return query
 
 def get_default_branch(tenant_id=None):
@@ -1570,6 +1594,50 @@ def register_restaurant():
         'message': 'Request submitted. Login will be enabled after admin approval.',
     })
 
+@app.route('/api/register-foodcourt', methods=['POST'])
+def register_foodcourt():
+    """Create a food court hub."""
+    d = request.json or {}
+    name = (d.get('name') or '').strip()
+    admin_name = (d.get('admin_name') or '').strip()
+    email = (d.get('email') or '').strip()
+    password = d.get('password') or ''
+
+    if not name or not admin_name or not email or not password:
+        return jsonify({'error': 'Food court name, admin name, email, and password are required'}), 400
+    if find_user_by_email(email):
+        return jsonify({'error': 'Email already exists'}), 400
+    password_error = strong_password_error(password, email)
+    if password_error:
+        return jsonify({'error': password_error}), 400
+
+    # Create Food Court
+    fc = FoodCourt(name=name, is_active=False, approval_status='pending')
+    db.session.add(fc)
+    db.session.flush()
+
+    # Create owner user
+    owner = User(
+        name=admin_name,
+        email=email,
+        password=generate_password_hash(password, method='scrypt'),
+        role='admin',
+        food_court_id=fc.id,
+        is_superadmin=True,
+    )
+    db.session.add(owner)
+    db.session.flush()
+
+    fc.owner_id = owner.id
+    db.session.commit()
+
+    return jsonify({
+        'ok': True,
+        'name': owner.name,
+        'status': 'pending',
+        'message': 'Request submitted. Login will be enabled after admin approval.',
+    })
+
 @app.route('/api/register-customer', methods=['POST'])
 def register_customer():
     """Public customer signup (no tenant binding; customers can choose restaurants later)."""
@@ -1715,6 +1783,13 @@ def customer():
 def dashboard():
     t_id = get_current_tenant_id()
     t = Tenant.query.get(t_id) if t_id else None
+    
+    # Check if user is a food court admin
+    user = db.session.get(User, session['user_id'])
+    food_court = None
+    if user and user.food_court_id:
+        food_court = db.session.get(FoodCourt, user.food_court_id)
+        
     return render_template(
         'dashboard.html',
         user_name=session.get('user_name'),
@@ -1722,7 +1797,39 @@ def dashboard():
         active_branch=get_selected_branch(),
         is_superadmin=is_superadmin(),
         tenant=t,
+        food_court=food_court,
     )
+
+def _serialize_shrey_foodcourt(fc, preload=None):
+    preload = preload or {}
+    owners_by_fc = preload.get('owners_by_fc') or {}
+    
+    owner = owners_by_fc.get(fc.id)
+    if owner is None:
+        owner = db.session.get(User, fc.owner_id) if fc.owner_id else User.query.filter_by(
+            food_court_id=fc.id, role='restaurant'
+        ).order_by(User.id.asc()).first()
+        
+    status = (fc.approval_status or ('approved' if fc.is_active else 'pending')).strip().lower()
+    
+    return {
+        'id': f'fc_{fc.id}', # String ID to differentiate from Tenants in the UI
+        'raw_id': fc.id,
+        'name': fc.name,
+        'owner': owner.name if owner else '—',
+        'email': owner.email if owner else '',
+        'city': (fc.address or '').strip() or '—',
+        'phone': '—',
+        'plan': 'enterprise', # Food courts might not have plans, use enterprise
+        'applied': fc.created_at.strftime('%Y-%m-%d') if fc.created_at else '',
+        'status': status,
+        'type': 'Food Court Hub',
+        'note': 'Central food court admin',
+        'tables': 0,
+        'ordersDay': 0,
+        'feature_flags': {},
+        'max_staff': 0,
+    }
 
 def _serialize_shrey_request(tenant, preload=None):
     preload = preload or {}
@@ -1878,18 +1985,28 @@ def shrey_requests_api():
         return jsonify({'error': 'unauthorized'}), 401
 
     tenants = Tenant.query.order_by(Tenant.created_at.desc(), Tenant.id.desc()).all()
+    food_courts = FoodCourt.query.order_by(FoodCourt.created_at.desc(), FoodCourt.id.desc()).all()
     tenant_ids = [tenant.id for tenant in tenants if tenant.slug != 'default']
     owner_ids = [tenant.owner_id for tenant in tenants if tenant.owner_id]
     food_court_ids = [tenant.food_court_id for tenant in tenants if tenant.food_court_id]
+    
+    fc_owner_ids = [fc.owner_id for fc in food_courts if fc.owner_id]
+    all_owner_ids = list(set(owner_ids + fc_owner_ids))
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
     owners_by_tenant = {}
-    if owner_ids:
-        owner_records = User.query.filter(User.id.in_(owner_ids)).all()
+    owners_by_fc = {}
+    if all_owner_ids:
+        owner_records = User.query.filter(User.id.in_(all_owner_ids)).all()
         owners_by_tenant.update({
             user.tenant_id: user
             for user in owner_records
             if user.tenant_id is not None
+        })
+        owners_by_fc.update({
+            user.food_court_id: user
+            for user in owner_records
+            if user.food_court_id is not None
         })
 
     if tenant_ids:
@@ -1945,6 +2062,7 @@ def shrey_requests_api():
 
     preload = {
         'owners_by_tenant': owners_by_tenant,
+        'owners_by_fc': owners_by_fc,
         'branches_by_tenant': branches_by_tenant,
         'food_courts_by_id': food_courts_by_id,
         'table_counts': table_counts,
@@ -1956,14 +2074,26 @@ def shrey_requests_api():
         if tenant.slug == 'default':
             continue
         requests.append(_serialize_shrey_request(tenant, preload=preload))
+        
+    for fc in food_courts:
+        requests.append(_serialize_shrey_foodcourt(fc, preload=preload))
+        
     return jsonify({'requests': requests})
 
 @csrf.exempt
-@app.route('/api/shrey/requests/<int:tenant_id>/approve', methods=['POST'])
+@app.route('/api/shrey/requests/<tenant_id>/approve', methods=['POST'])
 def approve_shrey_request(tenant_id):
     if not session.get('shrey_admin'):
         return jsonify({'error': 'unauthorized'}), 401
 
+    if str(tenant_id).startswith('fc_'):
+        fc_id = int(str(tenant_id)[3:])
+        fc = FoodCourt.query.get_or_404(fc_id)
+        fc.is_active = True
+        fc.approval_status = 'approved'
+        db.session.commit()
+        return jsonify({'ok': True, 'request': _serialize_shrey_foodcourt(fc)})
+        
     tenant = Tenant.query.get_or_404(tenant_id)
     tenant.is_active = True
     tenant.approval_status = 'approved'
@@ -1971,10 +2101,18 @@ def approve_shrey_request(tenant_id):
     return jsonify({'ok': True, 'request': _serialize_shrey_request(tenant)})
 
 @csrf.exempt
-@app.route('/api/shrey/requests/<int:tenant_id>/reject', methods=['POST'])
+@app.route('/api/shrey/requests/<tenant_id>/reject', methods=['POST'])
 def reject_shrey_request(tenant_id):
     if not session.get('shrey_admin'):
         return jsonify({'error': 'unauthorized'}), 401
+
+    if str(tenant_id).startswith('fc_'):
+        fc_id = int(str(tenant_id)[3:])
+        fc = FoodCourt.query.get_or_404(fc_id)
+        fc.is_active = False
+        fc.approval_status = 'rejected'
+        db.session.commit()
+        return jsonify({'ok': True, 'request': _serialize_shrey_foodcourt(fc)})
 
     tenant = Tenant.query.get_or_404(tenant_id)
     tenant.is_active = False
@@ -2314,7 +2452,7 @@ def get_floors():
     floors = q.options(selectinload(Floor.tables)).all()
     result = []
     for f in floors:
-        sorted_tables = sorted(f.tables, key=lambda t: t.order_index or 0)
+        sorted_tables = sorted(f.tables, key=lambda t: (t.order_index or 0, t.id))
         tables = [
             {
                 'id': t.id,
@@ -2337,14 +2475,39 @@ def add_floor():
     name = (d.get('name') or '').strip()
     if not name:
         return jsonify({'error': 'Floor name is required'}), 400
+    user = get_current_user()
+    food_court_id = getattr(user, 'food_court_id', None)
+    
     f = Floor(
         name=name,
         tenant_id=get_current_tenant_id(),
         branch_id=get_active_branch_id(),
+        food_court_id=food_court_id,
     )
     db.session.add(f)
     db.session.commit()
     return jsonify({'ok':True,'id':f.id})
+
+@app.route('/api/floors/<int:fid>', methods=['DELETE'])
+@staff_required
+def delete_floor(fid):
+    user = get_current_user()
+    tid = get_current_tenant_id()
+    if tid:
+        f = Floor.query.filter_by(id=fid, tenant_id=tid).first_or_404()
+    elif user and user.food_court_id:
+        f = Floor.query.filter_by(id=fid, food_court_id=user.food_court_id).first_or_404()
+    else:
+        return jsonify({'error': 'Unauthorized'}), 403
+    access_error = require_branch_access_or_403(f.branch_id)
+    if access_error:
+        return access_error
+    
+    # Also delete all tables associated with this floor
+    Table.query.filter_by(floor_id=f.id).delete()
+    db.session.delete(f)
+    db.session.commit()
+    return jsonify({'ok': True})
 
 @app.route('/api/tables', methods=['POST'])
 @staff_required
@@ -2362,7 +2525,15 @@ def add_table():
     except (TypeError, ValueError):
         seats = 4
 
-    floor = Floor.query.filter_by(id=floor_id, tenant_id=get_current_tenant_id()).first_or_404()
+    user = get_current_user()
+    tid = get_current_tenant_id()
+    if tid:
+        floor = Floor.query.filter_by(id=floor_id, tenant_id=tid).first_or_404()
+    elif user and user.food_court_id:
+        floor = Floor.query.filter_by(id=floor_id, food_court_id=user.food_court_id).first_or_404()
+    else:
+        return jsonify({'error': 'Unauthorized'}), 403
+        
     access_error = require_branch_access_or_403(floor.branch_id)
     if access_error:
         return access_error
@@ -2371,7 +2542,8 @@ def add_table():
         number=number,
         seats=seats,
         floor_id=floor.id,
-        tenant_id=get_current_tenant_id(),
+        tenant_id=tid,
+        food_court_id=getattr(user, 'food_court_id', None),
         branch_id=floor.branch_id if floor.branch_id is not None else get_active_branch_id(),
     )
     db.session.add(t)
@@ -5149,11 +5321,8 @@ def create_user():
     
     tenant = db.session.get(Tenant, tenant_id)
     if tenant and tenant.max_staff > 0:
-        current_staff_count = User.query.filter_by(tenant_id=tenant_id).count()
-        # Note: we might want to exclude the owner or superadmin, but for simplicity, we count all users in the tenant.
-        # Actually, let's exclude the owner if we want max_staff to represent only additional staff.
-        # But for now, we just enforce the total user count <= max_staff (if max_staff > 0).
-        # Actually, the user says "I set 1 staff but I add 2 more staff". Let's restrict it strictly.
+        # Exclude the owner from the staff count since max_staff applies to additional staff
+        current_staff_count = User.query.filter_by(tenant_id=tenant_id).filter(User.id != tenant.owner_id).count()
         if current_staff_count >= tenant.max_staff:
             return jsonify({'error': f'Staff limit reached (max {tenant.max_staff}). Upgrade your plan to add more.'}), 400
 
