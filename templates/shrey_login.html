@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>System Authentication — POS Cafè</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>System Authentication — POS Cafè</title>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
     :root{--bg:#080a0c;--s1:#0e1114;--s2:#141820;--border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.14);--text:#e8edf5;--muted:#5a6478;--cyan:#00d4ff;--cyan-d:#0099bb;--red:#ff4757;--red-bg:rgba(255,71,87,0.1);--amber:#ffb300;--amber-bg:rgba(255,179,0,0.1);}
@@ -66,9 +67,10 @@
       btn.textContent = 'VERIFYING...';
 
       try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         const res = await fetch('/shreyapi/login', {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
+          headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
           body: JSON.stringify({ username: user, password: pass })
         });
         const data = await res.json().catch(() => ({}));

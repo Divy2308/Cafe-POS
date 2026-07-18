@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="csrf-token" content="{{ csrf_token() }}">
 <title>POS Cafè — Super Admin</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -597,6 +598,16 @@ tr:hover td{background:rgba(0,0,0,.015)}
 </div>
 
 <script>
+  const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+  const originalFetch = window.fetch;
+  window.fetch = function() {
+    let [resource, config] = arguments;
+    if (config && (config.method === 'POST' || config.method === 'DELETE' || config.method === 'PUT')) {
+      config.headers = config.headers || {};
+      config.headers['X-CSRFToken'] = csrfToken;
+    }
+    return originalFetch(resource, config);
+  };
 let restaurants = [];
 let requests = [];
 let branchRequests = [];
@@ -1026,6 +1037,20 @@ function viewRestaurant(id){
       <div class="field-group"><label class="field-label">Type</label><div class="field-val">${r.type}</div></div>
       <div class="field-group"><label class="field-label">GST Number</label><div class="field-val">${r.gst||'Not provided'}</div></div>
     </div>
+    ${r.type === 'Food Court Hub' ? `
+    <div class="field-row" style="margin-bottom:12px">
+      <div class="field-group">
+        <label class="field-label">Food Court Shop Limit</label>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
+          <input type="number" min="0" max="999" value="${r.shop_limit || 0}" id="shop-limit-${r.raw_id}"
+            style="width:80px;padding:6px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--s1);color:var(--text);outline:none;"
+            placeholder="0">
+          <button class="act-btn view" style="padding:6px 12px;font-size:12px;" onclick="updateShopLimit(${r.raw_id}, '${r.id}')">Update</button>
+          <span style="font-size:11px;color:var(--muted);">0=unlimited (Current shops: ${r.shop_count || 0})</span>
+        </div>
+      </div>
+    </div>
+    ` : ''}
     <div class="field-group">
       <label class="field-label">Feature Access</label>
       <div class="table-card" style="padding:0 16px">${featureRows}</div>
@@ -1076,6 +1101,27 @@ async function updateStaffLimit(tenantId){
   addLog(data.request?.name||'Restaurant', `staff limit set to ${limit===0?'unlimited':limit}`, 'cyan');
   showToast(`Staff limit set to ${limit===0?'unlimited':limit} for ${data.request?.name||'restaurant'}`, 'cyan');
   viewRestaurant(tenantId);
+}
+async function updateShopLimit(rawId, stringId){
+  const input = document.getElementById('shop-limit-'+rawId);
+  if(!input) return;
+  const limit = parseInt(input.value, 10);
+  if(isNaN(limit) || limit < 0){ showToast('Enter a valid number (0 = unlimited)','red'); return; }
+  const res = await fetch(`/api/shrey/foodcourts/${rawId}/shop-limit`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ shop_limit: limit })
+  });
+  const data = await res.json().catch(()=>({}));
+  if (!res.ok) {
+    showToast(data.error || 'Shop limit update failed', 'red');
+    return;
+  }
+  updateRequestRecord(data.request);
+  renderRequests();
+  renderRestaurants();
+  showToast(`Shop limit updated to ${limit}`, 'green');
+  viewRestaurant(stringId);
 }
 function savePlan(id){
   const r=restaurants.find(x=>String(x.id)===String(id));

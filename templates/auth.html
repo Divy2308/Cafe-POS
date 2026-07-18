@@ -1969,8 +1969,8 @@
             </div>
 
             <div class="field">
-              <label>Phone (Optional)</label>
-              <input type="tel" id="register-phone" placeholder="+91 12345 67890" autocomplete="tel">
+              <label>Phone</label>
+              <input type="tel" id="register-phone" placeholder="+91 12345 67890" autocomplete="tel" required>
             </div>
 
             <button class="btn-primary" id="register-btn" data-label="Create Restaurant Account →"
@@ -2014,6 +2014,11 @@
                 <input type="password" id="fc-register-password" placeholder="Create a strong password" autocomplete="new-password">
                 <button type="button" class="pw-toggle" onclick="togglePassword('fc-register-password', this)">Show</button>
               </div>
+            </div>
+
+            <div class="field">
+              <label>Phone</label>
+              <input type="tel" id="fc-register-phone" placeholder="+91 12345 67890" autocomplete="tel" required>
             </div>
 
             <button class="btn-primary" id="fc-register-btn" data-label="Create Food Court Account →"
@@ -2467,11 +2472,12 @@
     const adminName = document.getElementById('fc-register-admin').value.trim();
     const email = document.getElementById('fc-register-email').value.trim();
     const pw = document.getElementById('fc-register-password').value;
+    const phone = document.getElementById('fc-register-phone').value.trim();
 
-    if (!name || !adminName || !email || !pw)
+    if (!name || !adminName || !email || !pw || !phone)
       return showAlert('fc-register-alert', 'Please fill in all required fields.', 'error', 'fc-register-alert-msg');
 
-    const payload = { name: name, admin_name: adminName, email, password: pw };
+    const payload = { name: name, admin_name: adminName, email, password: pw, phone };
     setLoading('fc-register-btn', true);
     api('/api/register-foodcourt', 'POST', payload)
       .then(r => {
@@ -2496,7 +2502,7 @@
     const pw = document.getElementById('register-password').value;
     const phone = document.getElementById('register-phone').value.trim();
 
-    if (!restaurantName || !ownerName || !email || !pw)
+    if (!restaurantName || !ownerName || !email || !pw || !phone)
       return showAlert('register-alert', 'Please fill in all required fields.');
 
     const checks = getPasswordChecks(pw, email);

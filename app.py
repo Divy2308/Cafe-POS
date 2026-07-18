@@ -287,6 +287,8 @@ class FoodCourt(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_active = db.Column(db.Boolean, default=False)
     approval_status = db.Column(db.String(20), default='pending')
+    phone = db.Column(db.String(20), default='')
+    shop_limit = db.Column(db.Integer, default=0)  # 0 = unlimited
 
 class Tenant(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -1220,6 +1222,10 @@ def landing():
             session.clear()
     return render_template('landing.html')
 
+@app.route('/terms')
+def terms():
+    return render_template('terms.html')
+
 @app.route('/auth')
 def auth():
     if 'user_id' in session:
@@ -1527,8 +1533,8 @@ def register_restaurant():
     password = d.get('password') or ''
     phone = (d.get('phone') or '').strip()
 
-    if not restaurant_name or not name or not email or not password:
-        return jsonify({'error': 'Restaurant name, your name, email, and password are required'}), 400
+    if not restaurant_name or not name or not email or not password or not phone:
+        return jsonify({'error': 'Restaurant name, your name, email, password, and phone number are required'}), 400
     if find_user_by_email(email):
         return jsonify({'error': 'Email already exists'}), 400
     password_error = strong_password_error(password, email)
@@ -1543,12 +1549,23 @@ def register_restaurant():
         slug = f'{base_slug}-{counter}'
         counter += 1
 
+    # If registering under a food court, enforce shop limit
+    food_court_id = d.get('food_court_id')
+    if food_court_id:
+        fc = FoodCourt.query.get(food_court_id)
+        if fc and fc.shop_limit and fc.shop_limit > 0:
+            current_count = Tenant.query.filter_by(food_court_id=fc.id).count()
+            if current_count >= fc.shop_limit:
+                return jsonify({'error': f'Shop limit reached. This food court allows a maximum of {fc.shop_limit} shops.'}), 400
+
     # Create tenant
     tenant = Tenant(
         name=restaurant_name,
         slug=slug,
         is_active=False,
         approval_status='pending',
+        phone=phone,
+        food_court_id=food_court_id,
     )
     db.session.add(tenant)
     db.session.flush()
@@ -1602,9 +1619,10 @@ def register_foodcourt():
     admin_name = (d.get('admin_name') or '').strip()
     email = (d.get('email') or '').strip()
     password = d.get('password') or ''
+    phone = (d.get('phone') or '').strip()
 
-    if not name or not admin_name or not email or not password:
-        return jsonify({'error': 'Food court name, admin name, email, and password are required'}), 400
+    if not name or not admin_name or not email or not password or not phone:
+        return jsonify({'error': 'Food court name, admin name, email, password, and phone number are required'}), 400
     if find_user_by_email(email):
         return jsonify({'error': 'Email already exists'}), 400
     password_error = strong_password_error(password, email)
@@ -1612,7 +1630,7 @@ def register_foodcourt():
         return jsonify({'error': password_error}), 400
 
     # Create Food Court
-    fc = FoodCourt(name=name, is_active=False, approval_status='pending')
+    fc = FoodCourt(name=name, is_active=False, approval_status='pending', phone=phone)
     db.session.add(fc)
     db.session.flush()
 
@@ -1812,6 +1830,8 @@ def _serialize_shrey_foodcourt(fc, preload=None):
         
     status = (fc.approval_status or ('approved' if fc.is_active else 'pending')).strip().lower()
     
+    shop_count = Tenant.query.filter_by(food_court_id=fc.id).count()
+    
     return {
         'id': f'fc_{fc.id}', # String ID to differentiate from Tenants in the UI
         'raw_id': fc.id,
@@ -1819,7 +1839,7 @@ def _serialize_shrey_foodcourt(fc, preload=None):
         'owner': owner.name if owner else '—',
         'email': owner.email if owner else '',
         'city': (fc.address or '').strip() or '—',
-        'phone': '—',
+        'phone': (fc.phone or '').strip() or '—',
         'plan': 'enterprise', # Food courts might not have plans, use enterprise
         'applied': fc.created_at.strftime('%Y-%m-%d') if fc.created_at else '',
         'status': status,
@@ -1829,6 +1849,8 @@ def _serialize_shrey_foodcourt(fc, preload=None):
         'ordersDay': 0,
         'feature_flags': {},
         'max_staff': 0,
+        'shop_limit': fc.shop_limit or 0,
+        'shop_count': shop_count,
     }
 
 def _serialize_shrey_request(tenant, preload=None):
@@ -1900,7 +1922,6 @@ def shrey_login_page():
         return render_template('shrey.html')
     return render_template('shrey_login.html')
 
-@csrf.exempt
 @app.route('/shreyapi/login', methods=['POST'])
 def shrey_login_api():
     ip = request.remote_addr or 'unknown'
@@ -1945,7 +1966,6 @@ def shrey_login_api():
     remaining_attempts = MAX_LOGIN_ATTEMPTS - _login_attempts[ip]['attempts']
     return jsonify({'error': f'Invalid credentials. {remaining_attempts} attempt(s) left.'}), 401
 
-@csrf.exempt
 @app.route('/shreyapi/logout', methods=['POST'])
 def shrey_logout_api():
     log_login('superadmin_logout')
@@ -2080,7 +2100,6 @@ def shrey_requests_api():
         
     return jsonify({'requests': requests})
 
-@csrf.exempt
 @app.route('/api/shrey/requests/<tenant_id>/approve', methods=['POST'])
 def approve_shrey_request(tenant_id):
     if not session.get('shrey_admin'):
@@ -2100,7 +2119,6 @@ def approve_shrey_request(tenant_id):
     db.session.commit()
     return jsonify({'ok': True, 'request': _serialize_shrey_request(tenant)})
 
-@csrf.exempt
 @app.route('/api/shrey/requests/<tenant_id>/reject', methods=['POST'])
 def reject_shrey_request(tenant_id):
     if not session.get('shrey_admin'):
@@ -2120,7 +2138,6 @@ def reject_shrey_request(tenant_id):
     db.session.commit()
     return jsonify({'ok': True, 'request': _serialize_shrey_request(tenant)})
 
-@csrf.exempt
 @app.route('/api/shrey/requests/<int:tenant_id>/pause', methods=['POST'])
 def pause_shrey_restaurant(tenant_id):
     """Toggle pause/resume a restaurant. Paused = is_active False + status suspended.
@@ -2142,7 +2159,6 @@ def pause_shrey_restaurant(tenant_id):
     db.session.commit()
     return jsonify({'ok': True, 'action': action, 'request': _serialize_shrey_request(tenant)})
 
-@csrf.exempt
 @app.route('/api/shrey/requests/<int:tenant_id>/delete', methods=['DELETE'])
 def delete_shrey_restaurant(tenant_id):
     if not session.get('shrey_admin'):
@@ -2234,7 +2250,6 @@ def shrey_branch_requests_api():
         app.logger.exception('Shrey branch requests failed')
         return jsonify({'error': 'Failed to load branch requests', 'details': str(e)}), 500
 
-@csrf.exempt
 @app.route('/api/shrey/branch-requests/<int:br_id>/approve', methods=['POST'])
 def approve_shrey_branch_request(br_id):
     if not session.get('shrey_admin'):
@@ -2262,7 +2277,6 @@ def approve_shrey_branch_request(br_id):
         'reviewed_at': br.reviewed_at.strftime('%Y-%m-%d %H:%M'),
     }})
 
-@csrf.exempt
 @app.route('/api/shrey/branch-requests/<int:br_id>/reject', methods=['POST'])
 def reject_shrey_branch_request(br_id):
     if not session.get('shrey_admin'):
@@ -2279,7 +2293,6 @@ def reject_shrey_branch_request(br_id):
     }})
 
 
-@csrf.exempt
 @app.route('/api/shrey/tenants/<int:tenant_id>/features/<feature_key>', methods=['POST'])
 def update_shrey_tenant_feature(tenant_id, feature_key):
     if not session.get('shrey_admin'):
@@ -2297,7 +2310,6 @@ def update_shrey_tenant_feature(tenant_id, feature_key):
     db.session.commit()
     return jsonify({'ok': True, 'request': _serialize_shrey_request(tenant)})
 
-@csrf.exempt
 @app.route('/api/shrey/tenants/<int:tenant_id>/max-staff', methods=['POST'])
 def update_shrey_max_staff(tenant_id):
     """Set the maximum number of staff accounts for a tenant. 0 = unlimited."""
@@ -2314,6 +2326,23 @@ def update_shrey_max_staff(tenant_id):
     tenant.max_staff = limit
     db.session.commit()
     return jsonify({'ok': True, 'max_staff': limit, 'request': _serialize_shrey_request(tenant)})
+
+@app.route('/api/shrey/foodcourts/<int:fc_id>/shop-limit', methods=['POST'])
+def update_shrey_shop_limit(fc_id):
+    """Set the maximum number of shops for a food court. 0 = unlimited."""
+    if not session.get('shrey_admin'):
+        return jsonify({'error': 'unauthorized'}), 401
+    fc = FoodCourt.query.get_or_404(fc_id)
+    d = request.json or {}
+    try:
+        limit = int(d.get('shop_limit', 0))
+        if limit < 0:
+            raise ValueError
+    except (TypeError, ValueError):
+        return jsonify({'error': 'shop_limit must be a non-negative integer'}), 400
+    fc.shop_limit = limit
+    db.session.commit()
+    return jsonify({'ok': True, 'shop_limit': limit, 'request': _serialize_shrey_foodcourt(fc)})
 
 # ─── API: Products ─────────────────────────────────────────
 @app.route('/api/products', methods=['GET'])
