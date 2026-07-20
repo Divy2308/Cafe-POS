@@ -185,7 +185,7 @@
   const BRANCH_ID = {{ branch_id|tojson }};
 
   // ── TABLE LOCK: prevent customers changing table via URL ──
-  const TABLE_LOCK_KEY = 'pos_cafe_table_lock_' + TENANT_ID;
+  const TABLE_LOCK_KEY = 'qbite_table_lock_' + TENANT_ID;
   const lockedTable = sessionStorage.getItem(TABLE_LOCK_KEY);
   if (!lockedTable) {
     // First visit — lock this tab to this table
@@ -194,9 +194,9 @@
     // Someone edited the URL — redirect them back
     window.location.replace('/table/' + lockedTable + '/order');
   }
-  const LS_TOKEN = 'pos_cafe_guest_token';
-  const LS_CART = 'pos_cafe_self_cart_' + TABLE_ID;
-  const LS_ORDERS = 'pos_cafe_guest_order_refs';
+  const LS_TOKEN = 'qbite_guest_token';
+  const LS_CART = 'qbite_self_cart_' + TABLE_ID;
+  const LS_ORDERS = 'qbite_guest_order_refs';
   const QR_TOKEN = {{ qr_token|tojson }};
 
   function getGuestToken() {
@@ -222,7 +222,37 @@
   let activeAddonProduct = null;
 
   const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
-  const emojiMap = { Food: '🍽️', Beverages: '☕', Desserts: '🍰', Snacks: '🥨' };
+  function getCatEmojiFallback(name) {
+    const n = (name || '').toLowerCase();
+    if (n.includes('pizza'))                                    return '🍕';
+    if (n.includes('burger'))                                   return '🍔';
+    if (n.includes('pasta') || n.includes('noodle'))            return '🍝';
+    if (n.includes('sizzler'))                                  return '🥩';
+    if (n.includes('salad'))                                    return '🥗';
+    if (n.includes('dessert') || n.includes('sweet') || n.includes('cake') || n.includes('ice cream')) return '🍰';
+    if (n.includes('snack') || n.includes('fry') || n.includes('fries') || n.includes('finger')) return '🍟';
+    if (n.includes('tea') || n.includes('coffee'))              return '☕';
+    if (n.includes('juice') || n.includes('shake') || n.includes('smoothie')) return '🧃';
+    if (n.includes('drink') || n.includes('beverage') || n.includes('water') || n.includes('soda') || n.includes('mocktail') || n.includes('cocktail')) return '🥤';
+    if (n.includes('bread') || n.includes('roti') || n.includes('naan') || n.includes('paratha')) return '🫓';
+    if (n.includes('rice') || n.includes('biryani') || n.includes('pulao')) return '🍚';
+    if (n.includes('soup') || n.includes('broth'))              return '🍜';
+    if (n.includes('wrap') || n.includes('roll') || n.includes('kathi')) return '🌯';
+    if (n.includes('sandwich') || n.includes('sub'))            return '🥪';
+    if (n.includes('chicken') || n.includes('poultry'))         return '🍗';
+    if (n.includes('mutton') || n.includes('lamb') || n.includes('beef')) return '🥩';
+    if (n.includes('fish') || n.includes('seafood') || n.includes('prawn') || n.includes('shrimp')) return '🐟';
+    if (n.includes('veg') || n.includes('paneer') || n.includes('tofu')) return '🥦';
+    if (n.includes('starter') || n.includes('appetizer') || n.includes('starter')) return '🥠';
+    if (n.includes('breakfast') || n.includes('morning') || n.includes('egg')) return '🍳';
+    if (n.includes('thali') || n.includes('combo') || n.includes('meal')) return '🍱';
+    if (n.includes('chinese') || n.includes('indo-chinese')) return '🥡';
+    if (n.includes('south') || n.includes('dosa') || n.includes('idli')) return '🫔';
+    if (n.includes('north indian') || n.includes('punjabi') || n.includes('curry')) return '🍛';
+    if (n.includes('grill') || n.includes('bbq') || n.includes('tandoor')) return '🔥';
+    if (n.includes('main') || n.includes('food') || n.includes('dish')) return '🍽️';
+    return '🛒';
+  }
 
   function esc(s) {
     const d = document.createElement('div');
@@ -231,19 +261,36 @@
   }
 
   function getCategoryImage(categoryName) {
-    const name = (categoryName || '').toLowerCase();
-    if (name.includes('tea') || name.includes('coffee'))  return '/static/img/categories/teaorcoffee.png';
-    if (name.includes('snack'))                           return '/static/img/categories/Snacks.png';
-    if (name.includes('sizzler'))                         return '/static/img/categories/sizzler.png';
-    if (name.includes('pizza'))                           return '/static/img/categories/pizza.png';
-    if (name.includes('burger'))                          return '/static/img/categories/burger.png';
-    if (name.includes('pasta'))                           return '/static/img/categories/pasta.png';
-    if (name.includes('salad'))                           return '/static/img/categories/salads.png';
-    if (name.includes('dessert') || name.includes('sweet')) return '/static/img/categories/Desserts.png';
-    if (name.includes('mains') || name.includes('main'))  return '/static/img/categories/mains.png';
-    if (name.includes('drink') || name.includes('water') || name.includes('beverage') || name.includes('juice'))
+    const n = (categoryName || '').toLowerCase();
+    // ── Tea / Coffee ───────────────────────────────────────
+    if (n.includes('tea') || n.includes('coffee') || n.includes('cappuccino') || n.includes('latte') || n.includes('espresso'))
+                                                          return '/static/img/categories/teaorcoffee.png';
+    // ── Snacks ─────────────────────────────────────────────
+    if (n.includes('snack') || n.includes('fries') || n.includes('fry') || n.includes('finger') || n.includes('nugget') || n.includes('starter') || n.includes('appetizer'))
+                                                          return '/static/img/categories/Snacks.png';
+    // ── Sizzler ────────────────────────────────────────────
+    if (n.includes('sizzler') || n.includes('grill') || n.includes('bbq') || n.includes('tandoor'))
+                                                          return '/static/img/categories/sizzler.png';
+    // ── Pizza ──────────────────────────────────────────────
+    if (n.includes('pizza') || n.includes('flatbread'))   return '/static/img/categories/pizza.png';
+    // ── Burger ─────────────────────────────────────────────
+    if (n.includes('burger') || n.includes('sandwich') || n.includes('sub') || n.includes('wrap') || n.includes('roll') || n.includes('kathi'))
+                                                          return '/static/img/categories/burger.png';
+    // ── Pasta / Noodles ────────────────────────────────────
+    if (n.includes('pasta') || n.includes('noodle') || n.includes('spaghetti') || n.includes('chinese') || n.includes('indo-chinese'))
+                                                          return '/static/img/categories/pasta.png';
+    // ── Salads ─────────────────────────────────────────────
+    if (n.includes('salad') || n.includes('bowl') || n.includes('veg'))  return '/static/img/categories/salads.png';
+    // ── Desserts / Sweets ──────────────────────────────────
+    if (n.includes('dessert') || n.includes('sweet') || n.includes('cake') || n.includes('ice cream') || n.includes('waffle') || n.includes('brownie') || n.includes('pudding'))
+                                                          return '/static/img/categories/Desserts.png';
+    // ── Mains / Rice / Biryani / Curry ─────────────────────
+    if (n.includes('main') || n.includes('rice') || n.includes('biryani') || n.includes('pulao') || n.includes('curry') || n.includes('thali') || n.includes('combo') || n.includes('meal') || n.includes('north indian') || n.includes('south indian') || n.includes('dosa') || n.includes('idli'))
+                                                          return '/static/img/categories/mains.png';
+    // ── Beverages ──────────────────────────────────────────
+    if (n.includes('drink') || n.includes('water') || n.includes('beverage') || n.includes('juice') || n.includes('soda') || n.includes('shake') || n.includes('smoothie') || n.includes('mocktail') || n.includes('cocktail') || n.includes('lassi') || n.includes('lemonade'))
                                                           return '/static/img/categories/Beverages.png';
-    return '';
+    return null; // no match — use emoji fallback
   }
 
   function escapeAttr(s) {
@@ -379,7 +426,7 @@
       } else if (p.image_b64) {
         imgHtml = `<img src="${esc(p.image_b64)}" style="width:100%;height:96px;object-fit:cover;border-radius:10px;margin-bottom:8px;" alt="" loading="lazy">`;
       } else {
-        imgHtml = `<div style="width:100%;height:96px;border-radius:10px;margin-bottom:8px;background:#1e1e24;display:flex;align-items:center;justify-content:center;font-size:32px;">${emojiMap[c.name] || '🛒'}</div>`;
+        imgHtml = `<div style="width:100%;height:96px;border-radius:10px;margin-bottom:8px;background:linear-gradient(135deg,#1e1e24,#2a2a34);display:flex;align-items:center;justify-content:center;font-size:40px;">${getCatEmojiFallback(c.name)}</div>`;
       }
       const addonBadge = p.addons && p.addons.length
         ? `<div style="font-size:10px; color:#fdba74; margin-top:5px;">Customize +${p.addons.length} addons</div>`
@@ -737,7 +784,7 @@
       key: gateway.key_id,
       amount: gateway.amount,
       currency: gateway.currency,
-      name: gateway.merchant_name || 'POS Cafè',
+      name: gateway.merchant_name || 'Qbite',
       description: `Order ${gateway.order_number}`,
       order_id: gateway.razorpay_order_id,
       prefill: { name: gateway.customer_name || '' },

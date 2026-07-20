@@ -5,12 +5,12 @@ self.addEventListener('push', event => {
   } catch (e) {
     payload = {};
   }
-  const title = payload.title || 'POS Cafe';
+  const title = payload.title || 'Qbite';
   const options = {
     body: payload.body || 'You have a new update.',
-    icon: '/static/img/logo_icon.svg',
-    badge: '/static/img/logo_icon.svg',
-    tag: payload.tag || 'pos-cafe-update',
+    icon: '/static/img/qbitecriclelogo.png',
+    badge: '/static/img/qbitecriclelogo.png',
+    tag: payload.tag || 'qbite-update',
     data: payload.data || {},
   };
   event.waitUntil(self.registration.showNotification(title, options));

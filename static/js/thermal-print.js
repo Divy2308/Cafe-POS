@@ -1,5 +1,5 @@
 /**
- * Thermal printing: QZ Tray ESC/POS + browser print helpers for POS Cafe.
+ * Thermal printing: QZ Tray ESC/POS + browser print helpers for Qbite.
  * Depends on base.html loading qz-tray.js (optional; graceful if missing).
  */
 (function (global) {
@@ -69,7 +69,7 @@
     data.push(escPosRaw((cafe.invoice_title || 'TAX INVOICE') + '\n'));
     data.push(escPosRaw(ESC + 'E' + '\x00'));
     data.push(escPosRaw(ESC + '!' + '\x10'));
-    data.push(escPosRaw((cafe.name || 'POS Cafe') + '\n'));
+    data.push(escPosRaw((cafe.name || 'Qbite') + '\n'));
     data.push(escPosRaw(ESC + '!' + '\x00'));
     if (cafe.address) data.push(escPosRaw(cafe.address + '\n'));
     if (cafe.phone) data.push(escPosRaw('Ph: ' + cafe.phone + '\n'));

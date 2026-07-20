@@ -1202,12 +1202,12 @@
   <div class="sidebar bg-card border-r border-border flex flex-col" id="sidebar">
     <div class="p-5 border-b border-border">
       <div class="flex items-center gap-3">
-        <div class="w-9 h-9 brand-gradient rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden"
+        <div class="flex items-center justify-center flex-shrink-0"
           id="pos-logo">
-          <img src="/static/img/logo_icon.svg" alt="POS Cafè Icon" class="w-6 h-6 object-contain">
+          <img src="/static/img/qbitecriclelogo.png" alt="Qbite Logo" style="height: 36px; width: 36px; object-fit: contain; border-radius: 50%;">
         </div>
         <div>
-          <div class="font-display font-700 text-sm text-heading" id="pos-cafe-name">POS Cafè</div>
+          <div class="font-display font-700 text-sm text-heading" id="qbite-name">Qbite</div>
           <div class="text-xs text-gray-500">{{ user_name }}</div>
         </div>
       </div>
@@ -2240,20 +2240,29 @@
     cats.forEach(c => {
       c.products.forEach(p => {
         const catName = (c.name || '').toLowerCase();
-        
+
+        // ── Pick category image by keyword ──────────────────────────
         let imgPath = '';
-        if (catName.includes('tea') || catName.includes('coffee')) imgPath = '/static/img/categories/teaorcoffee.png';
-        else if (catName.includes('snack')) imgPath = '/static/img/categories/Snacks.png';
-        else if (catName.includes('sizzler')) imgPath = '/static/img/categories/sizzler.png';
-        else if (catName.includes('pizza')) imgPath = '/static/img/categories/pizza.png';
-        else if (catName.includes('burger')) imgPath = '/static/img/categories/burger.png';
-        else if (catName.includes('pasta')) imgPath = '/static/img/categories/pasta.png';
-        else if (catName.includes('salad')) imgPath = '/static/img/categories/salads.png';
-        else if (catName.includes('dessert')) imgPath = '/static/img/categories/Desserts.png';
-        else if (catName.includes('main')) imgPath = '/static/img/categories/mains.png';
-        else if (catName.includes('drink') || catName.includes('water') || catName.includes('beverage') || catName.includes('juice')) {
-            imgPath = '/static/img/categories/Beverages.png';
-        }
+        if (catName.includes('tea') || catName.includes('coffee') || catName.includes('cappuccino') || catName.includes('latte') || catName.includes('espresso'))
+          imgPath = '/static/img/categories/teaorcoffee.png';
+        else if (catName.includes('snack') || catName.includes('fries') || catName.includes('fry') || catName.includes('finger') || catName.includes('nugget') || catName.includes('starter') || catName.includes('appetizer'))
+          imgPath = '/static/img/categories/Snacks.png';
+        else if (catName.includes('sizzler') || catName.includes('grill') || catName.includes('bbq') || catName.includes('tandoor'))
+          imgPath = '/static/img/categories/sizzler.png';
+        else if (catName.includes('pizza') || catName.includes('flatbread'))
+          imgPath = '/static/img/categories/pizza.png';
+        else if (catName.includes('burger') || catName.includes('sandwich') || catName.includes('sub') || catName.includes('wrap') || catName.includes('roll') || catName.includes('kathi'))
+          imgPath = '/static/img/categories/burger.png';
+        else if (catName.includes('pasta') || catName.includes('noodle') || catName.includes('spaghetti') || catName.includes('chinese') || catName.includes('indo-chinese'))
+          imgPath = '/static/img/categories/pasta.png';
+        else if (catName.includes('salad') || catName.includes('bowl') || catName.includes('veg'))
+          imgPath = '/static/img/categories/salads.png';
+        else if (catName.includes('dessert') || catName.includes('sweet') || catName.includes('cake') || catName.includes('ice cream') || catName.includes('waffle') || catName.includes('brownie') || catName.includes('pudding'))
+          imgPath = '/static/img/categories/Desserts.png';
+        else if (catName.includes('main') || catName.includes('rice') || catName.includes('biryani') || catName.includes('pulao') || catName.includes('curry') || catName.includes('thali') || catName.includes('combo') || catName.includes('meal') || catName.includes('north indian') || catName.includes('south indian') || catName.includes('dosa') || catName.includes('idli'))
+          imgPath = '/static/img/categories/mains.png';
+        else if (catName.includes('drink') || catName.includes('water') || catName.includes('beverage') || catName.includes('juice') || catName.includes('soda') || catName.includes('shake') || catName.includes('smoothie') || catName.includes('mocktail') || catName.includes('cocktail') || catName.includes('lassi') || catName.includes('lemonade'))
+          imgPath = '/static/img/categories/Beverages.png';
 
         let imgHtml = '';
         if (imgPath) {
@@ -2295,8 +2304,29 @@
   }
 
   function getCatEmoji(name) {
-    const map = { 'Food': '🍽️', 'Beverages': '☕', 'Desserts': '🍰' };
-    return map[name] || '🛒';
+    const n = (name || '').toLowerCase();
+    if (n.includes('pizza'))                                    return '🍕';
+    if (n.includes('burger') || n.includes('sandwich'))         return '🍔';
+    if (n.includes('pasta') || n.includes('noodle'))            return '🍝';
+    if (n.includes('sizzler') || n.includes('grill') || n.includes('bbq') || n.includes('tandoor')) return '🔥';
+    if (n.includes('salad') || n.includes('veg') || n.includes('bowl')) return '🥗';
+    if (n.includes('dessert') || n.includes('sweet') || n.includes('cake') || n.includes('ice cream')) return '🍰';
+    if (n.includes('snack') || n.includes('fries') || n.includes('starter') || n.includes('appetizer')) return '🍟';
+    if (n.includes('tea') || n.includes('coffee') || n.includes('latte')) return '☕';
+    if (n.includes('juice') || n.includes('shake') || n.includes('smoothie') || n.includes('lassi')) return '🧃';
+    if (n.includes('drink') || n.includes('beverage') || n.includes('water') || n.includes('soda') || n.includes('mocktail')) return '🥤';
+    if (n.includes('rice') || n.includes('biryani') || n.includes('pulao')) return '🍚';
+    if (n.includes('bread') || n.includes('roti') || n.includes('naan') || n.includes('paratha')) return '🫓';
+    if (n.includes('soup') || n.includes('broth'))              return '🍜';
+    if (n.includes('wrap') || n.includes('roll') || n.includes('kathi')) return '🌯';
+    if (n.includes('chicken') || n.includes('poultry'))         return '🍗';
+    if (n.includes('mutton') || n.includes('lamb') || n.includes('fish') || n.includes('seafood')) return '🥩';
+    if (n.includes('breakfast') || n.includes('egg'))           return '🍳';
+    if (n.includes('thali') || n.includes('combo') || n.includes('meal')) return '🍱';
+    if (n.includes('main') || n.includes('curry') || n.includes('food') || n.includes('dish')) return '🍽️';
+    if (n.includes('chinese') || n.includes('indo-chinese'))    return '🥡';
+    if (n.includes('south') || n.includes('dosa') || n.includes('idli')) return '🫔';
+    return '🛒';
   }
 
   // ─── Cart ─────────────────────────────────────────────────
@@ -2891,7 +2921,7 @@
       key: gateway.key_id,
       amount: gateway.amount,
       currency: gateway.currency,
-      name: gateway.merchant_name || 'POS Cafè',
+      name: gateway.merchant_name || 'Qbite',
       description: `Order ${gateway.order_number}`,
       order_id: gateway.razorpay_order_id,
       prefill: {
@@ -3149,7 +3179,7 @@
         </div>`).join('');
 
       const statusClass = sentToKitchen ? 'bg-orange-500/10 text-orange-500' : 'bg-gray-500/10 text-gray-500';
-      const waMsg = encodeURIComponent(`\uD83E\uDDFE POS Cafè \u2014 Bill\nOrder: ${b.order_number} | Table ${b.table}\nTotal: \u20b9${b.total.toFixed(0)}`);
+      const waMsg = encodeURIComponent(`\uD83E\uDDFE Qbite \u2014 Bill\nOrder: ${b.order_number} | Table ${b.table}\nTotal: \u20b9${b.total.toFixed(0)}`);
 
       return `
       <div class="card p-5 rounded-3xl border border-white/5 transition-all hover:scale-[1.01] ${isCurrent ? 'ring-2 ring-brand-500 bg-brand-500/5' : 'bg-card-2'}">
@@ -3708,7 +3738,7 @@
         '',
         cafe.footer_note || 'Thank you for visiting! 🙏',
         '',
-        '_Powered by POS Cafè_',
+        '_Powered by Qbite_',
         '━━━━━━━━━━━━━━━━━━━━━━━',
       ].filter(line => line !== null && line !== undefined).join('\n');
 
@@ -3823,7 +3853,7 @@
     try {
       const data = await api('/api/cafe-settings');
       if (data && data.name) {
-        const nameEl = document.getElementById('pos-cafe-name');
+        const nameEl = document.getElementById('qbite-name');
         if (nameEl) nameEl.textContent = data.name;
       }
       if (data && data.logo_b64) {

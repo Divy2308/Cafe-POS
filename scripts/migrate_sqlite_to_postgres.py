@@ -10,7 +10,7 @@ from app import app, db  # noqa: E402
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description='Migrate POS Cafe data from SQLite to PostgreSQL.'
+        description='Migrate Qbite data from SQLite to PostgreSQL.'
     )
     parser.add_argument(
         '--sqlite-path',

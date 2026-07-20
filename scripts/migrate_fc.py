@@ -1,7 +1,7 @@
 import sqlite3
 import os
 
-db_path = 'C:/Users/Shrey/AppData/Local/Temp/pos-cafe/pos_runtime.db'
+db_path = 'C:/Users/Shrey/AppData/Local/Temp/qbite/pos_runtime.db'
 conn = sqlite3.connect(db_path)
 cursor = conn.cursor()
 

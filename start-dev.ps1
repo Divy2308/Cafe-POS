@@ -2,7 +2,7 @@
 # Quick start script for development with Tailwind CSS
 
 Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host "POS Cafe - Development Setup" -ForegroundColor Cyan
+Write-Host "Qbite - Development Setup" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host ""
 

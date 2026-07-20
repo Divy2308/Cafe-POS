@@ -1,6 +1,6 @@
-# POS Cafè - Ultimate Multi-Branch Restaurant Management System
+# Qbite - Ultimate Multi-Branch Restaurant Management System
 
-POS Cafè is a high-performance, full-featured restaurant Point of Sale (POS) system designed for modern cafes and restaurants. Built with a focus on speed, scalability, and premium user experience, it handles everything from floor management to real-time kitchen coordination.
+Qbite is a high-performance, full-featured restaurant Point of Sale (POS) system designed for modern restaurants and cafes. Built with a focus on speed, scalability, and premium user experience, it handles everything from floor management to real-time kitchen coordination.
 
 ## 🌟 Premium Features
 
@@ -32,8 +32,8 @@ POS Cafè is a high-performance, full-featured restaurant Point of Sale (POS) sy
 
 1. **Clone & Navigate**:
    ```bash
-   git clone https://github.com/shreybhut21/pos-cafe.git
-   cd pos-cafe
+   git clone https://github.com/shreybhut21/qbite.git
+   cd qbite
    ```
 
 2. **Environment Setup**:
@@ -56,7 +56,7 @@ POS Cafè is a high-performance, full-featured restaurant Point of Sale (POS) sy
 Set `DATABASE_URL` to use PostgreSQL instead of SQLite:
 
 ```env
-DATABASE_URL=postgresql://username:password@localhost:5432/pos_cafe
+DATABASE_URL=postgresql://username:password@localhost:5432/qbite
 ```
 
 ### SQLite to PostgreSQL migration
@@ -85,7 +85,7 @@ Use `--keep-existing` only when you intentionally want to import into an existin
 | `/qr/<table_id>` | **Self-Order** | Guest interface for table-side ordering. |
 
 ## 🎨 Design Philosophy
-POS Cafè follows a **Glassmorphism** design language with a focus on:
+Qbite follows a **Glassmorphism** design language with a focus on:
 - **Micro-animations**: Smooth transitions for cart additions and status changes.
 - **Responsive Layouts**: Optimized for both high-resolution desktops and tablet-based mobile POS.
 - **Harmonious Palettes**: Tailored color schemes for Light and Dark modes.

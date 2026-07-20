@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="csrf-token" content="{{ csrf_token() }}">
-<title>POS Cafè — Super Admin</title>
+<title>Qbite — Super Admin</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -249,7 +249,7 @@ tr:hover td{background:rgba(0,0,0,.015)}
 
 <!-- LOCK SCREEN -->
 <div id="lock">
-  <div class="lock-logo">pos.cafe / system</div>
+  <div class="lock-logo">qbite / system</div>
   <div class="lock-icon">
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
   </div>
@@ -271,7 +271,7 @@ tr:hover td{background:rgba(0,0,0,.015)}
 <div class="topbar">
   <div class="topbar-brand">
     <div class="brand-dot"></div>
-    <div class="brand-name">POS.CAFE</div>
+    <div class="brand-name">QBITE</div>
     <div class="brand-sep">/</div>
     <div class="brand-role">SUPER ADMIN</div>
   </div>
@@ -1313,7 +1313,7 @@ function exportData(){
   const csv=rows.map(r=>r.join(',')).join('\n');
   const a=document.createElement('a');
   a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
-  a.download='pos-cafe-restaurants-'+new Date().toISOString().split('T')[0]+'.csv';
+  a.download='qbite-restaurants-'+new Date().toISOString().split('T')[0]+'.csv';
   a.click();
   addLog('Admin','exported restaurant data to CSV','cyan');
   showToast('CSV exported!','cyan');

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Secure Access — POS Cafè{% endblock %}
+{% block title %}Secure Access — Qbite{% endblock %}
 {% block extra_head %}
 <link
   href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cabinet+Grotesk:wght@300;400;500;600;700;800;900&family=DM+Mono:wght@300;400;500&display=swap"
@@ -250,13 +250,9 @@
   .lp-logo-mark {
     width: 44px;
     height: 44px;
-    border-radius: 12px;
-    background: linear-gradient(135deg, var(--ember), var(--ember3));
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 20px;
-    box-shadow: 0 8px 24px rgba(113, 75, 103, .4);
   }
 
   .lp-logo-text {
@@ -1810,10 +1806,10 @@
     <div class="lp-content">
       <div>
         <a href="/" class="lp-logo">
-          <div class="lp-logo-mark" style="overflow:hidden; display:flex; align-items:center; justify-content:center;">
-            <img src="/static/img/logo_icon.svg" alt="Logo" style="width: 28px; height: 28px;">
+          <div class="lp-logo-mark">
+            <img src="/static/img/qbitecriclelogo.png" alt="Logo" style="height: 36px; width: 36px; object-fit: contain; border-radius: 50%;">
           </div>
-          <span class="lp-logo-text">POS Cafè</span>
+          <span class="lp-logo-text">Qbite</span>
         </a>
 
         <div class="lp-badge">
@@ -1824,7 +1820,7 @@
         <h1 class="lp-headline">
           Protect the<br>register with<br><em>smarter</em> access.
         </h1>
-        <p class="lp-sub">Strong passwords, OTP recovery, and role-based routing keep your cafe data secure — without
+        <p class="lp-sub">Strong passwords, OTP recovery, and role-based routing keep your data secure — without
           slowing down service.</p>
 
         <div class="lp-cards">
@@ -1848,7 +1844,7 @@
 
       <div class="lp-footer">
         <div class="lp-footer-dot"></div>
-        <span>© 2024 POS Cafè · All systems operational</span>
+        <span>© 2024 Qbite · All systems operational</span>
       </div>
     </div>
   </section>
@@ -1857,15 +1853,10 @@
   <section class="right-panel">
     <div class="form-container">
 
-      <!-- mobile logo -->
       <div class="mobile-logo"
         style="display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom: 20px;">
-        <div
-          style="width: 28px; height: 28px; background: linear-gradient(135deg, oklch(65% 0.2 295), oklch(50% 0.2 295)); border-radius: 6px; display: flex; align-items:center; justify-content:center; overflow:hidden;">
-          <img src="/static/img/logo_icon.svg" alt="Logo" style="width: 20px; height: 20px;">
-        </div>
-        <span class="mobile-logo-text" style="font-weight: 700; color: rgb(11, 7, 7); font-size: 1.25rem;">POS
-          Cafè</span>
+          <img src="/static/img/qbitecriclelogo.png" alt="Logo" style="height: 40px; width: 40px; object-fit: contain; border-radius: 50%;">
+          <span class="mobile-logo-text" style="font-weight: 700; color: rgb(11, 7, 7); font-size: 1.25rem;">Qbite</span>
       </div>
 
       <!-- TAB BAR -->
@@ -1891,7 +1882,7 @@
             </div>
             <div class="field">
               <label>Email address</label>
-              <input type="email" id="login-email" placeholder="you@cafe.com" autocomplete="username">
+              <input type="email" id="login-email" placeholder="you@restaurant.com" autocomplete="username">
             </div>
             <div class="field">
               <div class="field-row">
@@ -1932,7 +1923,7 @@
             <div class="two-col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
               <div class="field" style="margin-bottom: 0;">
                 <label>Restaurant Name</label>
-                <input type="text" id="register-restaurant-name" placeholder="My Cafe" autocomplete="organization">
+                <input type="text" id="register-restaurant-name" placeholder="My Restaurant" autocomplete="organization">
               </div>
               <div class="field" style="margin-bottom: 0;">
                 <label>Owner Name</label>
@@ -1942,7 +1933,7 @@
 
             <div class="field">
               <label>Email Address</label>
-              <input type="email" id="register-email" placeholder="owner@cafe.com" autocomplete="email"
+              <input type="email" id="register-email" placeholder="owner@restaurant.com" autocomplete="email"
                 oninput="renderPasswordPolicy('register')">
             </div>
 
@@ -2112,7 +2103,7 @@
             <div id="rst-step1">
               <div class="field">
                 <label>Email address</label>
-                <input type="email" id="reset-email" placeholder="you@cafe.com" autocomplete="email"
+                <input type="email" id="reset-email" placeholder="you@restaurant.com" autocomplete="email"
                   oninput="syncResetEmail(); renderPasswordPolicy('reset')">
               </div>
               <div class="btn-row">

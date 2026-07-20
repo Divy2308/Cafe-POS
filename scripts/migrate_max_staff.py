@@ -1,6 +1,6 @@
 import sqlite3, os
 
-db = r'C:\Users\Shrey\AppData\Local\Temp\pos-cafe\pos_runtime.db'
+db = r'C:\Users\Shrey\AppData\Local\Temp\qbite\pos_runtime.db'
 print('DB path:', db)
 print('DB exists:', os.path.exists(db))
 if os.path.exists(db):

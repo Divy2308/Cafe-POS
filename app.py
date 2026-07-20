@@ -59,7 +59,7 @@ if os.path.exists(env_path):
             os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 LEGACY_DB_PATH = os.path.join(os.path.dirname(__file__), 'instance', 'pos.db')
-DB_DIR = os.path.join(tempfile.gettempdir(), 'pos-cafe')
+DB_DIR = os.path.join(tempfile.gettempdir(), 'qbite')
 DB_PATH = os.path.join(DB_DIR, 'pos_runtime.db')
 os.makedirs(DB_DIR, exist_ok=True)
 _temp_db_url = (os.getenv('DATABASE_URL') or '').strip()
@@ -88,7 +88,7 @@ if os.path.exists(DB_PATH) and not _temp_db_url:
             pass
 
 app = Flask(__name__)
-_secret_key = os.getenv('SECRET_KEY', 'pos-cafe-default-insecure-key')
+_secret_key = os.getenv('SECRET_KEY', 'qbite-default-insecure-key')
 app.config['SECRET_KEY'] = _secret_key
 database_url = (os.getenv('DATABASE_URL') or '').strip()
 if database_url.startswith('postgres://'):
@@ -114,12 +114,12 @@ SMTP_HOST = os.getenv('SMTP_HOST', '').strip()
 SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
 SMTP_USER = os.getenv('SMTP_USER', '').strip()
 SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', '').strip()
-SMTP_FROM = os.getenv('SMTP_FROM', SMTP_USER or 'no-reply@pos-cafe.local').strip()
+SMTP_FROM = os.getenv('SMTP_FROM', SMTP_USER or 'no-reply@qbite.local').strip()
 SMTP_USE_TLS = os.getenv('SMTP_USE_TLS', '1').strip() != '0'
 RESEND_API_KEY = os.getenv('RESEND_API_KEY', '').strip()
 RESEND_FROM = os.getenv(
     'RESEND_FROM',
-    os.getenv('EMAIL_FROM', 'POS Cafè <onboarding@resend.dev>')
+    os.getenv('EMAIL_FROM', 'Qbite <onboarding@resend.dev>')
 ).strip()
 if RESEND_API_KEY and resend is not None:
     resend.api_key = RESEND_API_KEY
@@ -127,7 +127,7 @@ if RESEND_API_KEY and resend is not None:
 RAZORPAY_KEY_ID = os.getenv('RAZORPAY_KEY_ID', '').strip()
 RAZORPAY_KEY_SECRET = os.getenv('RAZORPAY_KEY_SECRET', '').strip()
 RAZORPAY_CURRENCY = os.getenv('RAZORPAY_CURRENCY', 'INR').strip().upper() or 'INR'
-RAZORPAY_MERCHANT_NAME = os.getenv('RAZORPAY_MERCHANT_NAME', 'POS Cafè').strip() or 'POS Cafè'
+RAZORPAY_MERCHANT_NAME = os.getenv('RAZORPAY_MERCHANT_NAME', 'Qbite').strip() or 'Qbite'
 PASSWORD_RESET_CODES = {}
 
 # ── Super-admin credentials (set in .env) ──────────────────
@@ -176,7 +176,7 @@ def get_public_url_root():
     return request.url_root.rstrip('/')
 
 # Warn if running with the default insecure key
-if _secret_key == 'pos-cafe-default-insecure-key':
+if _secret_key == 'qbite-default-insecure-key':
     import logging
     logging.warning('[SECURITY] Using default SECRET_KEY. Set a strong SECRET_KEY in .env before deploying to production.')
 
@@ -378,6 +378,8 @@ class Product(db.Model):
     unit = db.Column(db.String(20), default='pcs')
     active = db.Column(db.Boolean, default=True)
     image_b64 = db.Column(db.Text, default='')  # base64 data URL for product photo
+    is_thali = db.Column(db.Boolean, default=False)  # True if this is a combo/thali product
+    components_json = db.Column(db.Text, default='[]')  # JSON list of component names
     branch = db.relationship('Branch', backref='products')
     tenant = db.relationship('Tenant', backref='products')
 
@@ -418,7 +420,7 @@ class PaymentMethod(db.Model):
 
 class CafeSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), default='POS Cafè')
+    name = db.Column(db.String(100), default='Qbite')
     phone = db.Column(db.String(20), default='')
     email = db.Column(db.String(120), default='')
     address = db.Column(db.Text, default='')
@@ -1107,9 +1109,9 @@ def strong_password_error(password, email=''):
     )
 
 def send_reset_email(email, otp):
-    subject = 'POS Cafè password reset code'
+    subject = 'Qbite password reset code'
     body = (
-        f'Your POS Cafè password reset code is {otp}. '
+        f'Your Qbite password reset code is {otp}. '
         'This code expires in 10 minutes.'
     )
 
@@ -1207,9 +1209,9 @@ def cleanup_reset_codes():
 # ─── Auth Routes ───────────────────────────────────────────
 @app.route('/favicon.ico')
 def favicon():
-    logo_path = os.path.join(os.path.dirname(__file__), 'pos_cafe_logo.svg')
+    logo_path = os.path.join(os.path.dirname(__file__), 'qbite_logo.svg')
     if os.path.exists(logo_path):
-        return send_from_directory(os.path.dirname(__file__), 'pos_cafe_logo.svg', mimetype='image/svg+xml')
+        return send_from_directory(os.path.dirname(__file__), 'qbite_logo.svg', mimetype='image/svg+xml')
     return '', 204
 
 @app.route('/')
@@ -2391,8 +2393,15 @@ def get_all_products():
     )
     cats = apply_tenant_scope(Category.query, Category).all()
     return jsonify({
-        'products': [{'id':p.id,'name':p.name,'price':p.price,'category_id':p.category_id,'description':p.description,'tax':p.tax,'unit':p.unit,'active':p.active,'image_b64':p.image_b64 or '', 'branch_id': p.branch_id, 'addons': [{'id': a.id, 'name': a.name, 'price': a.price} for a in p.addons]} for p in products],
-        'categories': [{'id':c.id,'name':c.name} for c in cats]
+        'products': [{
+            'id': p.id, 'name': p.name, 'price': p.price, 'category_id': p.category_id,
+            'description': p.description, 'tax': p.tax, 'unit': p.unit, 'active': p.active,
+            'image_b64': p.image_b64 or '', 'branch_id': p.branch_id,
+            'is_thali': bool(p.is_thali),
+            'components': json.loads(p.components_json or '[]'),
+            'addons': [{'id': a.id, 'name': a.name, 'price': a.price} for a in p.addons]
+        } for p in products],
+        'categories': [{'id': c.id, 'name': c.name} for c in cats]
     })
 
 
@@ -2406,11 +2415,15 @@ def add_product():
         cat = Category(name=d.get('category','General'), tenant_id=tid)
         db.session.add(cat)
         db.session.flush()
+    is_thali = bool(d.get('is_thali', False))
+    components = d.get('components', []) if is_thali else []
     p = Product(name=d['name'], price=float(d['price']), category_id=cat.id,
-                description=d.get('description',''), 
-                tax=float(d.get('tax',0)), 
+                description=d.get('description',''),
+                tax=float(d.get('tax', 0)),
                 tax_config_json=json.dumps(d.get('tax_config', {})),
-                unit=d.get('unit','pcs'),
+                unit=d.get('unit', 'pcs'),
+                is_thali=is_thali,
+                components_json=json.dumps(components),
                 branch_id=get_active_branch_id(), tenant_id=tid)
     db.session.add(p)
     db.session.flush()
@@ -2420,7 +2433,7 @@ def add_product():
             db.session.add(Addon(product_id=p.id, name=a_data['name'], price=float(a_data['price']), tenant_id=tid))
 
     db.session.commit()
-    return jsonify({'ok':True,'id':p.id})
+    return jsonify({'ok': True, 'id': p.id})
 
 @app.route('/api/products/<int:pid>', methods=['PUT'])
 @staff_required
@@ -2449,6 +2462,12 @@ def update_product(pid):
             db.session.flush()
         p.category_id = cat.id
     
+    # Thali fields
+    if 'is_thali' in d:
+        p.is_thali = bool(d['is_thali'])
+    if 'components' in d:
+        p.components_json = json.dumps(d['components'] if p.is_thali else [])
+
     if 'addons' in d:
         # Clear existing and add new
         Addon.query.filter_by(product_id=p.id).delete()
@@ -2456,7 +2475,7 @@ def update_product(pid):
             db.session.add(Addon(product_id=p.id, name=a_data['name'], price=float(a_data['price']), tenant_id=tid))
 
     db.session.commit()
-    return jsonify({'ok':True})
+    return jsonify({'ok': True})
 
 @app.route('/api/products/<int:pid>', methods=['DELETE'])
 @staff_required
@@ -2763,7 +2782,7 @@ def create_razorpay_order():
         'notes': {
             'order_id': str(order.id),
             'order_number': order.order_number,
-            'source': 'pos-cafe-localhost',
+            'source': 'qbite-localhost',
         },
     }
     result, err = call_razorpay_api('orders', payload)
@@ -3182,7 +3201,7 @@ def _send_web_push(record, payload):
             subscription_info=subscription,
             data=json.dumps(payload),
             vapid_private_key=os.getenv('VAPID_PRIVATE_KEY', '').strip(),
-            vapid_claims={'sub': os.getenv('VAPID_SUBJECT', 'mailto:no-reply@pos-cafe.local').strip() or 'mailto:no-reply@pos-cafe.local'},
+            vapid_claims={'sub': os.getenv('VAPID_SUBJECT', 'mailto:no-reply@qbite.local').strip() or 'mailto:no-reply@qbite.local'},
             ttl=60,
         )
         return True
@@ -4445,7 +4464,7 @@ def self_order_page(token):
     tenant = db.session.get(Tenant, t.tenant_id)
     if not tenant_feature_enabled('self_order', tenant=tenant):
         return tenant_feature_block_response('self_order', is_api=False)
-    cafe_name = tenant.name if tenant else 'POS Cafè'
+    cafe_name = tenant.name if tenant else 'Qbite'
     branch_id = _resolve_self_order_branch_id(t, tenant_id=t.tenant_id)
     return render_template('self_order.html',
         table_id=token,
@@ -5192,6 +5211,9 @@ def update_attendance_shift(clock_in_event_id):
         'clock_out_time': clock_out_event.timestamp.isoformat(),
     })
 
+
+
+
 @app.route('/api/admin/branches/compare', methods=['GET'])
 @admin_required
 def compare_branches():
@@ -5555,18 +5577,18 @@ def manage_inventory_item(iid):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-# ─── API: Cafe Settings ─────────────────────────────────
+# ─── API: Restaurant Settings ─────────────────────────────────
 @app.route('/api/cafe-settings', methods=['GET'])
 def get_cafe_settings():
     try:
         tid = get_current_tenant_id()
         if not tid:
             # Fallback for logo/name if not logged in or session lost
-            return jsonify({'name': 'POS Cafe', 'logo_b64': ''})
+            return jsonify({'name': 'Qbite', 'logo_b64': ''})
             
         settings = CafeSettings.query.filter_by(tenant_id=tid).first()
         if not settings:
-            settings = CafeSettings(tenant_id=tid, name='POS Cafè')
+            settings = CafeSettings(tenant_id=tid, name='Qbite')
             db.session.add(settings)
             db.session.commit()
         
@@ -5598,7 +5620,7 @@ def get_cafe_settings():
         })
     except Exception as e:
         app.logger.error(f"Error in get_cafe_settings: {e}")
-        return jsonify({'name': 'POS Cafè', 'logo_b64': ''})
+        return jsonify({'name': 'Qbite', 'logo_b64': ''})
 
 @app.route('/api/cafe-settings', methods=['POST'])
 @admin_required
@@ -5758,7 +5780,7 @@ def get_receipt_data(order_id):
         return access_error
     settings = CafeSettings.query.filter_by(tenant_id=o.tenant_id).first()
     cafe = {
-        'name': settings.name if settings else 'POS Cafè',
+        'name': settings.name if settings else 'Qbite',
         'address': (settings.address or '') if settings else '',
         'phone': (settings.phone or '') if settings else '',
         'email': (settings.email or '') if settings else '',
@@ -6816,7 +6838,7 @@ if __name__ == '__main__':
     debug = os.environ.get('FLASK_ENV') != 'production'
     use_reloader = debug and not IS_WINDOWS
     print(
-        f"Starting POS Cafe on http://127.0.0.1:{port} "
+        f"Starting Qbite on http://127.0.0.1:{port} "
         f"(debug={'on' if debug else 'off'}, async_mode={socketio.async_mode})",
         flush=True,
     )

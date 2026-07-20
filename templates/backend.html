@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Backend Config — POS Cafè{% endblock %}
+{% block title %}Backend Config — Qbite{% endblock %}
 {% block extra_head %}
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 <style>
@@ -596,7 +596,7 @@
             <div class="space-y-4">
               <div class="grid settings-grid gap-4" style="grid-template-columns:1fr 1fr">
                 <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Shop Name (on Bill)</label><input
-                    id="s-name" placeholder="POS Cafè"></div>
+                    id="s-name" placeholder="Qbite"></div>
                 <div><label class="text-xs text-gray-500 uppercase tracking-wider mb-1.5 block">Phone</label><input
                     id="s-phone" placeholder="823 823 7115"></div>
               </div>
@@ -1322,7 +1322,7 @@
 
   function downloadReservationQR() {
     if (!currentReservationQR) return;
-    const name = (document.getElementById('s-name')?.value || 'pos-cafe').trim() || 'pos-cafe';
+    const name = (document.getElementById('s-name')?.value || 'qbite').trim() || 'qbite';
     const link = document.createElement('a');
     link.href = currentReservationQR;
     link.download = `reservation_qr_${name.replace(/\s+/g, '_').toLowerCase()}.png`;
