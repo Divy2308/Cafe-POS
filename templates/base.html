@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, maximum-scale=1">
 <meta name="apple-mobile-web-app-capable" content="true">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="POS Cafè">
+<meta name="apple-mobile-web-app-title" content="Qbite">
 <meta name="theme-color" content="#1a1a1a">
 <meta name="csrf-token" content="{{ csrf_token() }}">
-<title>{% block title %}POS Cafè{% endblock %}</title>
+<title>{% block title %}Qbite{% endblock %}</title>
 <!-- Compiled Tailwind CSS for production -->
 <link rel="stylesheet" href="{{ url_for('static', filename='output.css') }}">
 <!-- Socket.io for real-time updates -->
@@ -197,7 +197,7 @@
 {% block body %}{% endblock %}
 <div id="toast" class="toast"></div>
 <script>
-const THEME_STORAGE_KEY = 'pos-cafe-theme';
+const THEME_STORAGE_KEY = 'qbite-theme';
 
 function applyTheme(theme) {
   const nextTheme = theme === 'light' ? 'light' : 'dark';
@@ -227,7 +227,13 @@ function toast(msg, type='success') {
   }, 3000);
 }
 
+window._pendingApiReqs = window._pendingApiReqs || new Set();
 async function api(url, method='GET', data=null) {
+  const reqKey = `${method}:${url}`;
+  if (method !== 'GET') {
+    if (window._pendingApiReqs.has(reqKey)) return { ok: false, error: 'Request in progress' };
+    window._pendingApiReqs.add(reqKey);
+  }
   try {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
     const opts = {
@@ -257,6 +263,8 @@ async function api(url, method='GET', data=null) {
     console.error('Network Error:', e);
     toast('Network error. Check connection.', 'error');
     return { error: 'network_error' };
+  } finally {
+    if (method !== 'GET') window._pendingApiReqs.delete(reqKey);
   }
 }
 

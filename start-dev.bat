@@ -2,7 +2,7 @@
 REM Quick start script for development with Tailwind CSS
 
 echo ==========================================
-echo POS Cafe - Development Setup
+echo Qbite - Development Setup
 echo ==========================================
 echo.
 

@@ -2,6 +2,22 @@
 {% block title %}POS Terminal{% endblock %}
 {% block extra_head %}
 <style>
+  @keyframes scan {
+    0% { top: 0%; opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+  }
+  .animate-scan {
+    animation: scan 2.5s infinite ease-in-out;
+  }
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .animate-fade-in-up {
+    animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
   /* Ensure fixed positioning works correctly for mobile nav */
   html,
   body {
@@ -137,7 +153,6 @@
     border-color: var(--input-border);
     color: var(--text);
   }
-
   body[data-theme="light"] .table-card.free {
     background: rgba(255, 255, 255, 0.45);
   }
@@ -416,7 +431,8 @@
       position: fixed !important;
       right: 0;
       top: 0;
-      height: 100vh;
+      bottom: 0;
+      height: auto;
       width: 100% !important;
       min-width: 100% !important;
       z-index: 102;
@@ -785,7 +801,7 @@
 
   @media (max-width: 480px) {
     #view-payment .card {
-      max-height: 50vh !important;
+      max-height: 80vh !important;
       overflow-y: auto !important;
     }
 
@@ -1186,12 +1202,12 @@
   <div class="sidebar bg-card border-r border-border flex flex-col" id="sidebar">
     <div class="p-5 border-b border-border">
       <div class="flex items-center gap-3">
-        <div class="w-9 h-9 brand-gradient rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden"
+        <div class="flex items-center justify-center flex-shrink-0"
           id="pos-logo">
-          <img src="/static/img/logo_icon.svg" alt="POS Cafè Icon" class="w-6 h-6 object-contain">
+          <img src="/static/img/qbitecriclelogo.png" alt="Qbite Logo" style="height: 36px; width: 36px; object-fit: contain; border-radius: 50%;">
         </div>
         <div>
-          <div class="font-display font-700 text-sm text-heading" id="pos-cafe-name">POS Cafè</div>
+          <div class="font-display font-700 text-sm text-heading" id="qbite-name">Qbite</div>
           <div class="text-xs text-gray-500">{{ user_name }}</div>
         </div>
       </div>
@@ -1565,10 +1581,10 @@
     </div>
 
     <!-- ═══ PAYMENT VIEW ═══ -->
-    <div id="view-payment" class="hidden flex-1 flex items-center justify-center p-4 sm:p-8">
-      <div class="w-full max-w-sm sm:max-w-md">
+    <div id="view-payment" class="hidden flex-1 flex-col sm:flex-row sm:items-center sm:justify-center sm:p-8 bg-[var(--card)] sm:bg-transparent">
+      <div class="w-full flex-1 sm:flex-none sm:max-w-md flex flex-col">
 
-        <div class="card p-5 sm:p-6" style="border-radius:20px; max-height:calc(100vh - 7rem); overflow-y:auto;">
+        <div class="card flex-1 sm:flex-none p-5 sm:p-6 rounded-[20px] border border-border w-full overflow-y-auto" style="max-height: calc(100vh - 4rem);">
           <h2 class="font-display text-xl sm:text-2xl font-700 mb-2">Payment</h2>
           <div class="text-xs text-gray-500 uppercase tracking-wider mb-4">Bill <span id="pay-order-num"
               class="text-white normal-case ml-2"></span></div>
@@ -1627,22 +1643,44 @@
       </div>
     </div>
 
-    <!-- ═══ UPI QR VIEW ═══ -->
-    <div id="view-qr" class="hidden flex-1 flex items-center justify-center p-8">
-      <div class="card p-8 text-center max-w-sm w-full" style="border-radius:20px">
-        <div class="text-xs text-gray-500 uppercase tracking-wider mb-2">UPI / QR Payment</div>
-        <div class="text-3xl font-display font-800 text-brand-500 mb-6" id="qr-amount"></div>
-        <div class="flex justify-center mb-4">
-          <div class="p-3 bg-white rounded-2xl">
-            <img id="qr-img" src="{{ url_for('qr_image') }}" alt="QR code for payment" class="w-48 h-48 object-contain">
+    <!-- 💰 UPI QR VIEW 💰 -->
+    <div id="view-qr" class="hidden flex-1 flex items-center justify-center p-4 sm:p-8 bg-black/80 backdrop-blur-sm z-[100] fixed inset-0">
+      <div class="card flex-none p-8 text-center max-w-sm w-full rounded-[28px] border border-white/10 shadow-2xl overflow-hidden relative bg-[#111] animate-fade-in-up">
+        
+        <!-- Decorative background glow -->
+        <div class="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-brand-500/20 rounded-full blur-[80px] pointer-events-none"></div>
+
+        <div class="relative z-10">
+          <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-brand-500/10 text-brand-500 mb-3 border border-brand-500/20">
+            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+            </svg>
           </div>
-        </div>
-        <div class="text-xs text-gray-500 mb-1">Scan to pay</div>
-        <div id="qr-upi-id" class="text-sm text-white font-medium mb-8"></div>
-        <div class="flex gap-3">
-          <button onclick="showView('payment')" class="btn-ghost flex-1 py-3 rounded-xl text-sm">Cancel</button>
-          <button onclick="confirmUPI()"
-            class="btn-primary flex-1 py-3 rounded-xl text-white text-sm font-medium">Confirmed ✓</button>
+          
+          <div class="text-xs font-semibold text-gray-400 tracking-widest uppercase mb-1">Scan to Pay</div>
+          <div class="text-5xl font-display font-900 text-white mb-6 tracking-tight" id="qr-amount"></div>
+          
+          <div class="flex justify-center mb-6 relative">
+            <div class="p-4 bg-white rounded-3xl shadow-xl border-4 border-gray-100 relative overflow-hidden group">
+              <img id="qr-img" src="" alt="QR code for payment" class="w-56 h-56 object-contain relative z-10 transition-transform duration-300 group-hover:scale-105">
+              <!-- Scanner animation line -->
+              <div class="absolute inset-0 w-full h-full pointer-events-none z-20 overflow-hidden rounded-2xl">
+                <div class="w-full h-1.5 shadow-[0_0_15px_rgba(249,115,22,0.8)] bg-[#f97316] absolute top-0 left-0 animate-scan"></div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="flex items-center justify-center gap-2 mb-8 bg-gray-800/50 py-2.5 px-4 rounded-full border border-gray-700/50 inline-flex mx-auto">
+            <svg class="w-4 h-4 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            <div id="qr-upi-id" class="text-sm text-gray-300 font-medium font-mono"></div>
+          </div>
+          
+          <div class="flex gap-3">
+            <button onclick="showView('payment')" class="flex-1 py-3.5 rounded-xl text-gray-400 font-medium bg-gray-800/50 hover:text-white hover:bg-gray-800 transition-all border border-transparent hover:border-gray-700">Cancel</button>
+            <button onclick="confirmUPI()" class="btn-primary flex-1 py-3.5 rounded-xl text-white font-bold transition-all shadow-[0_4px_15px_rgba(249,115,22,0.4)] hover:shadow-[0_6px_20px_rgba(249,115,22,0.6)]">Confirmed ✓</button>
+          </div>
         </div>
       </div>
     </div>
@@ -2171,46 +2209,70 @@
     activeCat = catId;
     document.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
     event.target.classList.add('active');
-    const filtered = catId ? products.filter(c => c.id === catId) : products;
-    renderProductGrid(filtered);
+    applyVisualFilter();
   }
 
+  let filterTimeout = null;
   function filterProducts() {
+    if (filterTimeout) clearTimeout(filterTimeout);
+    filterTimeout = setTimeout(doFilterProducts, 200);
+  }
+
+  function doFilterProducts() {
+    applyVisualFilter();
+  }
+
+  function applyVisualFilter() {
     const q = document.getElementById('product-search').value.toLowerCase();
-    const filtered = products.map(c => ({ ...c, products: c.products.filter(p => p.name.toLowerCase().includes(q)) })).filter(c => c.products.length);
-    renderProductGrid(filtered);
+    document.querySelectorAll('.product-btn').forEach(el => {
+      const matchCat = activeCat === null || parseInt(el.dataset.catId) === activeCat;
+      const matchSearch = q === '' || el.dataset.name.includes(q);
+      el.style.display = (matchCat && matchSearch) ? '' : 'none';
+    });
   }
 
   function renderProductGrid(cats) {
     const grid = document.getElementById('products-grid');
-    let html = '';
+    grid.innerHTML = '';
+    const BATCH_SIZE = 40;
+    
+    const allHtml = [];
     cats.forEach(c => {
       c.products.forEach(p => {
         const catName = (c.name || '').toLowerCase();
-        
+
+        // ── Pick category image by keyword ──────────────────────────
         let imgPath = '';
-        if (catName.includes('tea') || catName.includes('coffee')) imgPath = '/static/img/categories/teaorcoffee.png';
-        else if (catName.includes('snack')) imgPath = '/static/img/categories/Snacks.png';
-        else if (catName.includes('sizzler')) imgPath = '/static/img/categories/sizzler.png';
-        else if (catName.includes('pizza')) imgPath = '/static/img/categories/pizza.png';
-        else if (catName.includes('burger')) imgPath = '/static/img/categories/burger.png';
-        else if (catName.includes('pasta')) imgPath = '/static/img/categories/pasta.png';
-        else if (catName.includes('salad')) imgPath = '/static/img/categories/salads.png';
-        else if (catName.includes('dessert')) imgPath = '/static/img/categories/Desserts.png';
-        else if (catName.includes('mains')) imgPath = '/static/img/categories/mains.png';
-        else if (catName.includes('drink') || catName.includes('water') || catName.includes('beverage') || catName.includes('juice')) {
-            imgPath = '/static/img/categories/Beverages.png';
-        }
+        if (catName.includes('tea') || catName.includes('coffee') || catName.includes('cappuccino') || catName.includes('latte') || catName.includes('espresso'))
+          imgPath = '/static/img/categories/teaorcoffee.png';
+        else if (catName.includes('snack') || catName.includes('fries') || catName.includes('fry') || catName.includes('finger') || catName.includes('nugget') || catName.includes('starter') || catName.includes('appetizer'))
+          imgPath = '/static/img/categories/Snacks.png';
+        else if (catName.includes('sizzler') || catName.includes('grill') || catName.includes('bbq') || catName.includes('tandoor'))
+          imgPath = '/static/img/categories/sizzler.png';
+        else if (catName.includes('pizza') || catName.includes('flatbread'))
+          imgPath = '/static/img/categories/pizza.png';
+        else if (catName.includes('burger') || catName.includes('sandwich') || catName.includes('sub') || catName.includes('wrap') || catName.includes('roll') || catName.includes('kathi'))
+          imgPath = '/static/img/categories/burger.png';
+        else if (catName.includes('pasta') || catName.includes('noodle') || catName.includes('spaghetti') || catName.includes('chinese') || catName.includes('indo-chinese'))
+          imgPath = '/static/img/categories/pasta.png';
+        else if (catName.includes('salad') || catName.includes('bowl') || catName.includes('veg'))
+          imgPath = '/static/img/categories/salads.png';
+        else if (catName.includes('dessert') || catName.includes('sweet') || catName.includes('cake') || catName.includes('ice cream') || catName.includes('waffle') || catName.includes('brownie') || catName.includes('pudding'))
+          imgPath = '/static/img/categories/Desserts.png';
+        else if (catName.includes('main') || catName.includes('rice') || catName.includes('biryani') || catName.includes('pulao') || catName.includes('curry') || catName.includes('thali') || catName.includes('combo') || catName.includes('meal') || catName.includes('north indian') || catName.includes('south indian') || catName.includes('dosa') || catName.includes('idli'))
+          imgPath = '/static/img/categories/mains.png';
+        else if (catName.includes('drink') || catName.includes('water') || catName.includes('beverage') || catName.includes('juice') || catName.includes('soda') || catName.includes('shake') || catName.includes('smoothie') || catName.includes('mocktail') || catName.includes('cocktail') || catName.includes('lassi') || catName.includes('lemonade'))
+          imgPath = '/static/img/categories/Beverages.png';
 
         let imgHtml = '';
         if (imgPath) {
-          imgHtml = `<img src="${imgPath}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`;
+          imgHtml = `<img src="${imgPath}" alt="${escapeHTML(p.name)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`;
         } else if (p.image_b64) {
-          imgHtml = `<img src="${p.image_b64}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`;
+          imgHtml = `<img src="${p.image_b64}" alt="${escapeHTML(p.name)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`;
         } else {
           imgHtml = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px;opacity:0.6;">${getCatEmoji(c.name)}</div>`;
         }
-        html += `<div class="product-btn" role="button" tabindex="0" onclick="addToCart(${p.id},'${p.name.replace(/'/g, "\\'")}',${p.price})" onkeydown="handleProductCardKeydown(event, ${p.id}, '${p.name.replace(/'/g, "\\'")}', ${p.price})">
+        allHtml.push(`<div class="product-btn" role="button" tabindex="0" data-cat-id="${c.id}" data-name="${escapeHTML(p.name.toLowerCase())}" onclick="addToCart(${p.id},'${p.name.replace(/'/g, "\\'")}',${p.price})" onkeydown="handleProductCardKeydown(event, ${p.id}, '${p.name.replace(/'/g, "\\'")}', ${p.price})">
         <div class="product-image">${imgHtml}</div>
         <div class="product-name">${escapeHTML(p.name)}</div>
         <div class="product-category">${c.name}</div>
@@ -2218,10 +2280,21 @@
           <span class="product-price">₹${p.price}</span>
           &nbsp;&nbsp; <button class="add-btn" onclick="event.stopPropagation(); addToCart(${p.id},'${p.name.replace(/'/g, "\\'")}',${p.price})">+</button>
         </div>
-      </div>`;
+      </div>`);
       });
     });
-    grid.innerHTML = html;
+
+    grid.innerHTML = allHtml.slice(0, BATCH_SIZE).join('');
+    
+    if (allHtml.length > BATCH_SIZE) {
+      setTimeout(() => {
+        const frag = document.createElement('div');
+        frag.innerHTML = allHtml.slice(BATCH_SIZE).join('');
+        while(frag.firstChild) {
+          grid.appendChild(frag.firstChild);
+        }
+      }, 50);
+    }
   }
 
   function handleProductCardKeydown(event, id, name, price) {
@@ -2231,8 +2304,29 @@
   }
 
   function getCatEmoji(name) {
-    const map = { 'Food': '🍽️', 'Beverages': '☕', 'Desserts': '🍰' };
-    return map[name] || '🛒';
+    const n = (name || '').toLowerCase();
+    if (n.includes('pizza'))                                    return '🍕';
+    if (n.includes('burger') || n.includes('sandwich'))         return '🍔';
+    if (n.includes('pasta') || n.includes('noodle'))            return '🍝';
+    if (n.includes('sizzler') || n.includes('grill') || n.includes('bbq') || n.includes('tandoor')) return '🔥';
+    if (n.includes('salad') || n.includes('veg') || n.includes('bowl')) return '🥗';
+    if (n.includes('dessert') || n.includes('sweet') || n.includes('cake') || n.includes('ice cream')) return '🍰';
+    if (n.includes('snack') || n.includes('fries') || n.includes('starter') || n.includes('appetizer')) return '🍟';
+    if (n.includes('tea') || n.includes('coffee') || n.includes('latte')) return '☕';
+    if (n.includes('juice') || n.includes('shake') || n.includes('smoothie') || n.includes('lassi')) return '🧃';
+    if (n.includes('drink') || n.includes('beverage') || n.includes('water') || n.includes('soda') || n.includes('mocktail')) return '🥤';
+    if (n.includes('rice') || n.includes('biryani') || n.includes('pulao')) return '🍚';
+    if (n.includes('bread') || n.includes('roti') || n.includes('naan') || n.includes('paratha')) return '🫓';
+    if (n.includes('soup') || n.includes('broth'))              return '🍜';
+    if (n.includes('wrap') || n.includes('roll') || n.includes('kathi')) return '🌯';
+    if (n.includes('chicken') || n.includes('poultry'))         return '🍗';
+    if (n.includes('mutton') || n.includes('lamb') || n.includes('fish') || n.includes('seafood')) return '🥩';
+    if (n.includes('breakfast') || n.includes('egg'))           return '🍳';
+    if (n.includes('thali') || n.includes('combo') || n.includes('meal')) return '🍱';
+    if (n.includes('main') || n.includes('curry') || n.includes('food') || n.includes('dish')) return '🍽️';
+    if (n.includes('chinese') || n.includes('indo-chinese'))    return '🥡';
+    if (n.includes('south') || n.includes('dosa') || n.includes('idli')) return '🫔';
+    return '🛒';
   }
 
   // ─── Cart ─────────────────────────────────────────────────
@@ -2245,6 +2339,7 @@
       }
       selectedAddons = [];
     }
+    const p = findProductById(id);
 
     const itemPrice = price + selectedAddons.reduce((s, a) => s + a.price, 0);
     const itemKey = id + '_' + JSON.stringify(selectedAddons.map(a => a.id).sort());
@@ -2262,7 +2357,9 @@
         price: itemPrice,
         qty: 1,
         notes: '',
-        addons: selectedAddons
+        addons: selectedAddons,
+        is_thali: p ? p.is_thali : false,
+        components: p ? p.components || [] : []
       });
     }
     renderCart();
@@ -2340,9 +2437,10 @@
       <div class="cart-item">
         <div class="cart-item-header">
           <div>
-            <div class="cart-item-name">${escapeHTML(i.name)}</div>
+            <div class="cart-item-name">${escapeHTML(i.name)} ${i.is_thali ? '<span class="px-1 text-[10px] bg-brand-100 text-brand-600 rounded">THALI</span>' : ''}</div>
             <div class="cart-item-meta">₹${i.price} × ${i.qty}</div>
             ${i.addons && i.addons.length ? `<div class="text-[10px] text-brand-500 mt-1">${i.addons.map(a => '+' + escapeHTML(a.name)).join(', ')}</div>` : ''}
+            ${i.is_thali && i.components && i.components.length ? `<div class="text-[10px] text-gray-500 mt-1 italic">Includes: ${i.components.map(escapeHTML).join(', ')}</div>` : ''}
           </div>
           <div class="cart-item-price">₹${(i.price * i.qty).toFixed(0)}</div>
         </div>
@@ -2492,7 +2590,9 @@
       price: i.price,
       qty: i.qty,
       notes: i.notes || '',
-      addons_json: JSON.stringify(i.addons || [])
+      addons_json: JSON.stringify(i.addons || []),
+      is_thali: !!i.is_thali,
+      components: i.components || []
     }));
     if (currentOrder && currentOrder.status === 'draft' && currentOrder.id) {
       currentOrder.items = items.map(i => ({ ...i }));
@@ -2636,6 +2736,9 @@
   }
 
   function getPayableSubtotal(order) {
+    if (order.subtotal !== undefined) {
+      return order.subtotal;
+    }
     const itemsTotal = (order.items || []).reduce((s, i) => s + (i.price * i.qty), 0);
     const sentToKitchen = Boolean(order.sent_to_kitchen_at || order.status === 'sent');
     return sentToKitchen ? itemsTotal : 0;
@@ -2818,7 +2921,7 @@
       key: gateway.key_id,
       amount: gateway.amount,
       currency: gateway.currency,
-      name: gateway.merchant_name || 'POS Cafè',
+      name: gateway.merchant_name || 'Qbite',
       description: `Order ${gateway.order_number}`,
       order_id: gateway.razorpay_order_id,
       prefill: {
@@ -2874,7 +2977,7 @@
       if (selectedMethod.qr_b64 && selectedMethod.qr_b64.length > 50) {
         document.getElementById('qr-img').src = selectedMethod.qr_b64;
       } else {
-        document.getElementById('qr-img').src = "/api/qr-img/" + (selectedMethod.upiId || 'cafe@ybl') + "/" + selectedMethod.amount;
+        document.getElementById('qr-img').src = "/api/qr-img/" + (selectedMethod.upiId || 'cafe@ybl') + "/" + selectedMethod.amount.toFixed(2);
       }
       showView('qr');
       return;
@@ -2884,14 +2987,18 @@
 
   async function confirmUPI() { await completePayment(selectedMethod?.type || 'upi'); }
 
+  let isProcessingPayment = false;
   async function completePayment(method) {
-    const paidOrder = currentOrder ? { id: currentOrder.id, order_number: currentOrder.order_number, table: currentTable ? currentTable.number : (currentOrder.table || 'Takeaway') } : null;
-    const customerPhone = (document.getElementById('customer-phone')?.value || '').trim();
-    
-    const discount = Math.max(0, parseFloat(document.getElementById('pay-discount')?.value || 0) || 0);
-    const coupon = document.getElementById('pay-coupon')?.value || '';
-    currentDiscountAmount = discount;
-    const total = getPaymentTotal();
+    if (isProcessingPayment) return;
+    isProcessingPayment = true;
+    try {
+      const paidOrder = currentOrder ? { id: currentOrder.id, order_number: currentOrder.order_number, table: currentTable ? currentTable.number : (currentOrder.table || 'Takeaway') } : null;
+      const customerPhone = (document.getElementById('customer-phone')?.value || '').trim();
+      
+      const discount = Math.max(0, parseFloat(document.getElementById('pay-discount')?.value || 0) || 0);
+      const coupon = document.getElementById('pay-coupon')?.value || '';
+      currentDiscountAmount = discount;
+      const total = getPaymentTotal();
 
     const r = await api('/api/orders/' + currentOrder.id + '/pay', 'POST', { 
       method, 
@@ -2938,6 +3045,9 @@
           }
         }
       } catch (pe) { console.warn('Auto print:', pe); }
+    }
+    } finally {
+      isProcessingPayment = false;
     }
   }
 
@@ -3069,7 +3179,7 @@
         </div>`).join('');
 
       const statusClass = sentToKitchen ? 'bg-orange-500/10 text-orange-500' : 'bg-gray-500/10 text-gray-500';
-      const waMsg = encodeURIComponent(`\uD83E\uDDFE POS Cafè \u2014 Bill\nOrder: ${b.order_number} | Table ${b.table}\nTotal: \u20b9${b.total.toFixed(0)}`);
+      const waMsg = encodeURIComponent(`\uD83E\uDDFE Qbite \u2014 Bill\nOrder: ${b.order_number} | Table ${b.table}\nTotal: \u20b9${b.total.toFixed(0)}`);
 
       return `
       <div class="card p-5 rounded-3xl border border-white/5 transition-all hover:scale-[1.01] ${isCurrent ? 'ring-2 ring-brand-500 bg-brand-500/5' : 'bg-card-2'}">
@@ -3127,7 +3237,14 @@
   }
 
   async function payBill(orderId) {
-    await openBillForPayment(orderId);
+    if (isProcessingPayment) return;
+    isProcessingPayment = true;
+    try {
+      await openBillForPayment(orderId);
+      showView('payment');
+    } finally {
+      isProcessingPayment = false;
+    }
   }
 
   async function deleteBill(orderId) {
@@ -3153,6 +3270,14 @@
       toast(r.error || 'Failed to delete bill', 'error');
     }
   }
+
+  function playWaiterBellPos() {
+    try { const au = new Audio('/static/audio/waiter-bell.mp3'); au.play(); } catch (e) { }
+  }
+
+  // Force Light Theme for POS
+  document.documentElement.setAttribute('data-theme', 'light');
+  localStorage.setItem('theme', 'light');
 
   async function closeSession() {
     if (!confirm('Close current session?')) return;
@@ -3252,7 +3377,12 @@
   // Socket
   const socket = io();
   socket.on('order_paid', d => { toast('\u2713 Order ' + d.order_number + ' paid!'); reloadData(); });
+  socket.on('table_update', d => { reloadData(); });
+  socket.on('table_transfer', d => { reloadData(); });
+  socket.on('table_merged', d => { reloadData(); });
+  socket.on('table_unmerged', d => { reloadData(); });
   socket.on('order_update', d => {
+    reloadData(); // Refresh tables and orders immediately
     if (!d || d.status !== 'completed') return;
     playOrderReadyBellPos();
     const orderLabel = d.order_number || 'Unknown';
@@ -3265,7 +3395,6 @@
       timeoutMs: 15000,
     });
     toast(msg, 'success');
-    reloadData();
   });
 
   // Call Waiter alert
@@ -3609,7 +3738,7 @@
         '',
         cafe.footer_note || 'Thank you for visiting! 🙏',
         '',
-        '_Powered by POS Cafè_',
+        '_Powered by Qbite_',
         '━━━━━━━━━━━━━━━━━━━━━━━',
       ].filter(line => line !== null && line !== undefined).join('\n');
 
@@ -3724,7 +3853,7 @@
     try {
       const data = await api('/api/cafe-settings');
       if (data && data.name) {
-        const nameEl = document.getElementById('pos-cafe-name');
+        const nameEl = document.getElementById('qbite-name');
         if (nameEl) nameEl.textContent = data.name;
       }
       if (data && data.logo_b64) {
@@ -3746,52 +3875,56 @@
 
 <!-- ═══ MORE ACTIONS MODAL ═══ -->
 <div id="more-actions-modal"
-  class="hidden fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-4 modal-bg">
-  <div class="modal-content w-full max-w-sm bg-card border border-border rounded-2xl shadow-2xl overflow-hidden">
-    <div class="p-4 border-b border-border flex items-center justify-between">
-      <h3 class="font-700">More Actions</h3>
-      <button onclick="closeMoreActions()" class="p-2 text-gray-500">&times;</button>
+  class="hidden fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+  <div class="modal-content w-full max-w-sm bg-white border border-gray-200 rounded-3xl shadow-2xl overflow-hidden text-gray-900">
+    <div class="p-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+      <h3 class="font-800 text-lg">More Actions</h3>
+      <button onclick="closeMoreActions()" class="p-2 text-gray-400 hover:text-gray-900 transition-colors rounded-full hover:bg-gray-200/50">&times;</button>
     </div>
-    <div class="p-4 space-y-3">
+    <div class="p-5 space-y-3">
       <button id="attendance-btn" onclick="handleAttendance()"
-        class="w-full flex items-center gap-3 p-4 rounded-xl border border-border hover:bg-white/5 transition">
-        <span class="text-xl">📅</span>
-        <div class="text-left">
-          <div id="attendance-label" class="font-700 text-sm">Clock In</div>
-          <div id="attendance-meta" class="text-[10px] text-gray-500 uppercase">Tap to start staff duty</div>
+        class="w-full flex items-center gap-4 p-4 rounded-2xl border border-gray-200 bg-white hover:bg-brand-50 hover:border-brand-200 transition-all shadow-sm">
+        <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-xl">📅</div>
+        <div class="text-left flex-1">
+          <div id="attendance-label" class="font-800 text-sm text-gray-900">Clock In</div>
+          <div id="attendance-meta" class="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mt-0.5">Tap to start staff duty</div>
         </div>
+        <div class="text-gray-300">→</div>
       </button>
 
       <a href="/backend"
-        class="w-full flex items-center gap-3 p-4 rounded-xl border border-border hover:bg-white/5 transition">
-        <span class="text-xl">🟧</span>
-        <div class="text-left">
-          <div class="font-700 text-sm">Open Backend</div>
-          <div class="text-[10px] text-gray-500 uppercase">Manage Products & Settings</div>
+        class="w-full flex items-center gap-4 p-4 rounded-2xl border border-gray-200 bg-white hover:bg-brand-50 hover:border-brand-200 transition-all shadow-sm">
+        <div class="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-xl">🟧</div>
+        <div class="text-left flex-1">
+          <div class="font-800 text-sm text-gray-900">Open Backend</div>
+          <div class="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mt-0.5">Manage Products & Settings</div>
         </div>
+        <div class="text-gray-300">→</div>
       </a>
 
-      <button type="button" data-theme-toggle onclick="toggleTheme()"
-        class="w-full flex items-center gap-3 p-4 rounded-xl border border-border hover:bg-white/5 transition">
-        <span class="text-xl">🌓</span>
-        <div class="text-left">
-          <div class="font-700 text-sm">Switch Theme</div>
-          <div class="text-[10px] text-gray-500 uppercase">Light / dark mode</div>
+      <a href="/kitchen" target="_blank"
+        class="w-full flex items-center gap-4 p-4 rounded-2xl border border-gray-200 bg-white hover:bg-brand-50 hover:border-brand-200 transition-all shadow-sm">
+        <div class="w-10 h-10 rounded-full bg-yellow-50 flex items-center justify-center text-xl">🍳</div>
+        <div class="text-left flex-1">
+          <div class="font-800 text-sm text-gray-900">Kitchen Display</div>
+          <div class="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mt-0.5">View active orders</div>
         </div>
-      </button>
+        <div class="text-gray-300">→</div>
+      </a>
 
       <button onclick="closeSession()"
-        class="w-full flex items-center gap-3 p-4 rounded-xl border border-border hover:bg-white/5 transition">
-        <span class="text-xl">💰</span>
-        <div class="text-left">
-          <div class="font-700 text-sm">Close Register</div>
-          <div class="text-[10px] text-gray-500 uppercase">Finalize Today's Session</div>
+        class="w-full flex items-center gap-4 p-4 rounded-2xl border border-gray-200 bg-white hover:bg-brand-50 hover:border-brand-200 transition-all shadow-sm">
+        <div class="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center text-xl">💰</div>
+        <div class="text-left flex-1">
+          <div class="font-800 text-sm text-gray-900">Close Register</div>
+          <div class="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mt-0.5">Finalize Today's Session</div>
         </div>
+        <div class="text-gray-300">→</div>
       </button>
 
-      <div class="pt-4 border-t border-border">
+      <div class="pt-4 mt-2 border-t border-gray-100">
         <button onclick="logout()"
-          class="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-red-500/10 text-red-500 font-700 text-sm border border-red-500/20 hover:bg-red-500/20 transition">
+          class="w-full flex items-center justify-center gap-2 p-3.5 rounded-xl bg-red-50 text-red-600 font-700 text-sm border border-red-100 hover:bg-red-100 transition-all">
           ↩ Logout Account
         </button>
       </div>

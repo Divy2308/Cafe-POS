@@ -153,7 +153,7 @@
 <div class="receipt {{ 'compact' if cafe_settings and cafe_settings.receipt_layout == 'compact' else '' }}" style="text-align: {{ (cafe_settings.receipt_alignment if cafe_settings else 'center') or 'center' }}">
   <div class="{{ 'r-center' if cafe_settings and cafe_settings.receipt_alignment != 'left' else '' }}">
     <div class="r-bold r-invoice-header">{{ cafe_settings.invoice_title if cafe_settings else 'RETAIL INVOICE' }}</div>
-    <div class="r-shop-title r-bold">{{ cafe_settings.name if cafe_settings else 'POS Cafè' }}</div>
+    <div class="r-shop-title r-bold">{{ cafe_settings.name if cafe_settings else 'Qbite' }}</div>
     {% if cafe_settings and cafe_settings.address %}
     <div class="r-shop-address">{{ cafe_settings.address }}</div>
     {% endif %}
@@ -218,6 +218,12 @@
               {% set addons = item.addons_json|from_json %}
               {% if addons %}
                 <br><small style="font-size:8px;">Addons: {{ addons|map(attribute='name')|join(', ') }}</small>
+              {% endif %}
+            {% endif %}
+            {% if item.is_thali and item.components_json %}
+              {% set comps = item.components_json|from_json %}
+              {% if comps %}
+                <br><small style="font-size:8px;font-style:italic;">Includes: {{ comps|join(', ') }}</small>
               {% endif %}
             {% endif %}
         </td>

@@ -155,16 +155,16 @@
 </div>
 
 <div id="addon-modal" class="hidden fixed inset-0 addon-modal-bg items-center justify-center z-[80]" onclick="if(event.target===this)closeAddonModal()">
-  <div style="width:min(92vw, 420px); max-height:min(80vh, 620px); overflow:hidden; border-radius:20px; border:1px solid rgba(249,115,22,0.25); background:#0b0b0f; box-shadow:0 32px 90px rgba(0,0,0,0.55); display:flex; flex-direction:column;">
-    <div style="padding:20px 20px 12px; border-bottom:1px solid rgba(255,255,255,0.05);">
-      <div id="addon-product-name" style="font-family:Syne,sans-serif; font-size:22px; font-weight:800;"></div>
-      <div id="addon-product-price" style="color:#9ca3af; font-size:13px; margin-top:4px;"></div>
+  <div style="width:min(92vw, 420px); max-height:min(80vh, 620px); overflow:hidden; border-radius:20px; border:1px solid rgba(249,115,22,0.25); background:#ffffff; box-shadow:0 32px 90px rgba(0,0,0,0.15); display:flex; flex-direction:column;">
+    <div style="padding:20px 20px 12px; border-bottom:1px solid rgba(0,0,0,0.05);">
+      <div id="addon-product-name" style="font-family:Syne,sans-serif; font-size:22px; font-weight:800; color:#111827;"></div>
+      <div id="addon-product-price" style="color:#4b5563; font-size:13px; margin-top:4px;"></div>
     </div>
     <div id="addon-list" style="padding:16px 20px; overflow-y:auto; display:flex; flex-direction:column; gap:10px;"></div>
-    <div style="padding:16px 20px 20px; border-top:1px solid rgba(255,255,255,0.05);">
+    <div style="padding:16px 20px 20px; border-top:1px solid rgba(0,0,0,0.05);">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-        <span style="font-size:13px; color:#9ca3af;">Item total</span>
-        <span id="addon-total-display" style="font-size:22px; font-weight:800; color:#fff;">₹0</span>
+        <span style="font-size:13px; color:#4b5563;">Item total</span>
+        <span id="addon-total-display" style="font-size:22px; font-weight:800; color:#111827;">₹0</span>
       </div>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
         <button type="button" onclick="closeAddonModal()" class="bill-action-btn" style="width:100%;">Cancel</button>
@@ -179,24 +179,24 @@
 {% block scripts %}
 <script>
 (function () {
-  const TABLE_ID = {{ table_id }};
+  const TABLE_ID = {{ table_id|tojson }};
   const TABLE_NUMBER = {{ table_number|tojson }};
   const TENANT_ID = {{ tenant_id|tojson }};
   const BRANCH_ID = {{ branch_id|tojson }};
 
   // ── TABLE LOCK: prevent customers changing table via URL ──
-  const TABLE_LOCK_KEY = 'pos_cafe_table_lock_' + TENANT_ID;
+  const TABLE_LOCK_KEY = 'qbite_table_lock_' + TENANT_ID;
   const lockedTable = sessionStorage.getItem(TABLE_LOCK_KEY);
   if (!lockedTable) {
     // First visit — lock this tab to this table
     sessionStorage.setItem(TABLE_LOCK_KEY, String(TABLE_ID));
-  } else if (parseInt(lockedTable, 10) !== TABLE_ID) {
+  } else if (lockedTable !== TABLE_ID) {
     // Someone edited the URL — redirect them back
     window.location.replace('/table/' + lockedTable + '/order');
   }
-  const LS_TOKEN = 'pos_cafe_guest_token';
-  const LS_CART = 'pos_cafe_self_cart_' + TABLE_ID;
-  const LS_ORDERS = 'pos_cafe_guest_order_refs';
+  const LS_TOKEN = 'qbite_guest_token';
+  const LS_CART = 'qbite_self_cart_' + TABLE_ID;
+  const LS_ORDERS = 'qbite_guest_order_refs';
   const QR_TOKEN = {{ qr_token|tojson }};
 
   function getGuestToken() {
@@ -222,7 +222,37 @@
   let activeAddonProduct = null;
 
   const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
-  const emojiMap = { Food: '🍽️', Beverages: '☕', Desserts: '🍰', Snacks: '🥨' };
+  function getCatEmojiFallback(name) {
+    const n = (name || '').toLowerCase();
+    if (n.includes('pizza'))                                    return '🍕';
+    if (n.includes('burger'))                                   return '🍔';
+    if (n.includes('pasta') || n.includes('noodle'))            return '🍝';
+    if (n.includes('sizzler'))                                  return '🥩';
+    if (n.includes('salad'))                                    return '🥗';
+    if (n.includes('dessert') || n.includes('sweet') || n.includes('cake') || n.includes('ice cream')) return '🍰';
+    if (n.includes('snack') || n.includes('fry') || n.includes('fries') || n.includes('finger')) return '🍟';
+    if (n.includes('tea') || n.includes('coffee'))              return '☕';
+    if (n.includes('juice') || n.includes('shake') || n.includes('smoothie')) return '🧃';
+    if (n.includes('drink') || n.includes('beverage') || n.includes('water') || n.includes('soda') || n.includes('mocktail') || n.includes('cocktail')) return '🥤';
+    if (n.includes('bread') || n.includes('roti') || n.includes('naan') || n.includes('paratha')) return '🫓';
+    if (n.includes('rice') || n.includes('biryani') || n.includes('pulao')) return '🍚';
+    if (n.includes('soup') || n.includes('broth'))              return '🍜';
+    if (n.includes('wrap') || n.includes('roll') || n.includes('kathi')) return '🌯';
+    if (n.includes('sandwich') || n.includes('sub'))            return '🥪';
+    if (n.includes('chicken') || n.includes('poultry'))         return '🍗';
+    if (n.includes('mutton') || n.includes('lamb') || n.includes('beef')) return '🥩';
+    if (n.includes('fish') || n.includes('seafood') || n.includes('prawn') || n.includes('shrimp')) return '🐟';
+    if (n.includes('veg') || n.includes('paneer') || n.includes('tofu')) return '🥦';
+    if (n.includes('starter') || n.includes('appetizer') || n.includes('starter')) return '🥠';
+    if (n.includes('breakfast') || n.includes('morning') || n.includes('egg')) return '🍳';
+    if (n.includes('thali') || n.includes('combo') || n.includes('meal')) return '🍱';
+    if (n.includes('chinese') || n.includes('indo-chinese')) return '🥡';
+    if (n.includes('south') || n.includes('dosa') || n.includes('idli')) return '🫔';
+    if (n.includes('north indian') || n.includes('punjabi') || n.includes('curry')) return '🍛';
+    if (n.includes('grill') || n.includes('bbq') || n.includes('tandoor')) return '🔥';
+    if (n.includes('main') || n.includes('food') || n.includes('dish')) return '🍽️';
+    return '🛒';
+  }
 
   function esc(s) {
     const d = document.createElement('div');
@@ -231,19 +261,36 @@
   }
 
   function getCategoryImage(categoryName) {
-    const name = (categoryName || '').toLowerCase();
-    if (name.includes('tea') || name.includes('coffee'))  return '/static/img/categories/teaorcoffee.png';
-    if (name.includes('snack'))                           return '/static/img/categories/Snacks.png';
-    if (name.includes('sizzler'))                         return '/static/img/categories/sizzler.png';
-    if (name.includes('pizza'))                           return '/static/img/categories/pizza.png';
-    if (name.includes('burger'))                          return '/static/img/categories/burger.png';
-    if (name.includes('pasta'))                           return '/static/img/categories/pasta.png';
-    if (name.includes('salad'))                           return '/static/img/categories/salads.png';
-    if (name.includes('dessert') || name.includes('sweet')) return '/static/img/categories/Desserts.png';
-    if (name.includes('mains') || name.includes('main'))  return '/static/img/categories/mains.png';
-    if (name.includes('drink') || name.includes('water') || name.includes('beverage') || name.includes('juice'))
+    const n = (categoryName || '').toLowerCase();
+    // ── Tea / Coffee ───────────────────────────────────────
+    if (n.includes('tea') || n.includes('coffee') || n.includes('cappuccino') || n.includes('latte') || n.includes('espresso'))
+                                                          return '/static/img/categories/teaorcoffee.png';
+    // ── Snacks ─────────────────────────────────────────────
+    if (n.includes('snack') || n.includes('fries') || n.includes('fry') || n.includes('finger') || n.includes('nugget') || n.includes('starter') || n.includes('appetizer'))
+                                                          return '/static/img/categories/Snacks.png';
+    // ── Sizzler ────────────────────────────────────────────
+    if (n.includes('sizzler') || n.includes('grill') || n.includes('bbq') || n.includes('tandoor'))
+                                                          return '/static/img/categories/sizzler.png';
+    // ── Pizza ──────────────────────────────────────────────
+    if (n.includes('pizza') || n.includes('flatbread'))   return '/static/img/categories/pizza.png';
+    // ── Burger ─────────────────────────────────────────────
+    if (n.includes('burger') || n.includes('sandwich') || n.includes('sub') || n.includes('wrap') || n.includes('roll') || n.includes('kathi'))
+                                                          return '/static/img/categories/burger.png';
+    // ── Pasta / Noodles ────────────────────────────────────
+    if (n.includes('pasta') || n.includes('noodle') || n.includes('spaghetti') || n.includes('chinese') || n.includes('indo-chinese'))
+                                                          return '/static/img/categories/pasta.png';
+    // ── Salads ─────────────────────────────────────────────
+    if (n.includes('salad') || n.includes('bowl') || n.includes('veg'))  return '/static/img/categories/salads.png';
+    // ── Desserts / Sweets ──────────────────────────────────
+    if (n.includes('dessert') || n.includes('sweet') || n.includes('cake') || n.includes('ice cream') || n.includes('waffle') || n.includes('brownie') || n.includes('pudding'))
+                                                          return '/static/img/categories/Desserts.png';
+    // ── Mains / Rice / Biryani / Curry ─────────────────────
+    if (n.includes('main') || n.includes('rice') || n.includes('biryani') || n.includes('pulao') || n.includes('curry') || n.includes('thali') || n.includes('combo') || n.includes('meal') || n.includes('north indian') || n.includes('south indian') || n.includes('dosa') || n.includes('idli'))
+                                                          return '/static/img/categories/mains.png';
+    // ── Beverages ──────────────────────────────────────────
+    if (n.includes('drink') || n.includes('water') || n.includes('beverage') || n.includes('juice') || n.includes('soda') || n.includes('shake') || n.includes('smoothie') || n.includes('mocktail') || n.includes('cocktail') || n.includes('lassi') || n.includes('lemonade'))
                                                           return '/static/img/categories/Beverages.png';
-    return '';
+    return null; // no match — use emoji fallback
   }
 
   function escapeAttr(s) {
@@ -319,7 +366,9 @@
   }
 
   async function loadMenu() {
-    const res = await fetch('/api/self-order/menu?table_id=' + encodeURIComponent(TABLE_ID));
+    let url = '/api/self-order/menu?table_id=' + encodeURIComponent(TABLE_ID);
+    if (TENANT_ID) url += '&tenant_id=' + encodeURIComponent(TENANT_ID);
+    const res = await fetch(url);
     if (!res.ok) {
       toast('Could not load menu', 'error');
       return;
@@ -377,7 +426,7 @@
       } else if (p.image_b64) {
         imgHtml = `<img src="${esc(p.image_b64)}" style="width:100%;height:96px;object-fit:cover;border-radius:10px;margin-bottom:8px;" alt="" loading="lazy">`;
       } else {
-        imgHtml = `<div style="width:100%;height:96px;border-radius:10px;margin-bottom:8px;background:#1e1e24;display:flex;align-items:center;justify-content:center;font-size:32px;">${emojiMap[c.name] || '🛒'}</div>`;
+        imgHtml = `<div style="width:100%;height:96px;border-radius:10px;margin-bottom:8px;background:linear-gradient(135deg,#1e1e24,#2a2a34);display:flex;align-items:center;justify-content:center;font-size:40px;">${getCatEmojiFallback(c.name)}</div>`;
       }
       const addonBadge = p.addons && p.addons.length
         ? `<div style="font-size:10px; color:#fdba74; margin-top:5px;">Customize +${p.addons.length} addons</div>`
@@ -418,7 +467,9 @@
         price,
         qty: 1,
         notes: '',
-        addons
+        addons,
+        is_thali: !!p.is_thali,
+        components: p.components || []
       });
     }
     renderCart();
@@ -433,10 +484,10 @@
     document.getElementById('addon-product-name').textContent = product.name;
     document.getElementById('addon-product-price').textContent = 'Base price: ₹' + formatMoney(product.price);
     document.getElementById('addon-list').innerHTML = (product.addons || []).map(addon => `
-      <label style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; border:1px solid rgba(255,255,255,0.06); border-radius:14px; cursor:pointer; background:#111318;">
+      <label style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; border:1px solid rgba(0,0,0,0.08); border-radius:14px; cursor:pointer; background:#f9fafb;">
         <span style="display:flex; align-items:center; gap:10px; min-width:0;">
           <input type="checkbox" class="addon-checkbox addon-check" data-id="${addon.id}" data-name="${esc(addon.name)}" data-price="${addon.price}" onchange="updateAddonTotal()" />
-          <span style="font-size:13px; font-weight:700; color:#f3f4f6;">${esc(addon.name)}</span>
+          <span style="font-size:13px; font-weight:700; color:#374151;">${esc(addon.name)}</span>
         </span>
         <span style="font-size:12px; font-weight:800; color:#fb923c;">+₹${formatMoney(addon.price)}</span>
       </label>
@@ -490,9 +541,10 @@
     el.innerHTML = cart.map((item, idx) => `
       <div class="cart-row" style="flex-wrap:wrap;">
         <div style="flex:1; min-width:0;">
-          <div style="font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(item.name)}</div>
+          <div style="font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(item.name)} ${item.is_thali ? '<span style="padding:1px 4px;font-size:10px;background:#10b981;color:#fff;border-radius:4px;">THALI</span>' : ''}</div>
           <div style="font-size:11px; color:#6b7280;">₹${formatMoney(item.price)} each</div>
           ${item.addons && item.addons.length ? `<div style="font-size:11px; color:#fdba74; margin-top:5px;">+ ${item.addons.map(a => esc(a.name)).join(', ')}</div>` : ''}
+          ${item.is_thali && item.components && item.components.length ? `<div style="font-size:10px; color:#9ca3af; margin-top:3px; font-style:italic;">Includes: ${item.components.map(esc).join(', ')}</div>` : ''}
           <input type="text" class="item-note-input" placeholder="Note for kitchen (e.g. no onion)" value="${escapeAttr(item.notes)}" oninput="updateNote(${idx}, this.value)" />
         </div>
         <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
@@ -627,6 +679,7 @@
           <span>
             ${esc(i.name)} ×${i.qty}
             ${addons.length ? `<div style="font-size:11px;color:#fdba74;margin-top:3px;">+ ${addons.map(a => esc(a.name)).join(', ')}</div>` : ''}
+            ${i.is_thali && i.components && i.components.length ? `<div style="font-size:10px;color:#9ca3af;margin-top:2px;font-style:italic;">Includes: ${i.components.map(esc).join(', ')}</div>` : ''}
           </span>
         </div>`;
       }).join('');
@@ -671,13 +724,16 @@
       table_id: TABLE_ID,
       token: QR_TOKEN,
       guest_token: guestToken,
+      tenant_id: TENANT_ID,
       customer_name: (document.getElementById('cust-name') && document.getElementById('cust-name').value || '').trim(),
       customer_phone: (document.getElementById('cust-phone') && document.getElementById('cust-phone').value) || '',
       items: cart.map(i => ({
         product_id: i.product_id,
         qty: i.qty,
-        notes: i.notes || '',
-        addons: i.addons || []
+        notes: (i.notes || '').trim(),
+        addons_json: JSON.stringify(Array.isArray(i.addons) ? i.addons : []),
+        is_thali: !!i.is_thali,
+        components: Array.isArray(i.components) ? i.components : []
       }))
     };
     if (!body.customer_name) { toast('Please enter your name', 'error'); btn.disabled = false; btn.textContent = prev; return; }
@@ -728,7 +784,7 @@
       key: gateway.key_id,
       amount: gateway.amount,
       currency: gateway.currency,
-      name: gateway.merchant_name || 'POS Cafè',
+      name: gateway.merchant_name || 'Qbite',
       description: `Order ${gateway.order_number}`,
       order_id: gateway.razorpay_order_id,
       prefill: { name: gateway.customer_name || '' },

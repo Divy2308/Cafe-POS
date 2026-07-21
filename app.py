@@ -1,4 +1,7 @@
 import sys
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
 IS_WINDOWS = sys.platform == "win32"
 
@@ -15,6 +18,9 @@ from flask_cors import CORS
 from flask_wtf.csrf import CSRFProtect, generate_csrf
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import or_, func
+from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.exc import IntegrityError, ProgrammingError
+from itsdangerous import URLSafeSerializer, BadSignature
 import qrcode, io, base64, json
 import sqlite3
 import os
@@ -53,10 +59,11 @@ if os.path.exists(env_path):
             os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 LEGACY_DB_PATH = os.path.join(os.path.dirname(__file__), 'instance', 'pos.db')
-DB_DIR = os.path.join(tempfile.gettempdir(), 'pos-cafe')
+DB_DIR = os.path.join(tempfile.gettempdir(), 'qbite')
 DB_PATH = os.path.join(DB_DIR, 'pos_runtime.db')
 os.makedirs(DB_DIR, exist_ok=True)
-if os.path.exists(DB_PATH):
+_temp_db_url = (os.getenv('DATABASE_URL') or '').strip()
+if os.path.exists(DB_PATH) and not _temp_db_url:
     def _db_is_writable(path):
         conn = None
         try:
@@ -81,7 +88,7 @@ if os.path.exists(DB_PATH):
             pass
 
 app = Flask(__name__)
-_secret_key = os.getenv('SECRET_KEY', 'pos-cafe-default-insecure-key')
+_secret_key = os.getenv('SECRET_KEY', 'qbite-default-insecure-key')
 app.config['SECRET_KEY'] = _secret_key
 database_url = (os.getenv('DATABASE_URL') or '').strip()
 if database_url.startswith('postgres://'):
@@ -107,12 +114,12 @@ SMTP_HOST = os.getenv('SMTP_HOST', '').strip()
 SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
 SMTP_USER = os.getenv('SMTP_USER', '').strip()
 SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', '').strip()
-SMTP_FROM = os.getenv('SMTP_FROM', SMTP_USER or 'no-reply@pos-cafe.local').strip()
+SMTP_FROM = os.getenv('SMTP_FROM', SMTP_USER or 'no-reply@qbite.local').strip()
 SMTP_USE_TLS = os.getenv('SMTP_USE_TLS', '1').strip() != '0'
 RESEND_API_KEY = os.getenv('RESEND_API_KEY', '').strip()
 RESEND_FROM = os.getenv(
     'RESEND_FROM',
-    os.getenv('EMAIL_FROM', 'POS Cafè <onboarding@resend.dev>')
+    os.getenv('EMAIL_FROM', 'Qbite <onboarding@resend.dev>')
 ).strip()
 if RESEND_API_KEY and resend is not None:
     resend.api_key = RESEND_API_KEY
@@ -120,7 +127,7 @@ if RESEND_API_KEY and resend is not None:
 RAZORPAY_KEY_ID = os.getenv('RAZORPAY_KEY_ID', '').strip()
 RAZORPAY_KEY_SECRET = os.getenv('RAZORPAY_KEY_SECRET', '').strip()
 RAZORPAY_CURRENCY = os.getenv('RAZORPAY_CURRENCY', 'INR').strip().upper() or 'INR'
-RAZORPAY_MERCHANT_NAME = os.getenv('RAZORPAY_MERCHANT_NAME', 'POS Cafè').strip() or 'POS Cafè'
+RAZORPAY_MERCHANT_NAME = os.getenv('RAZORPAY_MERCHANT_NAME', 'Qbite').strip() or 'Qbite'
 PASSWORD_RESET_CODES = {}
 
 # ── Super-admin credentials (set in .env) ──────────────────
@@ -169,7 +176,7 @@ def get_public_url_root():
     return request.url_root.rstrip('/')
 
 # Warn if running with the default insecure key
-if _secret_key == 'pos-cafe-default-insecure-key':
+if _secret_key == 'qbite-default-insecure-key':
     import logging
     logging.warning('[SECURITY] Using default SECRET_KEY. Set a strong SECRET_KEY in .env before deploying to production.')
 
@@ -271,6 +278,18 @@ def service_worker():
 
 
 # ─── Models ───────────────────────────────────────────────
+class FoodCourt(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    address = db.Column(db.Text)
+    owner_id = db.Column(db.Integer)
+    food_court_id = db.Column(db.Integer)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_active = db.Column(db.Boolean, default=False)
+    approval_status = db.Column(db.String(20), default='pending')
+    phone = db.Column(db.String(20), default='')
+    shop_limit = db.Column(db.Integer, default=0)  # 0 = unlimited
+
 class Tenant(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -288,6 +307,7 @@ class Tenant(db.Model):
     tags_json = db.Column(db.Text, default='[]')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     owner_id = db.Column(db.Integer, nullable=True)
+    food_court_id = db.Column(db.Integer, db.ForeignKey('food_court.id'), nullable=True)
 
 class Branch(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -324,6 +344,7 @@ class User(db.Model):
     is_platform_admin = db.Column(db.Boolean, default=False)
     tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
     branch_id = db.Column(db.Integer, db.ForeignKey('branch.id'), nullable=True)
+    food_court_id = db.Column(db.Integer, db.ForeignKey('food_court.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     tenant = db.relationship('Tenant', backref='users')
     branch = db.relationship('Branch', backref='users')
@@ -357,6 +378,8 @@ class Product(db.Model):
     unit = db.Column(db.String(20), default='pcs')
     active = db.Column(db.Boolean, default=True)
     image_b64 = db.Column(db.Text, default='')  # base64 data URL for product photo
+    is_thali = db.Column(db.Boolean, default=False)  # True if this is a combo/thali product
+    components_json = db.Column(db.Text, default='[]')  # JSON list of component names
     branch = db.relationship('Branch', backref='products')
     tenant = db.relationship('Tenant', backref='products')
 
@@ -364,6 +387,7 @@ class Floor(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
+    food_court_id = db.Column(db.Integer, db.ForeignKey('food_court.id'), nullable=True)
     tables = db.relationship('Table', backref='floor', lazy=True)
     tenant = db.relationship('Tenant', backref='floors')
     branch_id = db.Column(db.Integer, db.ForeignKey('branch.id'), nullable=True)
@@ -375,9 +399,11 @@ class Table(db.Model):
     seats = db.Column(db.Integer, default=4)
     floor_id = db.Column(db.Integer, db.ForeignKey('floor.id'))
     tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'), nullable=True)
+    food_court_id = db.Column(db.Integer, db.ForeignKey('food_court.id'), nullable=True)
     active = db.Column(db.Boolean, default=True)
     status = db.Column(db.String(20), default='free')  # free, occupied
     merged_to_id = db.Column(db.Integer, db.ForeignKey('table.id'), nullable=True)
+    order_index = db.Column(db.Integer, default=0)
     tenant = db.relationship('Tenant', backref='tables')
     branch_id = db.Column(db.Integer, db.ForeignKey('branch.id'), nullable=True)
     branch = db.relationship('Branch', backref='tables')
@@ -394,7 +420,7 @@ class PaymentMethod(db.Model):
 
 class CafeSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), default='POS Cafè')
+    name = db.Column(db.String(100), default='Qbite')
     phone = db.Column(db.String(20), default='')
     email = db.Column(db.String(120), default='')
     address = db.Column(db.Text, default='')
@@ -676,6 +702,10 @@ def page_login_required(allowed_roles=None, redirect_to=None):
         def decorated(*args, **kwargs):
             if 'user_id' not in session:
                 return redirect(url_for('auth'))
+            user = get_current_user()
+            if not user:
+                session.clear()
+                return redirect(url_for('auth'))
             role = normalize_role(session.get('user_role'))
             if allowed_roles is not None:
                 allowed = {normalize_role(r) for r in allowed_roles}
@@ -689,6 +719,10 @@ def staff_page_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if 'user_id' not in session:
+            return redirect(url_for('auth'))
+        user = get_current_user()
+        if not user:
+            session.clear()
             return redirect(url_for('auth'))
         role = normalize_role(session.get('user_role'))
         if role == 'customer':
@@ -744,21 +778,34 @@ def find_user_by_email(email):
     return User.query.filter(db.func.lower(User.email) == email.lower()).first()
 
 def get_tenant_access_block_message(user):
-    if not user or not user.tenant_id or getattr(user, 'is_platform_admin', False):
+    if not user or getattr(user, 'is_platform_admin', False):
         return None
-    tenant = db.session.get(Tenant, user.tenant_id)
-    if not tenant:
+        
+    if user.tenant_id:
+        tenant = db.session.get(Tenant, user.tenant_id)
+        if not tenant:
+            return None
+        status = (tenant.approval_status or ('approved' if tenant.is_active else 'pending')).strip().lower()
+        type_name = 'restaurant'
+        is_active = tenant.is_active
+    elif user.food_court_id:
+        fc = db.session.get(FoodCourt, user.food_court_id)
+        if not fc:
+            return None
+        status = (fc.approval_status or ('approved' if fc.is_active else 'pending')).strip().lower()
+        type_name = 'food court'
+        is_active = fc.is_active
+    else:
         return None
 
-    status = (tenant.approval_status or ('approved' if tenant.is_active else 'pending')).strip().lower()
     if status == 'pending':
-        return 'Your restaurant request is pending admin approval.'
+        return f'Your {type_name} request is pending admin approval.'
     if status == 'rejected':
-        return 'Your restaurant request was rejected. Contact admin for review.'
+        return f'Your {type_name} request was rejected. Contact admin for review.'
     if status == 'suspended':
-        return 'This restaurant account is suspended.'
-    if not tenant.is_active:
-        return 'This restaurant account is not active.'
+        return f'This {type_name} account is suspended.'
+    if not is_active:
+        return f'This {type_name} account is not active.'
     return None
 
 def make_slug(name):
@@ -876,8 +923,12 @@ def apply_tenant_scope(query, model_class):
     if user and getattr(user, 'is_platform_admin', False):
         return query  # Platform admins see everything
     tid = get_current_tenant_id()
+    
     if tid and hasattr(model_class, 'tenant_id'):
         return query.filter(model_class.tenant_id == tid)
+    elif user and user.food_court_id and hasattr(model_class, 'food_court_id'):
+        return query.filter(model_class.food_court_id == user.food_court_id)
+        
     return query
 
 def get_default_branch(tenant_id=None):
@@ -1058,9 +1109,9 @@ def strong_password_error(password, email=''):
     )
 
 def send_reset_email(email, otp):
-    subject = 'POS Cafè password reset code'
+    subject = 'Qbite password reset code'
     body = (
-        f'Your POS Cafè password reset code is {otp}. '
+        f'Your Qbite password reset code is {otp}. '
         'This code expires in 10 minutes.'
     )
 
@@ -1158,21 +1209,33 @@ def cleanup_reset_codes():
 # ─── Auth Routes ───────────────────────────────────────────
 @app.route('/favicon.ico')
 def favicon():
-    logo_path = os.path.join(os.path.dirname(__file__), 'pos_cafe_logo.svg')
+    logo_path = os.path.join(os.path.dirname(__file__), 'qbite_logo.svg')
     if os.path.exists(logo_path):
-        return send_from_directory(os.path.dirname(__file__), 'pos_cafe_logo.svg', mimetype='image/svg+xml')
+        return send_from_directory(os.path.dirname(__file__), 'qbite_logo.svg', mimetype='image/svg+xml')
     return '', 204
 
 @app.route('/')
-def index():
+def landing():
     if 'user_id' in session:
-        return redirect(role_home(session.get('user_role')))
+        user = get_current_user()
+        if user:
+            return redirect(role_home(session.get('user_role')))
+        else:
+            session.clear()
     return render_template('landing.html')
+
+@app.route('/terms')
+def terms():
+    return render_template('terms.html')
 
 @app.route('/auth')
 def auth():
     if 'user_id' in session:
-        return redirect(role_home(session.get('user_role')))
+        user = get_current_user()
+        if user:
+            return redirect(role_home(session.get('user_role')))
+        else:
+            session.clear()
     return render_template('auth.html')
 
 
@@ -1472,8 +1535,8 @@ def register_restaurant():
     password = d.get('password') or ''
     phone = (d.get('phone') or '').strip()
 
-    if not restaurant_name or not name or not email or not password:
-        return jsonify({'error': 'Restaurant name, your name, email, and password are required'}), 400
+    if not restaurant_name or not name or not email or not password or not phone:
+        return jsonify({'error': 'Restaurant name, your name, email, password, and phone number are required'}), 400
     if find_user_by_email(email):
         return jsonify({'error': 'Email already exists'}), 400
     password_error = strong_password_error(password, email)
@@ -1488,12 +1551,23 @@ def register_restaurant():
         slug = f'{base_slug}-{counter}'
         counter += 1
 
+    # If registering under a food court, enforce shop limit
+    food_court_id = d.get('food_court_id')
+    if food_court_id:
+        fc = FoodCourt.query.get(food_court_id)
+        if fc and fc.shop_limit and fc.shop_limit > 0:
+            current_count = Tenant.query.filter_by(food_court_id=fc.id).count()
+            if current_count >= fc.shop_limit:
+                return jsonify({'error': f'Shop limit reached. This food court allows a maximum of {fc.shop_limit} shops.'}), 400
+
     # Create tenant
     tenant = Tenant(
         name=restaurant_name,
         slug=slug,
         is_active=False,
         approval_status='pending',
+        phone=phone,
+        food_court_id=food_court_id,
     )
     db.session.add(tenant)
     db.session.flush()
@@ -1536,6 +1610,51 @@ def register_restaurant():
         'name': owner.name,
         'status': 'pending',
         'tenant_slug': tenant.slug,
+        'message': 'Request submitted. Login will be enabled after admin approval.',
+    })
+
+@app.route('/api/register-foodcourt', methods=['POST'])
+def register_foodcourt():
+    """Create a food court hub."""
+    d = request.json or {}
+    name = (d.get('name') or '').strip()
+    admin_name = (d.get('admin_name') or '').strip()
+    email = (d.get('email') or '').strip()
+    password = d.get('password') or ''
+    phone = (d.get('phone') or '').strip()
+
+    if not name or not admin_name or not email or not password or not phone:
+        return jsonify({'error': 'Food court name, admin name, email, password, and phone number are required'}), 400
+    if find_user_by_email(email):
+        return jsonify({'error': 'Email already exists'}), 400
+    password_error = strong_password_error(password, email)
+    if password_error:
+        return jsonify({'error': password_error}), 400
+
+    # Create Food Court
+    fc = FoodCourt(name=name, is_active=False, approval_status='pending', phone=phone)
+    db.session.add(fc)
+    db.session.flush()
+
+    # Create owner user
+    owner = User(
+        name=admin_name,
+        email=email,
+        password=generate_password_hash(password, method='scrypt'),
+        role='admin',
+        food_court_id=fc.id,
+        is_superadmin=True,
+    )
+    db.session.add(owner)
+    db.session.flush()
+
+    fc.owner_id = owner.id
+    db.session.commit()
+
+    return jsonify({
+        'ok': True,
+        'name': owner.name,
+        'status': 'pending',
         'message': 'Request submitted. Login will be enabled after admin approval.',
     })
 
@@ -1652,10 +1771,13 @@ def pos():
 @app.route('/backend')
 @page_login_required(allowed_roles=('restaurant',))
 def backend():
+    t_id = get_current_tenant_id()
+    t = Tenant.query.get(t_id) if t_id else None
     return render_template(
         'backend.html',
         user_name=session.get('user_name'),
         user_role=session.get('user_role'),
+        tenant=t,
     )
 
 @app.route('/admin')
@@ -1679,38 +1801,106 @@ def customer():
 @page_login_required(allowed_roles=('restaurant',))
 @tenant_feature_required('dashboard')
 def dashboard():
+    t_id = get_current_tenant_id()
+    t = Tenant.query.get(t_id) if t_id else None
+    
+    # Check if user is a food court admin
+    user = db.session.get(User, session['user_id'])
+    food_court = None
+    if user and user.food_court_id:
+        food_court = db.session.get(FoodCourt, user.food_court_id)
+        
     return render_template(
         'dashboard.html',
         user_name=session.get('user_name'),
         user_role=session.get('user_role'),
         active_branch=get_selected_branch(),
         is_superadmin=is_superadmin(),
+        tenant=t,
+        food_court=food_court,
     )
 
-def _serialize_shrey_request(tenant):
-    owner = db.session.get(User, tenant.owner_id) if tenant.owner_id else User.query.filter_by(
-        tenant_id=tenant.id, role='restaurant'
-    ).order_by(User.id.asc()).first()
-    branch = Branch.query.filter_by(tenant_id=tenant.id).order_by(Branch.id.asc()).first()
+def _serialize_shrey_foodcourt(fc, preload=None):
+    preload = preload or {}
+    owners_by_fc = preload.get('owners_by_fc') or {}
+    
+    owner = owners_by_fc.get(fc.id)
+    if owner is None:
+        owner = db.session.get(User, fc.owner_id) if fc.owner_id else User.query.filter_by(
+            food_court_id=fc.id, role='restaurant'
+        ).order_by(User.id.asc()).first()
+        
+    status = (fc.approval_status or ('approved' if fc.is_active else 'pending')).strip().lower()
+    
+    shop_count = Tenant.query.filter_by(food_court_id=fc.id).count()
+    
+    return {
+        'id': f'fc_{fc.id}', # String ID to differentiate from Tenants in the UI
+        'raw_id': fc.id,
+        'name': fc.name,
+        'owner': owner.name if owner else '—',
+        'email': owner.email if owner else '',
+        'city': (fc.address or '').strip() or '—',
+        'phone': (fc.phone or '').strip() or '—',
+        'plan': 'enterprise', # Food courts might not have plans, use enterprise
+        'applied': fc.created_at.strftime('%Y-%m-%d') if fc.created_at else '',
+        'status': status,
+        'type': 'Food Court Hub',
+        'note': 'Central food court admin',
+        'tables': 0,
+        'ordersDay': 0,
+        'feature_flags': {},
+        'max_staff': 0,
+        'shop_limit': fc.shop_limit or 0,
+        'shop_count': shop_count,
+    }
+
+def _serialize_shrey_request(tenant, preload=None):
+    preload = preload or {}
+    owners_by_tenant = preload.get('owners_by_tenant') or {}
+    branches_by_tenant = preload.get('branches_by_tenant') or {}
+    food_courts_by_id = preload.get('food_courts_by_id') or {}
+    table_counts = preload.get('table_counts') or {}
+    orders_day_counts = preload.get('orders_day_counts') or {}
+
+    owner = owners_by_tenant.get(tenant.id)
+    if owner is None:
+        owner = db.session.get(User, tenant.owner_id) if tenant.owner_id else User.query.filter_by(
+            tenant_id=tenant.id, role='restaurant'
+        ).order_by(User.id.asc()).first()
+
+    branch = branches_by_tenant.get(tenant.id)
+    if branch is None:
+        branch = Branch.query.filter_by(tenant_id=tenant.id).order_by(Branch.id.asc()).first()
+
+    food_court = food_courts_by_id.get(tenant.food_court_id) if tenant.food_court_id else None
+    if tenant.food_court_id and food_court is None:
+        food_court = db.session.get(FoodCourt, tenant.food_court_id)
+
     status = (tenant.approval_status or ('approved' if tenant.is_active else 'pending')).strip().lower()
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    table_count = Table.query.filter_by(tenant_id=tenant.id, active=True).count()
-    orders_day = Order.query.filter(
-        Order.tenant_id == tenant.id,
-        Order.created_at >= today_start,
-    ).count()
+    table_count = table_counts.get(tenant.id)
+    if table_count is None:
+        table_count = Table.query.filter_by(tenant_id=tenant.id, active=True).count()
+
+    orders_day = orders_day_counts.get(tenant.id)
+    if orders_day is None:
+        orders_day = Order.query.filter(
+            Order.tenant_id == tenant.id,
+            Order.created_at >= today_start,
+        ).count()
     return {
         'id': tenant.id,
         'name': tenant.name,
         'owner': owner.name if owner else '—',
         'email': owner.email if owner else '',
-        'city': (branch.address or '').strip() or '—',
-        'phone': (branch.phone or '').strip() or '—',
+        'city': (branch.address or tenant.address or '').strip() or '—',
+        'phone': (branch.phone or tenant.phone or '').strip() or '—',
         'plan': tenant.plan or 'free',
         'applied': tenant.created_at.strftime('%Y-%m-%d') if tenant.created_at else '',
         'status': status,
-        'type': 'Restaurant',
-        'note': '',
+        'type': 'Food Court Shop' if tenant.food_court_id else 'Restaurant',
+        'note': food_court.name if food_court else '',
         'tables': table_count,
         'ordersDay': orders_day,
         'feature_flags': get_tenant_feature_flags(tenant=tenant),
@@ -1734,7 +1924,6 @@ def shrey_login_page():
         return render_template('shrey.html')
     return render_template('shrey_login.html')
 
-@csrf.exempt
 @app.route('/shreyapi/login', methods=['POST'])
 def shrey_login_api():
     ip = request.remote_addr or 'unknown'
@@ -1779,7 +1968,6 @@ def shrey_login_api():
     remaining_attempts = MAX_LOGIN_ATTEMPTS - _login_attempts[ip]['attempts']
     return jsonify({'error': f'Invalid credentials. {remaining_attempts} attempt(s) left.'}), 401
 
-@csrf.exempt
 @app.route('/shreyapi/logout', methods=['POST'])
 def shrey_logout_api():
     log_login('superadmin_logout')
@@ -1819,30 +2007,132 @@ def shrey_requests_api():
         return jsonify({'error': 'unauthorized'}), 401
 
     tenants = Tenant.query.order_by(Tenant.created_at.desc(), Tenant.id.desc()).all()
+    food_courts = FoodCourt.query.order_by(FoodCourt.created_at.desc(), FoodCourt.id.desc()).all()
+    tenant_ids = [tenant.id for tenant in tenants if tenant.slug != 'default']
+    owner_ids = [tenant.owner_id for tenant in tenants if tenant.owner_id]
+    food_court_ids = [tenant.food_court_id for tenant in tenants if tenant.food_court_id]
+    
+    fc_owner_ids = [fc.owner_id for fc in food_courts if fc.owner_id]
+    all_owner_ids = list(set(owner_ids + fc_owner_ids))
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+
+    owners_by_tenant = {}
+    owners_by_fc = {}
+    if all_owner_ids:
+        owner_records = User.query.filter(User.id.in_(all_owner_ids)).all()
+        owners_by_tenant.update({
+            user.tenant_id: user
+            for user in owner_records
+            if user.tenant_id is not None
+        })
+        owners_by_fc.update({
+            user.food_court_id: user
+            for user in owner_records
+            if user.food_court_id is not None
+        })
+
+    if tenant_ids:
+        fallback_owners = (
+            User.query
+            .filter(User.tenant_id.in_(tenant_ids), User.role == 'restaurant')
+            .order_by(User.tenant_id.asc(), User.id.asc())
+            .all()
+        )
+        for user in fallback_owners:
+            owners_by_tenant.setdefault(user.tenant_id, user)
+
+        branches = (
+            Branch.query
+            .filter(Branch.tenant_id.in_(tenant_ids))
+            .order_by(Branch.tenant_id.asc(), Branch.id.asc())
+            .all()
+        )
+        branches_by_tenant = {}
+        for branch in branches:
+            branches_by_tenant.setdefault(branch.tenant_id, branch)
+
+        table_counts = {
+            tenant_id: count
+            for tenant_id, count in (
+                db.session.query(Table.tenant_id, func.count(Table.id))
+                .filter(Table.tenant_id.in_(tenant_ids), Table.active.is_(True))
+                .group_by(Table.tenant_id)
+                .all()
+            )
+        }
+
+        orders_day_counts = {
+            tenant_id: count
+            for tenant_id, count in (
+                db.session.query(Order.tenant_id, func.count(Order.id))
+                .filter(Order.tenant_id.in_(tenant_ids), Order.created_at >= today_start)
+                .group_by(Order.tenant_id)
+                .all()
+            )
+        }
+    else:
+        branches_by_tenant = {}
+        table_counts = {}
+        orders_day_counts = {}
+
+    food_courts_by_id = {}
+    if food_court_ids:
+        food_courts_by_id = {
+            food_court.id: food_court
+            for food_court in FoodCourt.query.filter(FoodCourt.id.in_(food_court_ids)).all()
+        }
+
+    preload = {
+        'owners_by_tenant': owners_by_tenant,
+        'owners_by_fc': owners_by_fc,
+        'branches_by_tenant': branches_by_tenant,
+        'food_courts_by_id': food_courts_by_id,
+        'table_counts': table_counts,
+        'orders_day_counts': orders_day_counts,
+    }
+
     requests = []
     for tenant in tenants:
-        if tenant.slug == 'default' or not tenant.owner_id:
+        if tenant.slug == 'default':
             continue
-        requests.append(_serialize_shrey_request(tenant))
+        requests.append(_serialize_shrey_request(tenant, preload=preload))
+        
+    for fc in food_courts:
+        requests.append(_serialize_shrey_foodcourt(fc, preload=preload))
+        
     return jsonify({'requests': requests})
 
-@csrf.exempt
-@app.route('/api/shrey/requests/<int:tenant_id>/approve', methods=['POST'])
+@app.route('/api/shrey/requests/<tenant_id>/approve', methods=['POST'])
 def approve_shrey_request(tenant_id):
     if not session.get('shrey_admin'):
         return jsonify({'error': 'unauthorized'}), 401
 
+    if str(tenant_id).startswith('fc_'):
+        fc_id = int(str(tenant_id)[3:])
+        fc = FoodCourt.query.get_or_404(fc_id)
+        fc.is_active = True
+        fc.approval_status = 'approved'
+        db.session.commit()
+        return jsonify({'ok': True, 'request': _serialize_shrey_foodcourt(fc)})
+        
     tenant = Tenant.query.get_or_404(tenant_id)
     tenant.is_active = True
     tenant.approval_status = 'approved'
     db.session.commit()
     return jsonify({'ok': True, 'request': _serialize_shrey_request(tenant)})
 
-@csrf.exempt
-@app.route('/api/shrey/requests/<int:tenant_id>/reject', methods=['POST'])
+@app.route('/api/shrey/requests/<tenant_id>/reject', methods=['POST'])
 def reject_shrey_request(tenant_id):
     if not session.get('shrey_admin'):
         return jsonify({'error': 'unauthorized'}), 401
+
+    if str(tenant_id).startswith('fc_'):
+        fc_id = int(str(tenant_id)[3:])
+        fc = FoodCourt.query.get_or_404(fc_id)
+        fc.is_active = False
+        fc.approval_status = 'rejected'
+        db.session.commit()
+        return jsonify({'ok': True, 'request': _serialize_shrey_foodcourt(fc)})
 
     tenant = Tenant.query.get_or_404(tenant_id)
     tenant.is_active = False
@@ -1850,7 +2140,6 @@ def reject_shrey_request(tenant_id):
     db.session.commit()
     return jsonify({'ok': True, 'request': _serialize_shrey_request(tenant)})
 
-@csrf.exempt
 @app.route('/api/shrey/requests/<int:tenant_id>/pause', methods=['POST'])
 def pause_shrey_restaurant(tenant_id):
     """Toggle pause/resume a restaurant. Paused = is_active False + status suspended.
@@ -1872,7 +2161,6 @@ def pause_shrey_restaurant(tenant_id):
     db.session.commit()
     return jsonify({'ok': True, 'action': action, 'request': _serialize_shrey_request(tenant)})
 
-@csrf.exempt
 @app.route('/api/shrey/requests/<int:tenant_id>/delete', methods=['DELETE'])
 def delete_shrey_restaurant(tenant_id):
     if not session.get('shrey_admin'):
@@ -1964,7 +2252,6 @@ def shrey_branch_requests_api():
         app.logger.exception('Shrey branch requests failed')
         return jsonify({'error': 'Failed to load branch requests', 'details': str(e)}), 500
 
-@csrf.exempt
 @app.route('/api/shrey/branch-requests/<int:br_id>/approve', methods=['POST'])
 def approve_shrey_branch_request(br_id):
     if not session.get('shrey_admin'):
@@ -1992,7 +2279,6 @@ def approve_shrey_branch_request(br_id):
         'reviewed_at': br.reviewed_at.strftime('%Y-%m-%d %H:%M'),
     }})
 
-@csrf.exempt
 @app.route('/api/shrey/branch-requests/<int:br_id>/reject', methods=['POST'])
 def reject_shrey_branch_request(br_id):
     if not session.get('shrey_admin'):
@@ -2009,7 +2295,6 @@ def reject_shrey_branch_request(br_id):
     }})
 
 
-@csrf.exempt
 @app.route('/api/shrey/tenants/<int:tenant_id>/features/<feature_key>', methods=['POST'])
 def update_shrey_tenant_feature(tenant_id, feature_key):
     if not session.get('shrey_admin'):
@@ -2027,7 +2312,6 @@ def update_shrey_tenant_feature(tenant_id, feature_key):
     db.session.commit()
     return jsonify({'ok': True, 'request': _serialize_shrey_request(tenant)})
 
-@csrf.exempt
 @app.route('/api/shrey/tenants/<int:tenant_id>/max-staff', methods=['POST'])
 def update_shrey_max_staff(tenant_id):
     """Set the maximum number of staff accounts for a tenant. 0 = unlimited."""
@@ -2045,11 +2329,37 @@ def update_shrey_max_staff(tenant_id):
     db.session.commit()
     return jsonify({'ok': True, 'max_staff': limit, 'request': _serialize_shrey_request(tenant)})
 
+@app.route('/api/shrey/foodcourts/<int:fc_id>/shop-limit', methods=['POST'])
+def update_shrey_shop_limit(fc_id):
+    """Set the maximum number of shops for a food court. 0 = unlimited."""
+    if not session.get('shrey_admin'):
+        return jsonify({'error': 'unauthorized'}), 401
+    fc = FoodCourt.query.get_or_404(fc_id)
+    d = request.json or {}
+    try:
+        limit = int(d.get('shop_limit', 0))
+        if limit < 0:
+            raise ValueError
+    except (TypeError, ValueError):
+        return jsonify({'error': 'shop_limit must be a non-negative integer'}), 400
+    fc.shop_limit = limit
+    db.session.commit()
+    return jsonify({'ok': True, 'shop_limit': limit, 'request': _serialize_shrey_foodcourt(fc)})
+
 # ─── API: Products ─────────────────────────────────────────
 @app.route('/api/products', methods=['GET'])
 def get_products():
     branch_id = get_active_branch_id()
-    products = apply_tenant_scope(apply_branch_scope(Product.query.filter_by(active=True), Product.branch_id), Product).all()
+    products = (
+        apply_tenant_scope(
+            apply_branch_scope(
+                Product.query.options(selectinload(Product.addons)).filter_by(active=True),
+                Product.branch_id
+            ),
+            Product
+        )
+        .all()
+    )
     products_by_category = {}
     for product in products:
         products_by_category.setdefault(product.category_id, []).append(product)
@@ -2074,12 +2384,26 @@ def get_products():
 @app.route('/api/products/all', methods=['GET'])
 @staff_required
 def get_all_products():
-    products = apply_tenant_scope(apply_branch_scope(Product.query, Product.branch_id), Product).all()
+    products = (
+        apply_tenant_scope(
+            apply_branch_scope(Product.query.options(selectinload(Product.addons)), Product.branch_id),
+            Product
+        )
+        .all()
+    )
     cats = apply_tenant_scope(Category.query, Category).all()
     return jsonify({
-        'products': [{'id':p.id,'name':p.name,'price':p.price,'category_id':p.category_id,'description':p.description,'tax':p.tax,'unit':p.unit,'active':p.active,'image_b64':p.image_b64 or '', 'branch_id': p.branch_id, 'addons': [{'id': a.id, 'name': a.name, 'price': a.price} for a in p.addons]} for p in products],
-        'categories': [{'id':c.id,'name':c.name} for c in cats]
+        'products': [{
+            'id': p.id, 'name': p.name, 'price': p.price, 'category_id': p.category_id,
+            'description': p.description, 'tax': p.tax, 'unit': p.unit, 'active': p.active,
+            'image_b64': p.image_b64 or '', 'branch_id': p.branch_id,
+            'is_thali': bool(p.is_thali),
+            'components': json.loads(p.components_json or '[]'),
+            'addons': [{'id': a.id, 'name': a.name, 'price': a.price} for a in p.addons]
+        } for p in products],
+        'categories': [{'id': c.id, 'name': c.name} for c in cats]
     })
+
 
 @app.route('/api/products', methods=['POST'])
 @staff_required
@@ -2091,11 +2415,15 @@ def add_product():
         cat = Category(name=d.get('category','General'), tenant_id=tid)
         db.session.add(cat)
         db.session.flush()
+    is_thali = bool(d.get('is_thali', False))
+    components = d.get('components', []) if is_thali else []
     p = Product(name=d['name'], price=float(d['price']), category_id=cat.id,
-                description=d.get('description',''), 
-                tax=float(d.get('tax',0)), 
+                description=d.get('description',''),
+                tax=float(d.get('tax', 0)),
                 tax_config_json=json.dumps(d.get('tax_config', {})),
-                unit=d.get('unit','pcs'),
+                unit=d.get('unit', 'pcs'),
+                is_thali=is_thali,
+                components_json=json.dumps(components),
                 branch_id=get_active_branch_id(), tenant_id=tid)
     db.session.add(p)
     db.session.flush()
@@ -2105,7 +2433,7 @@ def add_product():
             db.session.add(Addon(product_id=p.id, name=a_data['name'], price=float(a_data['price']), tenant_id=tid))
 
     db.session.commit()
-    return jsonify({'ok':True,'id':p.id})
+    return jsonify({'ok': True, 'id': p.id})
 
 @app.route('/api/products/<int:pid>', methods=['PUT'])
 @staff_required
@@ -2134,6 +2462,12 @@ def update_product(pid):
             db.session.flush()
         p.category_id = cat.id
     
+    # Thali fields
+    if 'is_thali' in d:
+        p.is_thali = bool(d['is_thali'])
+    if 'components' in d:
+        p.components_json = json.dumps(d['components'] if p.is_thali else [])
+
     if 'addons' in d:
         # Clear existing and add new
         Addon.query.filter_by(product_id=p.id).delete()
@@ -2141,7 +2475,7 @@ def update_product(pid):
             db.session.add(Addon(product_id=p.id, name=a_data['name'], price=float(a_data['price']), tenant_id=tid))
 
     db.session.commit()
-    return jsonify({'ok':True})
+    return jsonify({'ok': True})
 
 @app.route('/api/products/<int:pid>', methods=['DELETE'])
 @staff_required
@@ -2155,6 +2489,7 @@ def delete_product(pid):
     db.session.commit()
     return jsonify({'ok':True})
 
+
 # ─── API: Floors & Tables ──────────────────────────────────
 @app.route('/api/floors', methods=['GET'])
 def get_floors():
@@ -2162,9 +2497,10 @@ def get_floors():
     bid = get_active_branch_id()
     if bid is not None:
         q = q.filter(or_(Floor.branch_id == bid, Floor.branch_id.is_(None)))
-    floors = q.all()
+    floors = q.options(selectinload(Floor.tables)).all()
     result = []
     for f in floors:
+        sorted_tables = sorted(f.tables, key=lambda t: (t.order_index or 0, t.id))
         tables = [
             {
                 'id': t.id,
@@ -2174,7 +2510,7 @@ def get_floors():
                 'active': t.active,
                 'merged_to_id': t.merged_to_id,
             }
-            for t in f.tables
+            for t in sorted_tables
             if t.active and (bid is None or t.branch_id in (None, bid))
         ]
         result.append({'id':f.id,'name':f.name,'tables':tables})
@@ -2187,14 +2523,39 @@ def add_floor():
     name = (d.get('name') or '').strip()
     if not name:
         return jsonify({'error': 'Floor name is required'}), 400
+    user = get_current_user()
+    food_court_id = getattr(user, 'food_court_id', None)
+    
     f = Floor(
         name=name,
         tenant_id=get_current_tenant_id(),
         branch_id=get_active_branch_id(),
+        food_court_id=food_court_id,
     )
     db.session.add(f)
     db.session.commit()
     return jsonify({'ok':True,'id':f.id})
+
+@app.route('/api/floors/<int:fid>', methods=['DELETE'])
+@staff_required
+def delete_floor(fid):
+    user = get_current_user()
+    tid = get_current_tenant_id()
+    if tid:
+        f = Floor.query.filter_by(id=fid, tenant_id=tid).first_or_404()
+    elif user and user.food_court_id:
+        f = Floor.query.filter_by(id=fid, food_court_id=user.food_court_id).first_or_404()
+    else:
+        return jsonify({'error': 'Unauthorized'}), 403
+    access_error = require_branch_access_or_403(f.branch_id)
+    if access_error:
+        return access_error
+    
+    # Also delete all tables associated with this floor
+    Table.query.filter_by(floor_id=f.id).delete()
+    db.session.delete(f)
+    db.session.commit()
+    return jsonify({'ok': True})
 
 @app.route('/api/tables', methods=['POST'])
 @staff_required
@@ -2212,7 +2573,15 @@ def add_table():
     except (TypeError, ValueError):
         seats = 4
 
-    floor = Floor.query.filter_by(id=floor_id, tenant_id=get_current_tenant_id()).first_or_404()
+    user = get_current_user()
+    tid = get_current_tenant_id()
+    if tid:
+        floor = Floor.query.filter_by(id=floor_id, tenant_id=tid).first_or_404()
+    elif user and user.food_court_id:
+        floor = Floor.query.filter_by(id=floor_id, food_court_id=user.food_court_id).first_or_404()
+    else:
+        return jsonify({'error': 'Unauthorized'}), 403
+        
     access_error = require_branch_access_or_403(floor.branch_id)
     if access_error:
         return access_error
@@ -2221,7 +2590,8 @@ def add_table():
         number=number,
         seats=seats,
         floor_id=floor.id,
-        tenant_id=get_current_tenant_id(),
+        tenant_id=tid,
+        food_court_id=getattr(user, 'food_court_id', None),
         branch_id=floor.branch_id if floor.branch_id is not None else get_active_branch_id(),
     )
     db.session.add(t)
@@ -2412,7 +2782,7 @@ def create_razorpay_order():
         'notes': {
             'order_id': str(order.id),
             'order_number': order.order_number,
-            'source': 'pos-cafe-localhost',
+            'source': 'qbite-localhost',
         },
     }
     result, err = call_razorpay_api('orders', payload)
@@ -2831,7 +3201,7 @@ def _send_web_push(record, payload):
             subscription_info=subscription,
             data=json.dumps(payload),
             vapid_private_key=os.getenv('VAPID_PRIVATE_KEY', '').strip(),
-            vapid_claims={'sub': os.getenv('VAPID_SUBJECT', 'mailto:no-reply@pos-cafe.local').strip() or 'mailto:no-reply@pos-cafe.local'},
+            vapid_claims={'sub': os.getenv('VAPID_SUBJECT', 'mailto:no-reply@qbite.local').strip() or 'mailto:no-reply@qbite.local'},
             ttl=60,
         )
         return True
@@ -3263,6 +3633,7 @@ def _repair_open_self_orders_for_tenant(tenant_id):
         .filter(
             Order.tenant_id == tenant_id,
             Order.status == 'sent',
+            Order.branch_id.is_(None),
             Order.table_id.isnot(None),
             Order.razorpay_order_id.like('GUEST:%'),
         )
@@ -3343,7 +3714,13 @@ def get_bills():
     _repair_open_self_orders_for_tenant(get_current_tenant_id())
     orders = (
         apply_branch_scope(
-            apply_tenant_scope(Order.query.filter_by(status='sent'), Order),
+            apply_tenant_scope(
+                Order.query.options(
+                    selectinload(Order.items),
+                    joinedload(Order.table),
+                ).filter_by(status='sent'),
+                Order
+            ),
             Order.branch_id,
         )
         .order_by(Order.created_at.desc())
@@ -3364,7 +3741,10 @@ def get_all_orders():
 def get_bill_for_table(tid):
     _repair_open_self_orders_for_tenant(get_current_tenant_id())
     order = (
-        Order.query
+        Order.query.options(
+            selectinload(Order.items),
+            joinedload(Order.table),
+        )
         .filter_by(table_id=tid, status='sent', branch_id=get_active_branch_id(), tenant_id=get_current_tenant_id())
         .order_by(Order.created_at.desc())
         .first()
@@ -4071,17 +4451,23 @@ def _guest_token_from_order(o):
     return None
 
 
-@app.route('/table/<int:table_id>/order')
-def self_order_page(table_id):
-    """Table QR landing page – no login required for customers."""
+@app.route('/table/<token>/order')
+def self_order_page(token):
+    """Table QR landing page – no login required for customers. Uses a secure token."""
+    signer = URLSafeSerializer(app.secret_key, salt='qr-table')
+    try:
+        table_id = signer.loads(token)
+    except BadSignature:
+        return "Invalid or tampered QR code.", 403
+
     t = Table.query.get_or_404(table_id)
     tenant = db.session.get(Tenant, t.tenant_id)
     if not tenant_feature_enabled('self_order', tenant=tenant):
         return tenant_feature_block_response('self_order', is_api=False)
-    cafe_name = tenant.name if tenant else 'POS Cafè'
+    cafe_name = tenant.name if tenant else 'Qbite'
     branch_id = _resolve_self_order_branch_id(t, tenant_id=t.tenant_id)
     return render_template('self_order.html',
-        table_id=table_id,
+        table_id=token,
         table_number=t.number,
         tenant_id=t.tenant_id,
         branch_id=branch_id,
@@ -4155,14 +4541,20 @@ def create_self_order():
     Tenant is resolved from the table record, not the Flask session.
     """
     d = request.json or {}
-    table_id       = d.get('table_id')
+    token          = d.get('table_id')
     items          = d.get('items', [])
     guest_token    = (d.get('guest_token') or '').strip()
     customer_name  = (d.get('customer_name') or '').strip()[:100]
     customer_phone = (d.get('customer_phone') or '').strip()[:20]
 
-    if not table_id:     return jsonify({'error': 'Table ID required'}), 400
+    if not token:        return jsonify({'error': 'Table ID (token) required'}), 400
     if not guest_token:  return jsonify({'error': 'Guest token missing'}), 400
+
+    signer = URLSafeSerializer(app.secret_key, salt='qr-table')
+    try:
+        table_id = signer.loads(token)
+    except BadSignature:
+        return jsonify({'error': 'Invalid or tampered QR code.'}), 403
 
     t   = Table.query.get_or_404(table_id)
     tid = t.tenant_id   # always from table, never Flask session
@@ -4366,9 +4758,16 @@ def guest_order_list(guest_token):
 @app.route('/api/self-order/menu', methods=['GET'])
 def self_order_menu():
     """Public menu for QR self-order — scoped to the table's tenant (no login session)."""
-    table_id = request.args.get('table_id', type=int)
-    if not table_id:
-        return jsonify({'error': 'table_id required'}), 400
+    token = request.args.get('table_id')
+    if not token:
+        return jsonify({'error': 'table_id token required'}), 400
+
+    signer = URLSafeSerializer(app.secret_key, salt='qr-table')
+    try:
+        table_id = signer.loads(token)
+    except BadSignature:
+        return jsonify({'error': 'Invalid token'}), 403
+
     tbl = Table.query.get_or_404(table_id)
     tid = tbl.tenant_id
     if not tid:
@@ -4426,7 +4825,9 @@ def table_qr_code(table_id):
     """Generate a QR code for the table's self-order URL."""
     t = Table.query.get_or_404(table_id)
     base_url = get_public_url_root()
-    url = base_url + f'/table/{table_id}/order'
+    signer = URLSafeSerializer(app.secret_key, salt='qr-table')
+    token = signer.dumps(table_id)
+    url = base_url + f'/table/{token}/order'
     qr = qrcode.QRCode(box_size=8, border=2)
     qr.add_data(url)
     qr.make(fit=True)
@@ -4460,9 +4861,16 @@ def push_subscribe_table():
     """Guest push subscription for a specific table (QR self-order)."""
     d = request.json or {}
     sub = d.get('subscription')
-    table_id = d.get('table_id')
-    if not sub or not table_id:
+    token = d.get('table_id')
+    if not sub or not token:
         return jsonify({'error': 'Missing data'}), 400
+
+    signer = URLSafeSerializer(app.secret_key, salt='qr-table')
+    try:
+        table_id = signer.loads(token)
+    except BadSignature:
+        return jsonify({'error': 'Invalid token'}), 403
+
     table = Table.query.get_or_404(table_id)
     if not tenant_feature_enabled('self_order', tenant_id=table.tenant_id):
         return tenant_feature_block_response('self_order', is_api=True)
@@ -4486,32 +4894,67 @@ def get_vapid_public_key():
 @staff_required
 @tenant_feature_required('dashboard')
 def dashboard_stats():
-    period = request.args.get('period','today')
+    start_date_str = request.args.get('start_date')
+    end_date_str = request.args.get('end_date')
     now = datetime.utcnow()
-    if period == 'today':
-        start = now.replace(hour=0,minute=0,second=0)
-    elif period == 'week':
-        start = now - timedelta(days=7)
-    else:
-        start = now - timedelta(days=30)
-    orders = apply_tenant_scope(apply_branch_scope(Order.query, Order.branch_id), Order).filter(Order.status=='paid', Order.created_at>=start).all()
-    total_sales = sum(o.total for o in orders)
-    total_orders = len(orders)
-    by_method = {}
-    for o in orders:
-        by_method[o.payment_method] = by_method.get(o.payment_method, 0) + o.total
-    # Top products
-    item_counts = {}
-    for o in orders:
-        for i in o.items:
-            item_counts[i.product_name] = item_counts.get(i.product_name, 0) + i.qty
-    top_products = sorted(item_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+    
+    start_date = parse_report_date(start_date_str, now.date())
+    end_date = parse_report_date(end_date_str, now.date())
+    
+    # Convert dates to datetime bounds (UTC)
+    start = datetime(start_date.year, start_date.month, start_date.day)
+    end = datetime(end_date.year, end_date.month, end_date.day) + timedelta(days=1)
+    
+    base_query = apply_tenant_scope(apply_branch_scope(Order.query, Order.branch_id), Order).filter(
+        Order.status == 'paid',
+        Order.created_at >= start,
+        Order.created_at < end,
+    )
+    total_orders = base_query.count()
+    total_sales = float(
+        base_query.with_entities(func.coalesce(func.sum(Order.total), 0.0)).scalar() or 0
+    )
+    by_method_rows = (
+        base_query.with_entities(
+            Order.payment_method,
+            func.coalesce(func.sum(Order.total), 0.0)
+        )
+        .group_by(Order.payment_method)
+        .all()
+    )
+    by_method = {
+        (payment_method or 'Unknown'): float(total or 0)
+        for payment_method, total in by_method_rows
+    }
+    top_product_rows = (
+        db.session.query(
+            OrderItem.product_name,
+            func.coalesce(func.sum(OrderItem.qty), 0).label('qty'),
+        )
+        .join(Order, Order.id == OrderItem.order_id)
+        .filter(
+            Order.tenant_id == get_current_tenant_id(),
+            Order.status == 'paid',
+            Order.created_at >= start,
+            Order.created_at < end,
+        )
+    )
+    active_branch_id = get_active_branch_id()
+    if active_branch_id is not None:
+        top_product_rows = top_product_rows.filter(Order.branch_id == active_branch_id)
+    top_product_rows = (
+        top_product_rows
+        .group_by(OrderItem.product_name)
+        .order_by(func.sum(OrderItem.qty).desc(), OrderItem.product_name.asc())
+        .limit(5)
+        .all()
+    )
     return jsonify({
         'total_sales': round(total_sales, 2),
         'total_orders': total_orders,
         'avg_order': round(total_sales/total_orders, 2) if total_orders else 0,
         'by_method': by_method,
-        'top_products': [{'name':n,'qty':q} for n,q in top_products]
+        'top_products': [{'name': name, 'qty': int(qty or 0)} for name, qty in top_product_rows]
     })
 
 def parse_report_date(value, default=None):
@@ -4670,10 +5113,18 @@ def attendance_report():
     start_date = parse_report_date(request.args.get('start_date'))
     end_date = parse_report_date(request.args.get('end_date'))
     attendance_query = apply_tenant_scope(apply_branch_scope(
-        AttendanceEvent.query.join(User, User.id == AttendanceEvent.staff_id),
+        AttendanceEvent.query.options(joinedload(AttendanceEvent.staff)).join(User, User.id == AttendanceEvent.staff_id),
         AttendanceEvent.branch_id,
         include_all_for_superadmin=False,
     ), AttendanceEvent)
+    if start_date:
+        attendance_query = attendance_query.filter(
+            AttendanceEvent.timestamp >= datetime.combine(start_date - timedelta(days=1), datetime.min.time())
+        )
+    if end_date:
+        attendance_query = attendance_query.filter(
+            AttendanceEvent.timestamp <= datetime.combine(end_date + timedelta(days=1), datetime.max.time())
+        )
     if staff_id:
         attendance_query = attendance_query.filter(AttendanceEvent.staff_id == staff_id)
     events = attendance_query.order_by(AttendanceEvent.timestamp.asc(), AttendanceEvent.id.asc()).all()
@@ -4760,6 +5211,9 @@ def update_attendance_shift(clock_in_event_id):
         'clock_out_time': clock_out_event.timestamp.isoformat(),
     })
 
+
+
+
 @app.route('/api/admin/branches/compare', methods=['GET'])
 @admin_required
 def compare_branches():
@@ -4775,32 +5229,60 @@ def compare_branches():
         branch_query = branch_query.filter(Branch.id == user.branch_id)
     branches = branch_query.all()
 
-    cards = []
-    for branch in branches:
-        order_query = Order.query.filter(
-            Order.branch_id == branch.id,
+    branch_ids = [branch.id for branch in branches]
+    totals_map = {}
+    top_items_map = {}
+    if branch_ids:
+        totals_query = db.session.query(
+            Order.branch_id,
+            func.count(Order.id).label('total_orders'),
+            func.coalesce(func.sum(Order.total), 0.0).label('total_revenue'),
+        ).filter(
+            Order.branch_id.in_(branch_ids),
             Order.status == 'paid',
         )
         if start_dt:
-            order_query = order_query.filter(Order.created_at >= start_dt)
+            totals_query = totals_query.filter(Order.created_at >= start_dt)
         if end_dt:
-            order_query = order_query.filter(Order.created_at <= end_dt)
-        orders = order_query.all()
-        total_orders = len(orders)
-        total_revenue = round(sum(float(order.total or 0) for order in orders), 2)
-        item_totals = {}
-        for order in orders:
-            for item in order.items:
-                item_totals[item.product_name] = item_totals.get(item.product_name, 0) + item.qty
-        top_item_name, top_item_qty = ('-', 0)
-        if item_totals:
-            top_item_name, top_item_qty = max(item_totals.items(), key=lambda entry: entry[1])
+            totals_query = totals_query.filter(Order.created_at <= end_dt)
+        totals_map = {
+            branch_id: {
+                'total_orders': int(total_orders or 0),
+                'total_revenue': round(float(total_revenue or 0), 2),
+            }
+            for branch_id, total_orders, total_revenue in totals_query.group_by(Order.branch_id).all()
+        }
+
+        top_item_query = db.session.query(
+            Order.branch_id,
+            OrderItem.product_name,
+            func.coalesce(func.sum(OrderItem.qty), 0).label('qty'),
+        ).join(OrderItem, Order.id == OrderItem.order_id).filter(
+            Order.branch_id.in_(branch_ids),
+            Order.status == 'paid',
+        )
+        if start_dt:
+            top_item_query = top_item_query.filter(Order.created_at >= start_dt)
+        if end_dt:
+            top_item_query = top_item_query.filter(Order.created_at <= end_dt)
+        for branch_id, product_name, qty in (
+            top_item_query
+            .group_by(Order.branch_id, OrderItem.product_name)
+            .order_by(Order.branch_id.asc(), func.sum(OrderItem.qty).desc(), OrderItem.product_name.asc())
+            .all()
+        ):
+            top_items_map.setdefault(branch_id, (product_name, int(qty or 0)))
+
+    cards = []
+    for branch in branches:
+        totals = totals_map.get(branch.id, {})
+        top_item_name, top_item_qty = top_items_map.get(branch.id, ('-', 0))
         cards.append({
             'branch_id': branch.id,
             'branch_name': branch.name,
             'address': branch.address,
-            'total_orders': total_orders,
-            'total_revenue': total_revenue,
+            'total_orders': totals.get('total_orders', 0),
+            'total_revenue': totals.get('total_revenue', 0.0),
             'top_selling_item': top_item_name,
             'top_selling_qty': top_item_qty,
         })
@@ -4814,7 +5296,14 @@ def get_users():
     if not user or (normalize_role(user.role) != 'restaurant' and not user.is_superadmin):
         return jsonify({'error': 'unauthorized'}), 403
 
-    users = apply_tenant_scope(apply_branch_scope(User.query, User.branch_id), User).filter(User.id != session['user_id']).all()
+    users = (
+        apply_tenant_scope(
+            apply_branch_scope(User.query.options(joinedload(User.branch)), User.branch_id),
+            User
+        )
+        .filter(User.id != session['user_id'])
+        .all()
+    )
     user_ids = [u.id for u in users]
     stats_map = {}
     if user_ids:
@@ -4843,6 +5332,26 @@ def get_users():
         'total_sales': stats_map.get(u.id, {}).get('total_sales', 0.0),
     } for u in users])
 
+@app.route('/api/tables/reorder', methods=['POST'])
+@staff_required
+def reorder_tables():
+    orders = (request.json or {}).get('orders') or []
+    if not isinstance(orders, list):
+        return jsonify({'error': 'orders must be a list'}), 400
+
+    tenant_id = get_current_tenant_id()
+    for row in orders:
+        try:
+            table_id = int((row or {}).get('id'))
+            position = int((row or {}).get('position', 0))
+        except (TypeError, ValueError):
+            return jsonify({'error': 'Invalid table id or position in orders'}), 400
+        t = Table.query.filter_by(id=table_id, tenant_id=tenant_id, active=True).first_or_404()
+        t.order_index = position
+
+    db.session.commit()
+    return jsonify({'ok': True})
+
 @app.route('/api/users', methods=['POST'])
 @admin_required
 @tenant_feature_required('staff')
@@ -4863,11 +5372,8 @@ def create_user():
     
     tenant = db.session.get(Tenant, tenant_id)
     if tenant and tenant.max_staff > 0:
-        current_staff_count = User.query.filter_by(tenant_id=tenant_id).count()
-        # Note: we might want to exclude the owner or superadmin, but for simplicity, we count all users in the tenant.
-        # Actually, let's exclude the owner if we want max_staff to represent only additional staff.
-        # But for now, we just enforce the total user count <= max_staff (if max_staff > 0).
-        # Actually, the user says "I set 1 staff but I add 2 more staff". Let's restrict it strictly.
+        # Exclude the owner from the staff count since max_staff applies to additional staff
+        current_staff_count = User.query.filter_by(tenant_id=tenant_id).filter(User.id != tenant.owner_id).count()
         if current_staff_count >= tenant.max_staff:
             return jsonify({'error': f'Staff limit reached (max {tenant.max_staff}). Upgrade your plan to add more.'}), 400
 
@@ -5071,18 +5577,18 @@ def manage_inventory_item(iid):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-# ─── API: Cafe Settings ─────────────────────────────────
+# ─── API: Restaurant Settings ─────────────────────────────────
 @app.route('/api/cafe-settings', methods=['GET'])
 def get_cafe_settings():
     try:
         tid = get_current_tenant_id()
         if not tid:
             # Fallback for logo/name if not logged in or session lost
-            return jsonify({'name': 'POS Cafe', 'logo_b64': ''})
+            return jsonify({'name': 'Qbite', 'logo_b64': ''})
             
         settings = CafeSettings.query.filter_by(tenant_id=tid).first()
         if not settings:
-            settings = CafeSettings(tenant_id=tid, name='POS Cafè')
+            settings = CafeSettings(tenant_id=tid, name='Qbite')
             db.session.add(settings)
             db.session.commit()
         
@@ -5114,7 +5620,7 @@ def get_cafe_settings():
         })
     except Exception as e:
         app.logger.error(f"Error in get_cafe_settings: {e}")
-        return jsonify({'name': 'POS Cafè', 'logo_b64': ''})
+        return jsonify({'name': 'Qbite', 'logo_b64': ''})
 
 @app.route('/api/cafe-settings', methods=['POST'])
 @admin_required
@@ -5274,7 +5780,7 @@ def get_receipt_data(order_id):
         return access_error
     settings = CafeSettings.query.filter_by(tenant_id=o.tenant_id).first()
     cafe = {
-        'name': settings.name if settings else 'POS Cafè',
+        'name': settings.name if settings else 'Qbite',
         'address': (settings.address or '') if settings else '',
         'phone': (settings.phone or '') if settings else '',
         'email': (settings.email or '') if settings else '',
@@ -5292,25 +5798,32 @@ import csv
 from io import StringIO
 from flask import Response
 
-@app.route('/api/export/orders')
+from io import BytesIO
+
+@app.route('/api/export/stats')
 @staff_required
-def export_orders_csv():
-    period = request.args.get('period', 'today')
+def export_stats():
+    start_date_str = request.args.get('start_date')
+    end_date_str = request.args.get('end_date')
+    export_format = request.args.get('format', 'csv').lower()
+    
     now = datetime.utcnow()
-    if period == 'week':
-        start = now - timedelta(days=7)
-    elif period == 'month':
-        start = now - timedelta(days=30)
-    else:
-        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    orders = apply_branch_scope(Order.query, Order.branch_id).filter(Order.status == 'paid', Order.created_at >= start).order_by(Order.created_at.desc()).all()
-    si = StringIO()
-    writer = csv.writer(si)
-    writer.writerow(['Date', 'Order #', 'Table', 'Customer', 'Items', 'Subtotal', 'Tip', 'Total', 'Payment Method'])
+    start_date = parse_report_date(start_date_str, now.date())
+    end_date = parse_report_date(end_date_str, now.date())
+    
+    start = datetime(start_date.year, start_date.month, start_date.day)
+    end = datetime(end_date.year, end_date.month, end_date.day) + timedelta(days=1)
+    
+    orders = apply_tenant_scope(apply_branch_scope(Order.query, Order.branch_id), Order).filter(
+        Order.status == 'paid', Order.created_at >= start, Order.created_at < end
+    ).order_by(Order.created_at.desc()).all()
+    
+    headers = ['Date', 'Order #', 'Table', 'Customer', 'Items', 'Subtotal', 'Tip', 'Total', 'Payment Method']
+    rows = []
     for o in orders:
         items_str = '; '.join(f'{i.product_name} x{i.qty}' for i in o.items)
         subtotal = sum(i.qty * i.price for i in o.items)
-        writer.writerow([
+        rows.append([
             o.created_at.strftime('%Y-%m-%d %H:%M'),
             o.order_number,
             o.table.number if o.table else 'Takeaway',
@@ -5321,12 +5834,67 @@ def export_orders_csv():
             round((o.tip or 0) + subtotal, 2),
             o.payment_method or '',
         ])
-    output = si.getvalue()
-    return Response(
-        output,
-        mimetype='text/csv',
-        headers={'Content-Disposition': f'attachment;filename=orders_{period}_{now.strftime("%Y%m%d")}.csv'}
-    )
+        
+    filename = f'stats_{start_date.strftime("%Y%m%d")}_to_{end_date.strftime("%Y%m%d")}'
+    
+    if export_format == 'excel':
+        import openpyxl
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Orders"
+        ws.append(headers)
+        for row in rows:
+            ws.append(row)
+        
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        return Response(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            headers={'Content-Disposition': f'attachment;filename={filename}.xlsx'}
+        )
+        
+    elif export_format == 'pdf':
+        from fpdf import FPDF
+        pdf = FPDF(orientation='L') # Landscape for wide table
+        pdf.add_page()
+        pdf.set_font("helvetica", size=10)
+        pdf.cell(0, 10, f"Order Stats ({start_date} to {end_date})", new_x="LMARGIN", new_y="NEXT", align="C")
+        
+        # Table Header
+        pdf.set_font("helvetica", style="B", size=8)
+        col_widths = [25, 20, 15, 25, 100, 15, 15, 20, 25]
+        for i, h in enumerate(headers):
+            pdf.cell(col_widths[i], 8, txt=str(h), border=1)
+        pdf.ln()
+        
+        # Table Rows
+        pdf.set_font("helvetica", size=8)
+        for row in rows:
+            for i, val in enumerate(row):
+                pdf.cell(col_widths[i], 8, txt=str(val)[:50], border=1) # truncate long items string
+            pdf.ln()
+            
+        output = pdf.output(dest='S')
+        return Response(
+            bytes(output),
+            mimetype='application/pdf',
+            headers={'Content-Disposition': f'attachment;filename={filename}.pdf'}
+        )
+        
+    else:
+        # Default to CSV
+        si = StringIO()
+        writer = csv.writer(si)
+        writer.writerow(headers)
+        writer.writerows(rows)
+        output = si.getvalue()
+        return Response(
+            output,
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment;filename={filename}.csv'}
+        )
 
 # ─── SocketIO ──────────────────────────────────────────────
 @socketio.on('connect')
@@ -5354,11 +5922,13 @@ def on_join_scope(data):
                 tenant_id = int(raw_tenant_id)
             except (TypeError, ValueError):
                 tenant_id = None
-    table_id = data.get('table_id')
-    if table_id and not tenant_id:
+    token = data.get('table_id')
+    if token and not tenant_id:
+        signer = URLSafeSerializer(app.secret_key, salt='qr-table')
         try:
-            tbl = db.session.get(Table, int(table_id))
-        except (TypeError, ValueError):
+            table_id = signer.loads(token)
+            tbl = db.session.get(Table, table_id)
+        except BadSignature:
             tbl = None
         if tbl:
             tenant_id = tbl.tenant_id
@@ -5391,8 +5961,14 @@ def on_call_waiter(data):
                 tid = int(raw_tid)
             except (TypeError, ValueError):
                 tid = None
-    if not tid and data.get('table_id'):
-        tbl = db.session.get(Table, data['table_id'])
+    token = data.get('table_id')
+    if not tid and token:
+        signer = URLSafeSerializer(app.secret_key, salt='qr-table')
+        try:
+            table_id = signer.loads(token)
+            tbl = db.session.get(Table, table_id)
+        except BadSignature:
+            tbl = None
         if tbl:
             tid = tbl.tenant_id
     if tid and bid is None:
@@ -5658,6 +6234,32 @@ def ensure_branch_schema():
         changed = True
     if changed:
         db.session.commit()
+
+def ensure_query_indexes():
+    statements = [
+        'CREATE INDEX IF NOT EXISTS ix_product_tenant_active_branch ON product (tenant_id, active, branch_id)',
+        'CREATE INDEX IF NOT EXISTS ix_product_tenant_category ON product (tenant_id, category_id)',
+        'CREATE INDEX IF NOT EXISTS ix_category_tenant_name ON category (tenant_id, name)',
+        'CREATE INDEX IF NOT EXISTS ix_floor_tenant_branch ON floor (tenant_id, branch_id)',
+        'CREATE INDEX IF NOT EXISTS ix_table_tenant_active_branch ON "table" (tenant_id, active, branch_id)',
+        'CREATE INDEX IF NOT EXISTS ix_table_floor_active ON "table" (floor_id, active)',
+        'CREATE INDEX IF NOT EXISTS ix_order_tenant_created_at ON "order" (tenant_id, created_at)',
+        'CREATE INDEX IF NOT EXISTS ix_order_branch_created_at ON "order" (branch_id, created_at)',
+        'CREATE INDEX IF NOT EXISTS ix_branch_tenant_name ON branch (tenant_id, name)',
+        'CREATE INDEX IF NOT EXISTS ix_user_tenant_role ON "user" (tenant_id, role)',
+        'CREATE INDEX IF NOT EXISTS ix_addon_product_id ON addon (product_id)',
+        'CREATE INDEX IF NOT EXISTS ix_reservation_tenant_status ON reservation (tenant_id, status)',
+        'CREATE INDEX IF NOT EXISTS ix_inventory_item_tenant_branch ON inventory_item (tenant_id, branch_id)',
+    ]
+    with db.engine.begin() as conn:
+        for statement in statements:
+            try:
+                conn.exec_driver_sql(statement)
+            except (IntegrityError, ProgrammingError) as exc:
+                message = str(exc).lower()
+                if 'already exists' in message or 'duplicate key value violates unique constraint "pg_class_relname_nsp_index"' in message:
+                    continue
+                raise
 
 def ensure_demo_catalog():
     # Get Default Tenant
@@ -6221,6 +6823,7 @@ def initialize_app_data():
         ensure_payment_methods()
         ensure_order_table_schema()
         ensure_branch_schema()
+        ensure_query_indexes()
         ensure_default_accounts()
         # ensure_demo_catalog()
         # ensure_demo_floors_and_tables()
@@ -6235,7 +6838,7 @@ if __name__ == '__main__':
     debug = os.environ.get('FLASK_ENV') != 'production'
     use_reloader = debug and not IS_WINDOWS
     print(
-        f"Starting POS Cafe on http://127.0.0.1:{port} "
+        f"Starting Qbite on http://127.0.0.1:{port} "
         f"(debug={'on' if debug else 'off'}, async_mode={socketio.async_mode})",
         flush=True,
     )

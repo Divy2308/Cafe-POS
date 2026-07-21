@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Admin Dashboard - POS Cafè{% endblock %}
+{% block title %}Admin Dashboard - Qbite{% endblock %}
 
 {% block body %}
 <div class="flex h-screen bg-surface">
@@ -8,7 +8,7 @@
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 brand-gradient text-white rounded-xl flex items-center justify-center">☕</div>
         <div>
-          <div class="font-display font-700">POS Cafè</div>
+          <div class="font-display font-700">Qbite</div>
           <div class="text-xs text-gray-500">Admin Dashboard</div>
         </div>
       </div>
@@ -201,10 +201,10 @@
       <section id="settings-tab" class="tab-content hidden">
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div class="lg:col-span-2 card p-6">
-            <h2 class="text-2xl font-bold mb-6">Cafe Settings</h2>
+            <h2 class="text-2xl font-bold mb-6">Restaurant Settings</h2>
             <div class="space-y-4">
               <div>
-                <label class="block text-sm text-gray-500 mb-2">Cafe Name</label>
+                <label class="block text-sm text-gray-500 mb-2">Restaurant Name</label>
                 <input type="text" id="cafeName">
               </div>
               <div>
@@ -377,7 +377,7 @@ function switchTab(tab, button) {
     attendance: ['Attendance & Payroll', 'Review clock-in/out pairs and adjust missed clock-outs.'],
     inventory: ['Inventory Management', 'Manage inventory items, stock levels, and thresholds.'],
     compare: ['Compare Branches', 'Compare order volume, revenue, and top sellers.'],
-    settings: ['Cafe Settings', 'Update shared cafe information.'],
+    settings: ['Restaurant Settings', 'Update shared restaurant information.'],
   };
   document.getElementById('pageTitle').textContent = titles[tab][0];
   document.getElementById('pageSubtitle').textContent = titles[tab][1];

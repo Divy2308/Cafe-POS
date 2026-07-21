@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>System Authentication — POS Cafè</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>System Authentication — Qbite</title>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
     :root{--bg:#080a0c;--s1:#0e1114;--s2:#141820;--border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.14);--text:#e8edf5;--muted:#5a6478;--cyan:#00d4ff;--cyan-d:#0099bb;--red:#ff4757;--red-bg:rgba(255,71,87,0.1);--amber:#ffb300;--amber-bg:rgba(255,179,0,0.1);}
@@ -30,7 +31,7 @@
 </head>
 <body>
   <div class="panel">
-    <div class="brand">pos.cafe / system</div>
+    <div class="brand">qbite / system</div>
     <div class="icon">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
@@ -66,9 +67,10 @@
       btn.textContent = 'VERIFYING...';
 
       try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         const res = await fetch('/shreyapi/login', {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
+          headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
           body: JSON.stringify({ username: user, password: pass })
         });
         const data = await res.json().catch(() => ({}));
