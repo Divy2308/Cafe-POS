@@ -2616,6 +2616,12 @@ def update_table_status(tid):
         return jsonify({'error': 'Invalid status'}), 400
     t.status = status
     db.session.commit()
+    
+    emit_scoped('table_update', {
+        'table_id': t.id,
+        'status': t.status
+    }, tenant_id=t.tenant_id, branch_id=t.branch_id)
+    
     return jsonify({'ok': True, 'status': t.status})
 
 @app.route('/api/tables/<int:source_tid>/transfer', methods=['POST'])
