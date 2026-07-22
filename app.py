@@ -6819,23 +6819,29 @@ def ensure_sample_data():
     
 # Create sample recipes for products
 
-def initialize_app_data():
-    with app.app_context():
-        db.create_all()
-        ensure_tenant_schema()
-        seed_data()
-        ensure_payment_method_schema()
-        ensure_cafe_settings_schema()
-        ensure_payment_methods()
-        ensure_order_table_schema()
-        ensure_branch_schema()
-        ensure_query_indexes()
-        ensure_default_accounts()
-        # ensure_demo_catalog()
-        # ensure_demo_floors_and_tables()
-        # ensure_sample_data()
+def init_db():
+    """Initialize database tables safely."""
+    try:
+        with app.app_context():
+            db.create_all()
+            ensure_tenant_schema()
+            seed_data()
+            ensure_payment_method_schema()
+            ensure_cafe_settings_schema()
+            ensure_payment_methods()
+            ensure_order_table_schema()
+            ensure_branch_schema()
+            ensure_query_indexes()
+            ensure_default_accounts()
+    except Exception as e:
+        app.logger.warning(f"Database initialization deferred: {e}")
 
-initialize_app_data()
+@app.before_request
+def before_request():
+    if not hasattr(app, '_db_initialized'):
+        init_db()
+        app._db_initialized = True
+
 
 if __name__ == '__main__':
 
