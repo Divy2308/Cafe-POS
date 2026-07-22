@@ -7,9 +7,7 @@ IS_WINDOWS = sys.platform == "win32"
 
 # gevent + Flask's debug reloader is unreliable on Windows and can double-bind
 # the development port. Keep Windows on the simpler threaded path for local dev.
-if not IS_WINDOWS:
-    import gevent.monkey
-    gevent.monkey.patch_all()
+# (gevent monkey patch removed to prevent double-patching under Gunicorn)
 
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_from_directory, abort
 from flask_sqlalchemy import SQLAlchemy
