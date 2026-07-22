@@ -9,8 +9,8 @@ pillow
 werkzeug
 psycopg2-binary
 resend
-gevent
-gevent-websocket
+gevent==24.2.1
+gevent-websocket==0.10.1
 gunicorn
 requests>=2.32,<3
 urllib3>=2,<3
